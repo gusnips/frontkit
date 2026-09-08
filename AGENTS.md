@@ -165,6 +165,55 @@ pin them; if one fails, a lesson is being un-learned.
 11. **Never `import.meta.dir`.** It is bun-only, and two donor scripts used it. Use
     `fileURLToPath(import.meta.url)`.
 
+### …and five more for anything under `react/src/ui/`
+
+The audit's headline finding was a NEGATIVE one: no wrapper in either donor adds scroll lock,
+focus trap, ESC, outside-dismiss, focus return, roving focus or typeahead. Base UI does all of
+it, and a wrapper that "adds" them is adding a second implementation of something that already
+works. Twenty-two of the donor's twenty-seven wrappers were dropped on that basis.
+
+What a wrapper legitimately buys is composition a caller cannot skip, required-a11y props
+expressed as types, and the facts below — each of which cost somebody a debugging session:
+
+12. **z-index goes on the Viewport, not the Popup.** `position: fixed` creates a stacking
+    context, so a z-index on the Popup competes only INSIDE the Viewport's own `z-auto` context
+    and paints under every `z-30` element on the page.
+13. **A drawer TIES with dialog rather than beating it.** Ranked above, a drawer paints over
+    every modal opened from inside it — the user taps, and nothing appears. At a tie the dialog
+    wins on DOM order, because it portals second.
+14. **Every part goes inside a Portal, including the ones that do not look like they need it.**
+    Base UI throws error #26 otherwise, and a non-overlay "scoped" variant still portals — into
+    a container rather than the body. Related: a combobox inside a portalled dialog is that
+    dialog's SIBLING on `<body>`, so without a higher z it paints behind its own anchor.
+15. **`outline-none` belongs on a popup container and nowhere else.** A popup takes focus
+    programmatically, so it is the one element that legitimately suppresses the ring; anywhere
+    else it deletes the app's only keyboard-focus affordance. Worth enforcing structurally — one
+    donor budgets one reset per `<Primitive.Popup>` in a file, which cannot rot the way a
+    filename allowlist does.
+16. **Style off the accessibility attribute, never a parallel data attribute.** The primitive
+    writes `aria-selected` and its own `data-*` from one state; styling the a11y contract is
+    what keeps what a screen reader announces and what an eye sees from drifting apart.
+17. **A shared control never hardcodes a colour it did not derive from a token.** `text-white`
+    on a primary fill is the common one and it is broken by construction: across two donors
+    `--color-primary-foreground` in dark mode is `#ffffff` and a near-black, so white-on-primary
+    is correct in one and unreadable in the other. Always `text-primary-foreground`,
+    `bg-scrim`, `border-border` — and never `bg-black/40`, which one donor wrote as two
+    different values for the same job.
+
+### The token contract, measured
+
+Across the two donors, **25 token names are spelled identically and the values agree on
+exactly four** — all of them the literal `#ffffff`. That is the argument for this split in one
+sentence: the names are the contract, the values are the brand, and there is no shared palette
+to find. Two of those names carry a floor rather than a preference, and a brand overriding them
+needs to know it:
+
+- `--color-input` must clear **3:1 against `--color-background`** (WCAG 1.4.11 — it is a
+  control boundary). One donor's is ~1.6:1, so every field border in two of its apps fails.
+- `--color-primary` must be **re-tuned in dark mode, not reused**. Holding one brand colour in
+  both modes is the trap; the donor that lifts it and flips `--color-primary-foreground` to a
+  near-black is the one whose primary control is legible on a card either way.
+
 ## What the migrations taught
 
 _(Filled in as migrations land. The audit that preceded the first line of code already taught
