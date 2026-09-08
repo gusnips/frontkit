@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM, and deliberately NOT @types/node. This package runs in the browser and
+    // during a prerender; `process`, `Buffer` and `node:*` must not typecheck here.
+    // `scripts/check-purity.ts` enforces the same rule at the source level, because
+    // a root-level @types can make a stray import compile anyway.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "jsx": "react-jsx",
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@gusnips/tokens",
+  "version": "0.1.0",
+  "description": "One Tailwind 4 @theme file: the semantic token contract, the dark-mode mechanism, and the base rules every app needs. Colours stay per-brand.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Gustavo Salomé",
+  "exports": {
+    "./theme.css": "./src/theme.css",
+    "./base.css": "./src/base.css",
+    "./index.css": "./src/index.css"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "sideEffects": ["*.css"],
+  "publishConfig": { "access": "public" },
+  "keywords": ["tailwindcss", "tailwind-v4", "design-tokens", "theme", "dark-mode", "css"],
+  "scripts": {
+    "build": "bun run scripts/compile-check.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "bun run scripts/compile-check.ts",
+    "lint": "eslint scripts"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gusnips/frontkit.git",
+    "directory": "tokens"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM, no @types/node. This package is types and pure functions; the API
+    // server, the browser client and the SDK all compile it unchanged, and the
+    // narrowest lib is what proves that.
+    "lib": ["ES2022"],
+    "types": [],
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

@@ -1,0 +1,17 @@
+node_modules
+dist
+*.tsbuildinfo
+.DS_Store
+
+# Copied in at publish time from the repo root — one source of truth.
+tokens/README.md
+tokens/LICENSE
+http/README.md
+http/LICENSE
+react/README.md
+react/LICENSE
+vite/README.md
+vite/LICENSE
+
+# Internal: names private codebases. Stays on disk, out of the repo.
+ROADMAP.local.md
