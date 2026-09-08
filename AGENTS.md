@@ -214,6 +214,16 @@ needs to know it:
   both modes is the trap; the donor that lifts it and flips `--color-primary-foreground` to a
   near-black is the one whose primary control is legible on a card either way.
 
+And one trap that is not about contrast at all:
+
+- **`--duration-*` is not a Tailwind namespace.** Defining `--duration-standard: 250ms` in
+  `@theme` compiles no utility, so `duration-standard` in a `className` is dead text and the
+  transition silently runs at Tailwind's default. `--ease-*` beside it DOES work, which is
+  exactly what hides it — the easing lands and the duration does not. One donor has 64 of
+  these. Use `duration-[250ms]`, or keep the token and write
+  `transition-duration: var(--duration-standard)` in a real rule. The token package's compile
+  check pins this so it cannot be rediscovered a third time.
+
 ## What the migrations taught
 
 _(Filled in as migrations land. The audit that preceded the first line of code already taught
