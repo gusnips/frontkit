@@ -164,8 +164,36 @@ pin them; if one fails, a lesson is being un-learned.
     prerender rather than a bundle. That one is checked by eye at every extraction.
 11. **Never `import.meta.dir`.** It is bun-only, and two donor scripts used it. Use
     `fileURLToPath(import.meta.url)`.
+12. **A shell strips its canonical, and takes `og:image` with it.** Blanking is not stripping:
+    an empty canonical is a claim about `""` and an empty `og:url` is a card pointing at the
+    origin root. The image is the half that gets missed — one donor sets it before it branches
+    on the shell, so its `404.html` advertises a card at `/og/__not-found__.png`, a file that
+    has never existed. Every share of a missing address unfurls broken, and nothing in a browser
+    shows it.
+13. **Sitemap `priority` arrives pre-formatted.** The two donors rank pages by different rules —
+    one reads a field off its registry, the other gives the front door 1.0 and every guide 0.8
+    flat, because ranking one guide above another would be a guess about a reader. A function
+    that formats the number owns a decision belonging to whoever walks the registry.
+14. **The template is also a destination.** `dist/index.html` is both the file every page is
+    baked FROM and the home page's own output, so a second pass over a `dist/` already written
+    reads a finished page as its blank and nests one render inside another. `vite build` empties
+    `dist/` and normally makes this impossible; a restored build cache and a hand-run of the
+    script both route around that. Refuse a template that already carries the prerendered-route
+    attribute — and declare `dist-ssr/**` as a build output beside `dist/**`, or a cache replay
+    restores written pages with no renderer beside them.
+15. **A barrel imports what its lightest caller needs, and nothing else.** A re-export is a
+    runtime import: `export { renderTree } from "./render.ts"` loads `react-dom/static.browser`
+    for a script that only wanted `sitemapXml`. This has now happened three times, once in our
+    own code — `hydrate.ts` sat in `react/`'s barrel beside the two prerender constants, so a
+    build script reading a string constant pulled in the browser renderer. The fix each time was
+    a subpath (`@gusnips/react/contract`, `@gusnips/vite/preset`, `@gusnips/vite/render`), and
+    the payoff is that the peer can then be `optional`: an adopter who only generates a sitemap
+    installs no React, and one on Radix installs no Base UI. Verify against the BUILT barrel's
+    import graph, never the source — a type-only re-export looks identical in source and
+    disappears at runtime, so reading `index.ts` answers a different question than the one that
+    matters.
 
-### …and five more for anything under `react/src/ui/`
+### …and six more for anything under `react/src/ui/`
 
 The audit's headline finding was a NEGATIVE one: no wrapper in either donor adds scroll lock,
 focus trap, ESC, outside-dismiss, focus return, roving focus or typeahead. Base UI does all of
@@ -175,25 +203,25 @@ works. Twenty-two of the donor's twenty-seven wrappers were dropped on that basi
 What a wrapper legitimately buys is composition a caller cannot skip, required-a11y props
 expressed as types, and the facts below — each of which cost somebody a debugging session:
 
-12. **z-index goes on the Viewport, not the Popup.** `position: fixed` creates a stacking
+16. **z-index goes on the Viewport, not the Popup.** `position: fixed` creates a stacking
     context, so a z-index on the Popup competes only INSIDE the Viewport's own `z-auto` context
     and paints under every `z-30` element on the page.
-13. **A drawer TIES with dialog rather than beating it.** Ranked above, a drawer paints over
+17. **A drawer TIES with dialog rather than beating it.** Ranked above, a drawer paints over
     every modal opened from inside it — the user taps, and nothing appears. At a tie the dialog
     wins on DOM order, because it portals second.
-14. **Every part goes inside a Portal, including the ones that do not look like they need it.**
+18. **Every part goes inside a Portal, including the ones that do not look like they need it.**
     Base UI throws error #26 otherwise, and a non-overlay "scoped" variant still portals — into
     a container rather than the body. Related: a combobox inside a portalled dialog is that
     dialog's SIBLING on `<body>`, so without a higher z it paints behind its own anchor.
-15. **`outline-none` belongs on a popup container and nowhere else.** A popup takes focus
+19. **`outline-none` belongs on a popup container and nowhere else.** A popup takes focus
     programmatically, so it is the one element that legitimately suppresses the ring; anywhere
     else it deletes the app's only keyboard-focus affordance. Worth enforcing structurally — one
     donor budgets one reset per `<Primitive.Popup>` in a file, which cannot rot the way a
     filename allowlist does.
-16. **Style off the accessibility attribute, never a parallel data attribute.** The primitive
+20. **Style off the accessibility attribute, never a parallel data attribute.** The primitive
     writes `aria-selected` and its own `data-*` from one state; styling the a11y contract is
     what keeps what a screen reader announces and what an eye sees from drifting apart.
-17. **A shared control never hardcodes a colour it did not derive from a token.** `text-white`
+21. **A shared control never hardcodes a colour it did not derive from a token.** `text-white`
     on a primary fill is the common one and it is broken by construction: across two donors
     `--color-primary-foreground` in dark mode is `#ffffff` and a near-black, so white-on-primary
     is correct in one and unreadable in the other. Always `text-primary-foreground`,

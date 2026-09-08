@@ -83,7 +83,7 @@ Reading them against each other found nine live bugs, in repos that were not eve
 
 ## Docs
 
-`AGENTS.md` in this repo is the real document: the eleven invariants, each with the incident
+`AGENTS.md` in this repo is the real document: the twenty-one invariants, each with the incident
 behind it, and the rule for migrating a repo onto this.
 
 MIT.
