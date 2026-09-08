@@ -24,7 +24,7 @@
     },
     "react": {
       "name": "@gusnips/react",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@gusnips/http": "workspace:*",
         "clsx": "^2.1.1",
@@ -75,7 +75,7 @@
     },
     "vite": {
       "name": "@gusnips/vite",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@gusnips/react": "workspace:*",
       },
@@ -101,6 +101,8 @@
       "optionalPeers": [
         "@tailwindcss/vite",
         "@vitejs/plugin-react",
+        "react",
+        "react-dom",
         "vite",
       ],
     },

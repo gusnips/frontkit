@@ -1,3 +1,4 @@
+import type { UseQueryResult } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -25,13 +26,32 @@ export interface SessionState {
 /**
  * The answer to a "who is this?" query, in the three states it actually has.
  *
- * This shape is invariant 4. A guard reading `!me?.isStaff` collapses "loading", "failed" and
+ * This shape is invariant 4. A guard reading `!me?.isStaff` collapses "pending", "failed" and
  * "no" into one branch — so an operator arriving while `/auth/me` is 500ing is told the page
  * does not exist. Wrong cause, no retry, and no request id to quote to support. One donor hit
  * that and fixed it; the other still has the collapsed version.
+ *
+ * `"pending"` and not `"loading"` for one measured reason: it is react-query's own word for this
+ * state since v5, and with the words matching a `UseQueryResult<TMe>` satisfies this type
+ * STRUCTURALLY — `createRequireProfile(useMe, …)` takes the hook directly, no adapter. With
+ * `"loading"` it does not typecheck and every adopter hand-writes the same six-line mapping;
+ * eight of the twelve repos this serves are on react-query, and the first migration wrote that
+ * mapping before anyone noticed. Nothing here imports react-query at runtime — the type stays
+ * structural, so an app on SWR or a plain `useState` still answers it in three lines.
  */
 export type MeQuery<TMe> =
-  { status: "loading" } | { status: "error"; error: unknown } | { status: "success"; data: TMe };
+  { status: "pending" } | { status: "error"; error: unknown } | { status: "success"; data: TMe };
+
+/**
+ * The paragraph above, pinned so it cannot quietly stop being true. A renamed state or a newly
+ * required field stops compiling HERE, which is cheaper than eight repos each finding out by
+ * writing an adapter. `import type` erases, so the built barrel never mentions react-query —
+ * `bun run exports` is what proves that, and it is why the peer stays optional.
+ */
+type Satisfied<T extends true> = T;
+type _QueryResultIsAMeQuery = Satisfied<
+  UseQueryResult<{ id: string }, Error> extends MeQuery<{ id: string }> ? true : false
+>;
 
 export interface GuardOptions {
   /** Drawn while the session or the profile is still resolving. */
@@ -90,7 +110,7 @@ export function createRequireProfile<TMe>(useMe: () => MeQuery<TMe>, { loading }
   ) {
     return function RequireProfile({ children }: { children: ReactNode }) {
       const query = useMe();
-      if (query.status === "loading") return <>{loading}</>;
+      if (query.status === "pending") return <>{loading}</>;
       if (query.status === "error") return <>{onError(query.error)}</>;
       if (!allow(query.data)) return <>{typeof onDenied === "function" ? onDenied() : onDenied}</>;
       return <>{children}</>;
