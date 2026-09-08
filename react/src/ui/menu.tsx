@@ -118,6 +118,15 @@ type MenuGroupCaption = { label?: string };
 
 const captionClasses = "px-3 pt-2 pb-1 text-muted-foreground";
 
+// The caption block below is written out TWICE, once per group kind, and that is deliberate.
+// Lifting it into a `caption(label)` helper is the obvious cleanup and it was tried: it moves
+// the `<Primitive.GroupLabel>` out of the `<Primitive.Group>` body it is written inside, and
+// `menu.test.ts` fails immediately — correctly. That guard proves placement by READING THE
+// SOURCE, so an indirection it cannot follow does not just break the test, it retires the
+// guarantee: after the extraction nothing stops a later edit calling `caption()` somewhere that
+// is not inside a group, which is the render-time throw this whole file exists to prevent.
+// Six duplicated lines are the price of a rule a machine can still check. Leave them.
+
 /**
  * A set of related items with an optional caption.
  *

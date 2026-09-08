@@ -27,14 +27,14 @@ const sources = readdirSync(here)
  * guard that fails on its own explanation teaches people to delete the explanation.
  */
 function linesMatching(text: string, pattern: RegExp): number[] {
-  return text
+  // Block comments are BLANKED, not deleted: removing them would collapse lines and every number
+  // reported after one would point at the wrong place. (That is also why this cannot share
+  // `menu.test.ts`'s `codeOf`, which strips outright because it only ever counts occurrences.)
+  // Blanking also means a wrapped comment line is ignored whether or not it opens with a `*`.
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "));
+  return code
     .split("\n")
-    .map((line, i) => {
-      const trimmed = line.trim();
-      const isComment =
-        trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*");
-      return !isComment && pattern.test(line) ? i + 1 : 0;
-    })
+    .map((line, i) => (!line.trim().startsWith("//") && pattern.test(line) ? i + 1 : 0))
     .filter(Boolean);
 }
 
@@ -55,6 +55,10 @@ describe("the wrappers do not draw their own focus ring", () => {
   // replacement ring left to write. This asserts the reset stayed inside the popup parts.
   it.each(sources)("$name resets the outline only on popup parts", ({ text }) => {
     const offenders = linesMatching(text, /outline-none/).filter((line) => {
+      // ponytail: "the nearest Primitive tag above" approximated as a 12-line lookback, which
+      // clears every part in this folder today with room to spare. The ceiling is a part whose
+      // props run longer than that, which would read as a violation while being correct. If that
+      // happens, parse the enclosing JSX element instead of counting lines — do not just raise 12.
       const context = text
         .split("\n")
         .slice(Math.max(0, line - 12), line)

@@ -57,8 +57,11 @@ function targetsOf(entry: string | Record<string, string>): string[] {
  * `rewriteRelativeImportExtensions` always writes a real `./x.js`, so there is no extension
  * guessing to do and nothing to get subtly wrong.
  */
-async function bareImports(entry: string, seen = new Set<string>()): Promise<Set<string>> {
-  const found = new Set<string>();
+async function bareImports(
+  entry: string,
+  seen = new Set<string>(),
+  found = new Set<string>(),
+): Promise<Set<string>> {
   const abs = resolve(entry);
   if (seen.has(abs)) return found;
   seen.add(abs);
@@ -67,12 +70,8 @@ async function bareImports(entry: string, seen = new Set<string>()): Promise<Set
   if (source === null) return found;
 
   for (const [, specifier] of source.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)) {
-    if (specifier.startsWith(".")) {
-      for (const nested of await bareImports(resolve(dirname(abs), specifier), seen))
-        found.add(nested);
-    } else {
-      found.add(specifier);
-    }
+    if (specifier.startsWith(".")) await bareImports(resolve(dirname(abs), specifier), seen, found);
+    else found.add(specifier);
   }
   return found;
 }
