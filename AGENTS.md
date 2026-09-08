@@ -291,8 +291,8 @@ these.)_
   extracting something is a valid outcome, and cheaper than extracting it and discovering later.
   Two then came back, and how they came back is the other half of the lesson: **menu** because
   the donor that had one knew a fact no comment can enforce (`GroupLabel` outside its `Group`
-  throws Base UI error #31, reported in production as the bare number 31 with no file and no
-  part named — so the part is not exported and the caption is a prop), and **tabs** because
+  throws — `Base UI error #31`, plus a link to look it up, naming neither the file, the part nor
+  the component — so the part is not exported and the caption is a prop), and **tabs** because
   `overflow-x: auto` forces `overflow-y` off `visible`, and a self-scrolling rail therefore
   crops the focus ring on the tab the keyboard is on. Seven, not five. A wrapper earns its place
   by knowing something, never by styling something.
