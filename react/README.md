@@ -1,11 +1,21 @@
 # @gusnips/react
 
 The layer under a Vite + React SPA: the fetch client, the auth store, the route guards, the error
-boundary, the query rules. No styling, no brand, no components you have to look at.
+boundary, the query rules. No styling, no brand, nothing that decides how your app looks.
 
 ```bash
 bun add @gusnips/react
 ```
+
+```ts
+const user = await api.get<User>("/me");
+```
+
+That is the whole call. `user` is a `User` — not a `Response`, not `res.json()`, not a null
+check. The client attached the token, unwrapped the envelope, and threw a typed `ApiError`
+carrying the code and the request id if the server refused.
+
+You build `api` once, wherever you keep that sort of thing:
 
 ```ts
 import { createApiClient } from "@gusnips/react";
@@ -15,12 +25,7 @@ const api = createApiClient({
   session: mySession,
   onSessionDead: () => window.location.replace("/sign-in"),
 });
-
-const user = await api.get<User>("/me");
 ```
-
-`api.get` gives you `user`, not a `Response`. It attaches the token, unwraps the envelope, and
-throws an `ApiError` carrying the code, the details and the request id when the server refuses.
 
 ## The client knows three things people learn the hard way
 

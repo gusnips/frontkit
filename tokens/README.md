@@ -21,8 +21,7 @@ Twenty names — `background`, `foreground`, `card`, `popover`, `primary`, `seco
 `accent`, `destructive`, their `-foreground` pairs, plus `border`, `input`, `ring` and `scrim`.
 
 Dark mode rebinds **the same names** under a `.dark` class. `bg-card` is one utility that
-resolves to a different colour below a `.dark` ancestor. That is the whole trick, and it is the
-reason the names are worth sharing at all.
+resolves to a different colour below a `.dark` ancestor. That is the whole trick.
 
 ## Your colours
 
@@ -41,10 +40,9 @@ both halves:
 
 Skip the second line and your daytime purple stays on screen at night.
 
-## Two names carry a floor
+## Two names you cannot pick freely
 
-A build check measures both and fails the build, so you hear it from the build and not from a
-user.
+A build check measures both, so a bad value fails your build instead of reaching someone.
 
 - **`--color-input` needs 3:1 against `--color-background`.** It is a field border, and WCAG
   1.4.11 asks 3:1 of anything that outlines a control. This is the one people miss: a grey

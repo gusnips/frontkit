@@ -1,7 +1,8 @@
 # @gusnips/http
 
-The two shapes your API answers with, written down once as types. Zero dependencies, no
-framework, no platform — the server, the browser client and an SDK all compile this same file.
+The two shapes your API answers with, written down once as types. No dependencies, and nothing
+tied to a framework or a platform — your server, your browser client and your SDK all compile
+this same file.
 
 ```bash
 bun add @gusnips/http

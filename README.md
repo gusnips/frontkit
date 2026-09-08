@@ -3,9 +3,9 @@
 The layer under a Vite + React SPA: the build rig, the fetch client, the auth store, the
 guards, the tokens.
 
-Not a component library. There is no Button here, and there never will be — the ten copies
-across the repos this came from overlap 4–7% because they are supposed to look different.
-Behaviour is shared, skin is not.
+Not a component library. There is no Button here, and there never will be — the two best copies
+in the repos this came from are 104 lines and 60 lines, and they share the idea and nothing
+else. Behaviour is shared, skin is not.
 
 ```bash
 bun add @gusnips/react
