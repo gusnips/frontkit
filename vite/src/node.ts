@@ -1,0 +1,140 @@
+/**
+ * The whole filesystem surface of this package: read the template, load the SSR bundle, write
+ * files.
+ *
+ * It is one file on purpose. Everything else here is string work that a test can run without a
+ * disk, and keeping the four impure functions together is what lets `head.ts`, `sitemap.ts`,
+ * `render.ts` and `og.ts` stay that way.
+ *
+ * The prerender LOOP is not here. Every donor's loop is different — one walks a registry once,
+ * another walks it per locale, a third writes three separate shells — and all of that is
+ * policy the product owns. What is identical in every one of them is these four functions and
+ * the gate in `assertRendered`, so those ship and the ~40-line loop stays in the app.
+ */
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { EMPTY_ROOT } from "./head.ts";
+import type { OgOverflow } from "./og.ts";
+import { describeOverflow } from "./og.ts";
+import type { PageRenderer } from "./render.ts";
+
+/**
+ * The built `index.html`, and a refusal to bake one twice.
+ *
+ * `dist/index.html` is BOTH the template and the front page's destination, so a second run over
+ * a `dist/` the prerender has already touched would read a finished page as its blank shell and
+ * nest one render inside another. `vite build` empties `dist/` and normally makes this
+ * impossible; what does not is a restored build cache, or somebody running the script directly
+ * to debug it. Caught here, by name, rather than as a missing-root error three frames down.
+ */
+export async function loadTemplate(distDir: string): Promise<string> {
+  const file = join(distDir, "index.html");
+  const template = await readFile(file, "utf8");
+  if (!template.includes(EMPTY_ROOT))
+    throw new Error(
+      `prerender: ${file} does not carry ${EMPTY_ROOT}. Either it is already a rendered page ` +
+        "— run `vite build` to regenerate the shell this reads — or the app's root element " +
+        "carries attributes, which the baker cannot fill.",
+    );
+  return template;
+}
+
+function exportsRenderer<Context>(mod: unknown): mod is { renderPage: PageRenderer<Context> } {
+  return (
+    typeof mod === "object" &&
+    mod !== null &&
+    "renderPage" in mod &&
+    typeof mod.renderPage === "function"
+  );
+}
+
+/**
+ * The app compiled for the server, imported out of the BUILT bundle.
+ *
+ * The prerender is a script rather than a Vite plugin for exactly this reason: it needs the SSR
+ * bundle, and a plugin running in `closeBundle` is inside the build that would have to have
+ * produced it. So the entry is a path on disk, written by `vite build --ssr src/entry-server.tsx`,
+ * and nothing in the source tree references it.
+ */
+export async function loadRenderer<Context = unknown>(
+  entryFile: string,
+): Promise<PageRenderer<Context>> {
+  const mod: unknown = await import(pathToFileURL(entryFile).href);
+  if (!exportsRenderer<Context>(mod))
+    throw new Error(
+      `prerender: ${entryFile} does not export renderPage — run \`vite build --ssr\` first`,
+    );
+  return mod.renderPage;
+}
+
+/** Write one file under `dist`, creating the folders a nested route needs. */
+export async function writeDist(distDir: string, file: string, contents: string): Promise<void> {
+  const target = join(distDir, file);
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, contents, "utf8");
+}
+
+/** One laid-out share card: the bytes, and anything that did not fit. */
+export interface OgCard {
+  png: Uint8Array;
+  /** Copy the layout could not hold. A single one refuses the whole run — see
+   *  {@link writeOgCards}. */
+  overflow?: readonly OgOverflow[];
+}
+
+export interface WriteOgCardsOptions<Page> {
+  pages: readonly Page[];
+  /** Where the cards land — `public/og` in both donors, so they are committed beside the
+   *  favicons and served as static files. */
+  outDir: string;
+  /** The file name for one page, inside `outDir`. `(page) => \`${pageSlug(page.path)}.png\``. */
+  file: (page: Page) => string;
+  /** Lay one card out and rasterize it. The card's art is the product's; this only drives it. */
+  card: (page: Page) => OgCard | Promise<OgCard>;
+  /** Lay every card out and report, without writing anything. */
+  check?: boolean;
+}
+
+/**
+ * Walk a page registry and write one share card per page.
+ *
+ * Every card is laid out BEFORE any is written, and a single line that does not fit refuses the
+ * whole run. That order is the point: a card that cannot hold its copy is a product decision,
+ * not something to resolve with an ellipsis — an ellipsis makes every string "fit", so
+ * overgrown copy has no failing case and ships a card missing the end of the one line the card
+ * exists to carry. The reader who finds out is someone else's link unfurl.
+ *
+ * Overflow is collected rather than thrown on the first card, so one run names every bad one:
+ * copy lands per locale in batches, and a build that dies on the first of six sends its
+ * operator round the loop six times.
+ */
+export async function writeOgCards<Page>({
+  pages,
+  outDir,
+  file,
+  card,
+  check = false,
+}: WriteOgCardsOptions<Page>): Promise<string[]> {
+  const laid: { file: string; png: Uint8Array }[] = [];
+  const overflows: OgOverflow[] = [];
+
+  for (const page of pages) {
+    const { png, overflow } = await card(page);
+    if (overflow?.length) overflows.push(...overflow);
+    laid.push({ file: file(page), png });
+  }
+
+  if (overflows.length > 0)
+    throw new Error(
+      `og: ${String(overflows.length)} card(s) cannot hold their copy —\n\n` +
+        overflows.map((o) => `  · ${describeOverflow(o)}`).join("\n\n") +
+        "\n\n  Shorten the copy, or change the size ladder deliberately. Nothing was written.",
+    );
+
+  if (check) return laid.map((entry) => entry.file);
+
+  await mkdir(outDir, { recursive: true });
+  for (const entry of laid) await writeFile(join(outDir, entry.file), entry.png);
+  return laid.map((entry) => entry.file);
+}
