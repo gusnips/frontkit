@@ -43,7 +43,7 @@ frontkit/               ← repo root (this folder), git root
 ├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
 ├── http/               ← @gusnips/http   — the envelope. Types only, zero deps, no framework.
 ├── react/              ← @gusnips/react  — the headless runtime. Peer: react.
-│   └── src/ui/         ← the five Base UI wrappers, behind a subpath (see below)
+│   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
 ├── vite/               ← @gusnips/vite   — the build rig. The ONLY package allowed node:fs.
 ├── scripts/            ← check-purity.ts, which enforces exactly that
 └── AGENTS.md           ← this file
@@ -198,7 +198,7 @@ pin them; if one fails, a lesson is being un-learned.
 The audit's headline finding was a NEGATIVE one: no wrapper in either donor adds scroll lock,
 focus trap, ESC, outside-dismiss, focus return, roving focus or typeahead. Base UI does all of
 it, and a wrapper that "adds" them is adding a second implementation of something that already
-works. Twenty-two of the donor's twenty-seven wrappers were dropped on that basis.
+works. Twenty of the donor's twenty-seven wrappers were dropped on that basis.
 
 What a wrapper legitimately buys is composition a caller cannot skip, required-a11y props
 expressed as types, and the facts below — each of which cost somebody a debugging session:
@@ -274,9 +274,15 @@ these.)_
   have shipped.
 - **A negative result is a finding.** The donor had 27 Base UI wrappers and the hypothesis was
   that they added scroll lock, focus trap, ESC, outside-dismiss and focus return. They add none
-  of it — Base UI already does. Only five earn a place, and the scope went from 27 to 5 before
-  anything was written. Not extracting something is a valid outcome, and cheaper than extracting
-  it and discovering later.
+  of it — Base UI already does. The scope went from 27 to 5 before anything was written. Not
+  extracting something is a valid outcome, and cheaper than extracting it and discovering later.
+  Two then came back, and how they came back is the other half of the lesson: **menu** because
+  the donor that had one knew a fact no comment can enforce (`GroupLabel` outside its `Group`
+  throws Base UI error #31, reported in production as the bare number 31 with no file and no
+  part named — so the part is not exported and the caption is a prop), and **tabs** because
+  `overflow-x: auto` forces `overflow-y` off `visible`, and a self-scrolling rail therefore
+  crops the focus ring on the tab the keyboard is on. Seven, not five. A wrapper earns its place
+  by knowing something, never by styling something.
 - **The best finding was not a bug in one repo, it was a landmine in another.** One repo
   prerenders with `react-dom/static` and documents why. A second uses `renderToString` and is
   safe *today* only because its site happens to have no `lazy()` routes. That is not a bug to
