@@ -48,23 +48,28 @@
     outline-offset: 2px;
   }
 
-  /* Text fields draw their own focus treatment — a border colour plus a ring — and the
-     global outline landed on top of it as a doubled, heavy frame. Checkboxes and radios
-     keep the outline; it is their only keyboard-focus affordance.
-     If your field has no focus styling of its own, put the ring back with
-     `focus-visible:outline-2` — a utility beats this, because utilities sit in a later
-     cascade layer. Never leave a focusable control with neither. */
-  input:not([type="checkbox"]):not([type="radio"]):focus-visible,
-  textarea:focus-visible,
-  select:focus-visible,
-  [role="combobox"]:focus-visible {
-    outline: none;
-  }
+  /* The ring reaches text fields too, and nothing here strips it from them. That is
+     deliberate, and it is the one donor rule that had to INVERT on the way into a package.
+     The app it came from follows this with `outline: none` on every input, textarea, select
+     and combobox, because its own fields each draw a border-plus-ring on focus and the
+     global outline landed on top as a doubled, heavy frame. There, removing it is a fix.
+     Here it would be the reverse: we add a ring the adopter never had, then take it away
+     again from exactly the elements that most need one. An app with plain `<input>`s would
+     import this file and come out with no keyboard focus indicator on any field — a WCAG
+     2.4.7 failure introduced by us, in an app that was fine before. A shared layer does not
+     get to make that trade, and a comment telling adopters to put the ring back is not a
+     fix, because it only works for the ones who read it.
+     A control that genuinely draws its own focus treatment opts out on itself, with
+     `focus-visible:outline-none` on the element. Utilities sit in a later cascade layer
+     than base, so it wins with no specificity fight, and the opt-out stays local to the one
+     component that earned it. */
 
   /* A thin scrollbar, because the OS default is a wide light bar that stays light on a
      dark app. The thumb reads `--color-input`, the one token defined to clear 3:1 against
      the surface behind it — exactly what a scrollbar needs — and it is rebound in `.dark`,
      so the thumb follows the theme without a second rule.
+     6px is a choice, not a contract — override the width in your own stylesheet if your
+     app wants a chunkier bar. What is load-bearing is the token the thumb reads.
      WebKit pseudo-elements only, deliberately: setting the standard `scrollbar-width`
      makes Chrome ignore these rules entirely, so asking for both gets neither. */
   ::-webkit-scrollbar {

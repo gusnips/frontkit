@@ -229,6 +229,17 @@ function main(): void {
       "named duration scale can ship after all",
   );
 
+  //    The focus ring must reach text fields. A donor strips it from every input, textarea,
+  //    select and combobox because its own fields draw their own; in a package that inverts
+  //    into removing a focus indicator from an adopter who never asked us to touch it. A
+  //    component with its own treatment opts out on itself instead.
+  expect(
+    !css.includes('[role="combobox"]'),
+    "the text-field outline suppression is back — it takes the keyboard focus ring off " +
+      "every adopter's plain <input> (WCAG 2.4.7). Opt out per component with " +
+      "`focus-visible:outline-none`, which beats the base rule on layer order.",
+  );
+
   // 7. The contrast floors, in both modes, on the values that actually shipped. The light
   //    region is everything before the `.dark` block, which is where @theme lands.
   const darkStart = css.indexOf("\n.dark {");
@@ -266,7 +277,6 @@ function main(): void {
     ["light color-scheme", "color-scheme: light"],
     ["dark color-scheme", "color-scheme: dark"],
     ["the focus ring", "outline: 2px solid var(--color-ring)"],
-    ["the text-field outline suppression", '[role="combobox"]:focus-visible'],
     ["the scrollbar thumb", "background: var(--color-input)"],
     ["`.scrollbar-none`", "scrollbar-width: none"],
     ["the reduced-motion clamp", "@media (prefers-reduced-motion: reduce)"],
