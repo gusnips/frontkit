@@ -11,7 +11,13 @@
  * static renderer plus two string rules.
  */
 import type { ReactNode } from "react";
-import { prerender } from "react-dom/static";
+// `static.browser`, not `static`. Three donor entry-servers converged on it independently, and
+// the reason is resolution rather than behaviour: `react-dom/static` is condition-resolved into
+// four different files (node, edge-light, workerd, browser) and an SSR bundler picks the
+// condition, not us. `.browser` is one implementation everywhere. Measured, `prerender` hands
+// back a Web `ReadableStream` from every one of them — which is what `new Response()` below
+// wants — so this pins a resolution, it does not fix a stream type.
+import { prerender } from "react-dom/static.browser";
 
 /**
  * React 19 hoists `<title>`, `<meta>` and `<link>` rendered anywhere in the tree into the

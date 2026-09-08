@@ -9,7 +9,10 @@
  * Pure string work, on purpose: no `node:` import anywhere in this file, so every branch is
  * unit-testable without a filesystem. The reading and writing lives in `node.ts`.
  */
-import { PRERENDERED_ROUTE_ATTR } from "@gusnips/react";
+// The `/contract` subpath, not the barrel: the barrel reaches `react-dom/client` through
+// `hydrate.ts`, and a build script asking for one string should not pull the browser renderer
+// into a Node process. That file imports nothing at all.
+import { PRERENDERED_ROUTE_ATTR } from "@gusnips/react/contract";
 import { escapeAttr, escapeRegex } from "./escape.ts";
 
 /** The empty root a template must carry — `bakeHead` fills it, and refuses a filled one. */

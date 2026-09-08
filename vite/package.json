@@ -13,6 +13,10 @@
     "./preset": {
       "types": "./dist/preset.d.ts",
       "default": "./dist/preset.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "default": "./dist/render.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -46,6 +50,8 @@
   "peerDependenciesMeta": {
     "@tailwindcss/vite": { "optional": true },
     "@vitejs/plugin-react": { "optional": true },
+    "react": { "optional": true },
+    "react-dom": { "optional": true },
     "vite": { "optional": true }
   },
   "devDependencies": {

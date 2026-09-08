@@ -9,8 +9,11 @@
  * Four repos wrote it independently and each learned something the others had not. What is
  * here is the merge; every non-obvious rule carries the reason it exists.
  *
- * The vite config preset lives at `@gusnips/vite/preset`, so a prerender script does not load
- * the React and Tailwind plugins to bake one `<head>`.
+ * Two things live behind their own subpath, because each drags a dependency this barrel would
+ * otherwise force on everyone: the vite config preset at `@gusnips/vite/preset` (the React and
+ * Tailwind plugins) and `renderTree` at `@gusnips/vite/render` (React itself). Nothing here
+ * imports React or vite, so a prerender script, an OG generator and a repo that only wants a
+ * sitemap all install exactly what they use.
  */
 export {
   assertRendered,
@@ -37,7 +40,11 @@ export {
   type FitResult,
   type OgOverflow,
 } from "./og.ts";
-export { renderTree, type PageRenderer } from "./render.ts";
+// `renderTree` itself is NOT here — it lives at `@gusnips/vite/render`, because it is the one
+// thing in this package that loads React. Its consumer is `entry-server.tsx`, a different file
+// in a different bundle to the prerender script, and a repo using this only for `sitemapXml`
+// and `robotsTxt` should not have to install a renderer. The TYPE is free: it erases.
+export type { PageRenderer } from "./render.ts";
 export {
   ogImagePath,
   pageFile,
