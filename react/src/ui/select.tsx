@@ -104,7 +104,9 @@ export function Select<T extends string = string>({
         aria-label={label}
         {...triggerProps}
         className={mergeClassName(
-          "flex w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+          // No focus style: the trigger keeps the app's one `:focus-visible` outline. Swapping
+          // it for a `ring-*` loses forced-colors mode, where a box-shadow is forced to none.
+          "flex w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-foreground disabled:pointer-events-none disabled:opacity-50",
           className,
         )}
       >

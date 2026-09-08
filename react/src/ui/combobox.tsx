@@ -158,7 +158,9 @@ export function Combobox<T>({
           {...inputProps}
           className={mergeClassName(
             [
-              "w-full min-w-0 rounded-md border border-input bg-background py-2 pr-16 pl-3 text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:text-sm",
+              // No focus style: the field keeps the app's one `:focus-visible` outline. Swapping
+              // it for a `ring-*` loses forced-colors mode, where a box-shadow is forced to none.
+              "w-full min-w-0 rounded-md border border-input bg-background py-2 pr-16 pl-3 text-base text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 md:text-sm",
               leadingIcon && "pl-9",
             ],
             // The caller's classes land BEFORE the space reserved for the buttons is

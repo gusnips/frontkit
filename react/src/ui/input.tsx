@@ -66,9 +66,16 @@ function withoutChrome<P extends FieldChrome & { multiline?: boolean }>(props: P
  *
  * `text-base` up to `md`: iOS Safari zooms the whole page in when a field it focuses has type
  * smaller than 16px, and it does not zoom back out. The pair is the fix, not a size choice.
+ *
+ * No focus style here, deliberately. The app's one ring is the `:focus-visible` outline in
+ * `@gusnips/tokens`' base layer, and a control that swaps it for `outline-none` plus a
+ * `ring-*` gains nothing and loses forced-colors mode: a ring is a `box-shadow`, which the UA
+ * forces to `none` under Windows High Contrast, while an outline survives and takes a system
+ * colour. The swap therefore deletes the focus indicator for exactly the people who need it
+ * most — and it is invisible in review, because it looks correct in every normal browser.
  */
 const controlClasses =
-  "w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive md:text-sm";
+  "w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive md:text-sm";
 
 /**
  * A field with its label, its error, and the aria that ties the three together.
