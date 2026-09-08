@@ -219,10 +219,20 @@ And one trap that is not about contrast at all:
 - **`--duration-*` is not a Tailwind namespace.** Defining `--duration-standard: 250ms` in
   `@theme` compiles no utility, so `duration-standard` in a `className` is dead text and the
   transition silently runs at Tailwind's default. `--ease-*` beside it DOES work, which is
-  exactly what hides it — the easing lands and the duration does not. One donor has 64 of
+  exactly what hides it — the easing lands and the duration does not. One donor has 61 of
   these. Use `duration-[250ms]`, or keep the token and write
   `transition-duration: var(--duration-standard)` in a real rule. The token package's compile
   check pins this so it cannot be rediscovered a third time.
+
+  It is not the only one. The same donor defines `--weight-regular|medium|semibold|bold`, and
+  Tailwind's namespace is `--font-weight-*` — four more dead tokens, harmless only because
+  nothing reads them. And `--radius-sm|md|lg|xl` are **already stock Tailwind names**, so both
+  donors were retuning built-ins rather than inventing a scale; `rounded-full` is a static
+  utility compiling to `calc(infinity * 1px)` and needs no token at all. So the general rule:
+  **before defining a token, check the namespace exists** — `@theme` accepts any `--name` you
+  write and silently generates nothing for a namespace Tailwind does not have. That is why
+  this package ships colours only, and why the compile check asserts the absent ones stay
+  absent: if Tailwind ever adds `--duration-*`, the check fails and tells us we can ship them.
 
 ## What the migrations taught
 
