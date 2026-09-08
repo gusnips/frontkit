@@ -13,6 +13,10 @@
     "./ui": {
       "types": "./dist/ui/index.d.ts",
       "default": "./dist/ui/index.js"
+    },
+    "./contract": {
+      "types": "./dist/prerender-contract.d.ts",
+      "default": "./dist/prerender-contract.js"
     }
   },
   "types": "./dist/index.d.ts",

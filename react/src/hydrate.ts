@@ -1,36 +1,19 @@
 /**
  * The browser half of prerendering: deciding whether to hydrate or to mount fresh.
  *
- * This lives in `react/` and not in `vite/` even though `vite/` writes the attribute, because
- * a BROWSER ENTRY reads it. Putting the constant in the build-time package would drag `node:`
- * into the client bundle for the sake of one string. Build-time depends on runtime; never the
- * reverse.
- *
  * Three separate repos invented all of this independently — same constant name, same string
- * value, same decision, and near-identical explaining comments. That is not a coincidence
- * worth deduping; it is one lesson learned three times, and it belongs somewhere it can be
- * learned once.
+ * value, same decision, and near-identical explaining comments. That is not a coincidence worth
+ * deduping; it is one lesson learned three times, and it belongs somewhere it can be learned
+ * once.
+ *
+ * The constants themselves live in `prerender-contract.ts`, which imports nothing, because the
+ * BUILD needs them too and must not pull `react-dom/client` into a Node process to get a string.
  */
 import type { ReactNode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
+import { PRERENDERED_ROUTE_ATTR } from "./prerender-contract.ts";
 
-/**
- * The attribute a prerendered file names its own route in — written by the build, read here.
- *
- * One constant because the writer and the reader are in different builds, and a typo between
- * them would show up only as a silent full re-render.
- */
-export const PRERENDERED_ROUTE_ATTR = "data-prerendered-route";
-
-/**
- * What a 404 shell writes instead of a route.
- *
- * It is the pattern that actually matched — the catch-all — and it can never equal an address,
- * which is the property that matters: every route a static host answers from the shell mounts
- * fresh rather than hydrating the not-found page over itself. A real 404 pays one redundant
- * client render for that, and keeps the markup a crawler reads.
- */
-export const SHELL_ROUTE = "*";
+export { PRERENDERED_ROUTE_ATTR, SHELL_ROUTE } from "./prerender-contract.ts";
 
 /**
  * Hydrate the render this file IS, and mount fresh over anything else.
