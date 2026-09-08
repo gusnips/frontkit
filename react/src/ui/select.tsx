@@ -55,6 +55,12 @@ export type SelectProps<T extends string = string> = Omit<
   className?: StateClassName<Primitive.Trigger.State>;
   popupClassName?: StateClassName<Primitive.Popup.State>;
   triggerProps?: Primitive.Trigger.Props;
+  /**
+   * Positioner props — `align`, `side`, `sideOffset`, `collisionPadding`, and the stacking
+   * order. The default `z-[60]` puts the list above the overlay layer (z-50: dialog, drawer);
+   * raise it with `positionerProps={{ className: "z-[80]" }}` if the app stacks something
+   * higher than a dialog above it.
+   */
   positionerProps?: Primitive.Positioner.Props;
 };
 
@@ -128,7 +134,10 @@ export function Select<T extends string = string>({
         <Primitive.Positioner
           sideOffset={4}
           {...positionerProps}
-          className="z-[60] max-w-[var(--available-width)] outline-none"
+          className={mergeClassName(
+            "z-[60] max-w-[var(--available-width)] outline-none",
+            positionerProps?.className,
+          )}
         >
           <Primitive.Popup
             className={mergeClassName(

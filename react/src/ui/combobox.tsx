@@ -87,6 +87,12 @@ export type ComboboxProps<T> = Omit<
   className?: StateClassName<Primitive.Input.State>;
   popupClassName?: StateClassName<Primitive.Popup.State>;
   inputProps?: Primitive.Input.Props;
+  /**
+   * Positioner props — `align`, `side`, `sideOffset`, `collisionPadding`, and the stacking
+   * order. The default `z-[60]` puts the list above the overlay layer (z-50: dialog, drawer);
+   * raise it with `positionerProps={{ className: "z-[80]" }}` if the app stacks something
+   * higher than a dialog above it.
+   */
   positionerProps?: Primitive.Positioner.Props;
 } & ComboboxLoadingState;
 
@@ -193,7 +199,10 @@ export function Combobox<T>({
         <Primitive.Positioner
           sideOffset={4}
           {...positionerProps}
-          className="z-[60] max-w-[var(--available-width)] outline-none"
+          className={mergeClassName(
+            "z-[60] max-w-[var(--available-width)] outline-none",
+            positionerProps?.className,
+          )}
         >
           <Primitive.Popup
             className={mergeClassName(
@@ -211,7 +220,10 @@ export function Combobox<T>({
                 {loading ? loadingHint : emptyHint}
               </div>
             </Primitive.Empty>
-            <Primitive.List className="max-h-64 overflow-y-auto">
+            {/* `--available-height` is the room the positioner measured between the anchor
+                and the edge of the viewport. Without it the list is unbounded and a long
+                result set runs off the bottom of the screen with no way to reach the end. */}
+            <Primitive.List className="max-h-[var(--available-height)] overflow-y-auto">
               {(item: T) => (
                 <Primitive.Item
                   key={getKey(item)}
