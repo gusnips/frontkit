@@ -19,17 +19,22 @@ cn("p-2", "p-4"); // → "p-4"
 
 ## Four packages
 
-| Package           | What it is                              | Depends on  |
-| ----------------- | --------------------------------------- | ----------- |
-| `@gusnips/tokens` | one Tailwind 4 `@theme` file            | nothing     |
-| `@gusnips/http`   | the request/response envelope, as types | nothing     |
-| `@gusnips/react`  | the headless runtime                    | react       |
-| `@gusnips/vite`   | the prerender rig and the vite preset   | node, react |
+| Package           | What it is                              | Needs            |
+| ----------------- | --------------------------------------- | ---------------- |
+| `@gusnips/tokens` | one Tailwind 4 `@theme` file            | nothing          |
+| `@gusnips/http`   | the request/response envelope, as types | nothing          |
+| `@gusnips/react`  | the headless runtime                    | react, react-dom |
+| `@gusnips/vite`   | the prerender rig and the vite preset   | node             |
 
 They are four and not one because of what each consumer can afford to install. An Astro
 marketing site wants the tokens and no JavaScript. An API server wants the envelope and no
 React. A browser bundle wants the runtime and no `node:fs`. The build script is the only thing
 that needs the filesystem, so it is the only thing that gets it.
+
+That column is a promise, and the build checks it. Anything a package needs beyond what is
+listed there lives behind a subpath, so you install it only by importing it: the Base UI
+wrappers at `@gusnips/react/ui`, the auth store at `/store`, the route guards at `/guards`, the
+renderer at `@gusnips/vite/render`. A package that generates your sitemap installs no React.
 
 ## What it does
 
