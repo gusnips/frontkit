@@ -8,8 +8,9 @@
  * fixture that uses every name, run the Tailwind CLI over it, and read the CSS that comes
  * back. The exit code proves nothing; the assertions below are the test.
  *
- * It also pins the two things that rot silently: a colour added to `@theme` and forgotten
- * in `.dark`, and the `dark:` variant itself.
+ * It also pins the three things that rot silently: a colour added to `@theme` and forgotten
+ * in `.dark`, the `dark:` variant itself, and the two contrast floors — a placeholder that
+ * drifts under them looks completely fine on screen and is unusable for somebody.
  *
  * Run: bun run scripts/compile-check.ts
  */
@@ -62,6 +63,43 @@ const ABSENT = "bg-not-a-token";
  * the namespace, this fails and we can ship the names for real.
  */
 const NOT_A_NAMESPACE = "duration-standard";
+
+/**
+ * The two contrast floors, measured on the hex values that actually compile out.
+ *
+ * Deliberately two pairs and not a contrast suite: these are the ones a placeholder can
+ * get wrong while looking completely fine. `input` is the sharp one — it is a control
+ * boundary, so WCAG 1.4.11 asks 3:1, and one donor points it at the same rung it uses for
+ * a passive divider: 1.6:1 in light, 2.2:1 in dark, every field border in two of its apps.
+ * Nothing about that looks broken on screen, which is why it needs a build failure and not
+ * a comment.
+ */
+const CONTRAST_FLOORS: Array<[token: string, against: string, floor: number]> = [
+  ["--color-input", "--color-background", 3],
+  ["--color-foreground", "--color-background", 4.5],
+];
+
+function luminance(hex: string): number {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const channel = (c: number): number => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return (
+    0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255)
+  );
+}
+
+function contrast(a: string, b: string): number {
+  const [x, y] = [luminance(a), luminance(b)];
+  const [hi, lo] = x > y ? [x, y] : [y, x];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** What a token resolves to inside one region of the output. Six-digit hex only, on purpose. */
+function hexValue(region: string, token: string): string | null {
+  return new RegExp(`${token}:\\s*(#[0-9a-fA-F]{6})\\s*;`).exec(region)?.[1] ?? null;
+}
 
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const workDir = join(pkgRoot, ".compile-check");
@@ -191,7 +229,35 @@ function main(): void {
       "named duration scale can ship after all",
   );
 
-  // 7. The base rules. Each is here because a product shipped without it.
+  // 7. The contrast floors, in both modes, on the values that actually shipped. The light
+  //    region is everything before the `.dark` block, which is where @theme lands.
+  const darkStart = css.indexOf("\n.dark {");
+  const regions: Array<[mode: string, region: string]> = [
+    ["light", darkStart === -1 ? css : css.slice(0, darkStart)],
+    ["dark", dark ?? ""],
+  ];
+  for (const [mode, region] of regions) {
+    for (const [token, against, floor] of CONTRAST_FLOORS) {
+      const fg = hexValue(region, token);
+      const bg = hexValue(region, against);
+      if (fg === null || bg === null) {
+        failures.push(
+          `${mode}: cannot measure ${token} on ${against} — one of them is no longer a ` +
+            "6-digit hex. Keep the placeholders hex, or teach this check the new notation; " +
+            "do not let the floor go unmeasured.",
+        );
+        continue;
+      }
+      const ratio = contrast(fg, bg);
+      expect(
+        ratio >= floor,
+        `${mode}: ${token} (${fg}) on ${against} (${bg}) is ${ratio.toFixed(2)}:1, ` +
+          `under the ${floor}:1 floor`,
+      );
+    }
+  }
+
+  // 8. The base rules. Each is here because a product shipped without it.
   const baseRules: Array<[label: string, needle: string]> = [
     // Two needles rather than the whole selector: how Tailwind joins a multi-line selector
     // is its business, and a check that breaks on whitespace is a check people learn to skip.
@@ -222,7 +288,8 @@ function main(): void {
   rmSync(workDir, { recursive: true, force: true });
   console.log(
     `✓ tokens: ${COLORS.length} colours resolve in both modes, ` +
-      `${UTILITIES.length} utilities compile, ${baseRules.length} base rules present.`,
+      `${UTILITIES.length} utilities compile, ${CONTRAST_FLOORS.length * 2} contrast floors ` +
+      `clear, ${baseRules.length} base rules present.`,
   );
 }
 

@@ -29,6 +29,13 @@
  * component follows. The rest is what your product looks like, and it stays in your
  * product.
  *
+ * Migrating a theme that has its own radii: keep `--radius-sm/md/lg/xl` and retune the
+ * values — they are already Tailwind's names. Drop `--radius-full` and `--radius-pill`.
+ * `rounded-full` is a built-in utility that needs no token at all, and it resolves to
+ * `calc(infinity * 1px)`, which stays round on an element taller than the `9999px` both
+ * donor themes redefined it to. A theme that spells it `pill` renames every
+ * `rounded-pill` to `rounded-full` and deletes the token.
+ *
  * One trap worth knowing before you write your own `@theme`: `--duration-*` is NOT a
  * Tailwind namespace. `duration-standard` compiles to nothing at all, silently, and the
  * transition falls back to 150ms. `duration-250` works; so does `var(--duration-standard)`

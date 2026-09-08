@@ -33,8 +33,7 @@
   /* ─── Light ───
      Contrast measured, not guessed: foreground on background 17.2:1, muted-foreground on
      background 7.5:1 and on muted 7.2:1, every `-foreground` on its own surface above
-     14:1. `input` is the odd one — it is a control BOUNDARY, so it answers WCAG 1.4.11's
-     3:1 rather than a text ratio, and it is deliberately much darker than `border`. */
+     14:1. Two of those are floors the compile check enforces — see `input` below. */
   --color-background: #fafafa;
   --color-foreground: #171717;
   --color-card: #ffffff;
@@ -58,7 +57,16 @@
   --color-destructive: #dc2626;
   --color-destructive-foreground: #ffffff;
   --color-border: #e5e5e5;
-  --color-input: #8c8c8c; /* 3.2:1 on background, 3.4:1 on card */
+  /* `input` is a control BOUNDARY, not decoration, so 3:1 against `--color-background` is
+     a FLOOR and not a preference (WCAG 1.4.11). The compile check fails below it, in both
+     modes. If you override this token, measure it: a grey picked to sit nicely beside
+     `border` will not clear 3:1, which is exactly how one donor ended up pointing `input`
+     at the same rung it uses for a passive divider — 1.6:1 in light, 2.2:1 in dark, so
+     every field border in two of its apps is invisible to somebody.
+     `border` has no floor. It is a hairline between two surfaces, and nothing depends on
+     seeing it; that is why the two tokens exist separately and why this one is so much
+     darker. Here: 3.2:1 on background, 3.4:1 on card. */
+  --color-input: #8c8c8c;
   --color-ring: #171717;
   /* What a dialog dims the page with. A token rather than `black/40`, because the two
      modes need different scrims: over a light ground a wash of ink reads as shade, and
@@ -82,6 +90,14 @@
   --color-card-foreground: #fafafa;
   --color-popover: #171717;
   --color-popover-foreground: #fafafa;
+  /* Primary LIFTS for dark, and its label flips dark with it. Copy the strategy, not the
+     greys. The tempting version — hold one brand colour across both modes, keep a white
+     label — is the trap: a fill chosen to look right on a white page is dark, and on a
+     near-black card it lands ON the 3:1 a UI component needs rather than clear of it. One
+     donor's held violet measures 3.08:1 against its own dark card, which passes with 0.08
+     to spare; the donor that lifts the same kind of hue for dark measures 6.6:1. The
+     margin is the whole difference, and it disappears the first time someone lightens a
+     card. The label must flip because a lifted fill is light — white on it is unreadable. */
   --color-primary: #fafafa;
   --color-primary-foreground: #171717;
   --color-secondary: #262626;
