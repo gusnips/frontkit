@@ -15,9 +15,10 @@
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "eslint tokens http react vite",
     "purity": "bun run scripts/check-purity.ts",
+    "exports": "bun run scripts/check-exports.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "bun run format:check && bun run build && bun run lint && bun run typecheck && bun run purity && bun run test"
+    "check": "bun run format:check && bun run build && bun run lint && bun run typecheck && bun run purity && bun run exports && bun run test"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

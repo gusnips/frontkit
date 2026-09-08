@@ -193,6 +193,19 @@ pin them; if one fails, a lesson is being un-learned.
     disappears at runtime, so reading `index.ts` answers a different question than the one that
     matters.
 
+    **The mechanical form, which is what `bun run exports` checks: a peer marked `optional` must
+    not be reachable from that package's `"."` entry.** Stated that way there is no judgement
+    call about weight, and it caught the fourth instance the day it was written — `@gusnips/react`
+    declared `zustand` and `react-router-dom` optional and imported both unconditionally from the
+    one entry point every adopter loads. An optional peer the barrel imports anyway is not
+    optional; it is a required peer whose error has been moved from install time, where a package
+    manager explains it, to the adopter's first build, where a bundler blames one of OUR files for
+    a package THEY never installed. `createAuthStore` and the guards moved to
+    `@gusnips/react/store` and `@gusnips/react/guards`, and the main barrel now imports `react`,
+    `react-dom` and `@gusnips/http` and nothing else. The three peers that stayed optional AND
+    stayed in the barrel — `@tanstack/react-query`, `i18next`, `react-i18next` — are safe for the
+    reason above: only their types are used, and types erase.
+
 ### …and six more for anything under `react/src/ui/`
 
 The audit's headline finding was a NEGATIVE one: no wrapper in either donor adds scroll lock,

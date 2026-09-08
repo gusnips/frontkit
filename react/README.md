@@ -91,7 +91,7 @@ screen plus a TypeError with only React frames in it, naming no chunk.
 ## Guards that can tell "no" from "I don't know"
 
 ```tsx
-import { createRequireProfile } from "@gusnips/react";
+import { createRequireProfile } from "@gusnips/react/guards";
 
 const requireProfile = createRequireProfile(useMe, { loading: <Spinner /> });
 
@@ -123,10 +123,13 @@ hurry cannot skip.
 
 ## Also here
 
-`createAuthStore` (a zustand store whose `isLoading` starts `false` where there is no window — a
-session bootstrap can only be in flight in a browser, and `true` during a build is a wait that
-never ends), `hydrateOrMount` for prerendered pages, `ErrorBoundary`, an SSE reader split into a
-platform-free parser and a stream wrapper, `i18nInitOptions`, and `cn`.
+`hydrateOrMount` for prerendered pages, `ErrorBoundary`, an SSE reader split into a platform-free
+parser and a stream wrapper, `i18nInitOptions`, and `cn`.
+
+`createAuthStore` is at `@gusnips/react/store` — a zustand store whose `isLoading` starts `false`
+where there is no window. A session bootstrap can only be in flight in a browser, and `true`
+during a build is a wait that never ends: it once shipped a spinner as the indexable body of a
+page whose whole job was to be found.
 
 ## The Base UI wrappers
 
@@ -148,10 +151,25 @@ stacking context. A drawer _ties_ with dialog rather than beating it, or a modal
 inside a drawer never paints. A wrapper earns its place by knowing something, not by styling
 something.
 
-## Peers
+## Subpaths, and what each one costs you
 
-Only `react` is required. `@base-ui/react`, `@tanstack/react-query`, `react-router-dom`,
-`zustand`, `i18next` and `react-i18next` are all optional — take the fetch client without
-installing a router.
+`@gusnips/react` itself needs `react`, `react-dom` and nothing else. Anything that needs more
+lives behind a subpath, so you install a dependency only if you import the thing that uses it:
+
+| Import from               | What is in it       | What you must have |
+| ------------------------- | ------------------- | ------------------ |
+| `@gusnips/react`          | the client and rest | react, react-dom   |
+| `@gusnips/react/store`    | `createAuthStore`   | zustand            |
+| `@gusnips/react/guards`   | the route guards    | react-router-dom   |
+| `@gusnips/react/ui`       | the seven wrappers  | @base-ui/react     |
+| `@gusnips/react/contract` | two prerender names | nothing            |
+
+The rule behind that table: **a peer marked optional must not be reachable from the main entry
+point.** An optional peer the barrel imports anyway is not optional — it is a required one whose
+error moved from install time to your first build, which is the worse of the two places to learn
+about it.
+
+`@tanstack/react-query`, `i18next` and `react-i18next` are optional and stay in the main entry,
+because only their types are used and types erase.
 
 MIT · part of [frontkit](https://github.com/gusnips/frontkit)

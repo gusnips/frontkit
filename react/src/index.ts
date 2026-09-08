@@ -1,7 +1,23 @@
 // @gusnips/react — the headless runtime under a Vite + React SPA.
 //
-// No styling, no brand, no Node built-ins. The Base UI wrappers live behind `@gusnips/react/ui`
-// so an app on a different primitive library (or none) never resolves `@base-ui/react`.
+// No styling, no brand, no Node built-ins.
+//
+// Three things live behind their own subpath, and the rule picking them is invariant 15 stated
+// as a test rather than a judgement: **a peer marked `optional` must not be reachable from this
+// barrel.** An optional peer the barrel imports anyway is not optional — it is a required peer
+// with the error moved from install time to the adopter's first build, which is the worse of the
+// two places to find out.
+//
+//   @gusnips/react/ui       the Base UI wrappers   → @base-ui/react
+//   @gusnips/react/store    createAuthStore        → zustand
+//   @gusnips/react/guards   the route guards       → react-router-dom
+//
+// So what is left here imports `react`, `react-dom` and `@gusnips/http` and nothing else, and an
+// app on TanStack Router or on Redux takes the fetch client without installing a router or a
+// store it will never call. `@tanstack/react-query`, `i18next` and `react-i18next` stay optional
+// AND stay here, because `query.ts`, `i18n.ts` and `states.ts` import only their TYPES — which
+// erase, so the built barrel does not reference them at runtime. Check that claim against
+// `dist/`, never against this file: a type-only re-export looks identical in source.
 
 export { cn } from "./cn.ts";
 
@@ -16,17 +32,7 @@ export {
 } from "./api-client.ts";
 export { createSseParser, readSseStream, type SseFrame } from "./sse.ts";
 
-export { createAuthStore, type AuthState } from "./auth-store.ts";
 export { queryDefaults, shouldRetry, type QueryDefaultsOptions } from "./query.ts";
-
-export {
-  createRequireAnonymous,
-  createRequireAuth,
-  createRequireProfile,
-  type GuardOptions,
-  type MeQuery,
-  type SessionState,
-} from "./guards.tsx";
 
 export {
   ErrorBoundary,

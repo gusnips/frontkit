@@ -14,6 +14,14 @@
       "types": "./dist/ui/index.d.ts",
       "default": "./dist/ui/index.js"
     },
+    "./store": {
+      "types": "./dist/auth-store.d.ts",
+      "default": "./dist/auth-store.js"
+    },
+    "./guards": {
+      "types": "./dist/guards.d.ts",
+      "default": "./dist/guards.js"
+    },
     "./contract": {
       "types": "./dist/prerender-contract.d.ts",
       "default": "./dist/prerender-contract.js"
