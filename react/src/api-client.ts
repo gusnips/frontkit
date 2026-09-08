@@ -70,6 +70,23 @@ export interface ApiClientOptions {
    */
   onSessionDead: () => void;
   /**
+   * Every failed response, seen once, just before it is thrown.
+   *
+   * For a reaction that belongs to the whole app rather than to one call site. The donor's case
+   * is the sharp one: a mid-session account suspension 403s every authed route except
+   * `GET /auth/me`, so the moment one arrives the app has to refresh `me` and route to the
+   * screen that explains it — otherwise every query on the page fails at once and the shell
+   * half-renders behind an error storm until `me` goes stale on its own.
+   *
+   * It cannot live at a call site, because the point is that it fires from whichever call
+   * happened to be first. It went in the donor's client directly, which made the client import
+   * its query cache and its query keys — a cycle that this hook removes.
+   *
+   * Observation only: the error is thrown either way, and throwing from here would replace a
+   * real API failure with whatever the listener hit.
+   */
+  onError?: (error: ApiError) => void;
+  /**
    * Abort a request that has not answered. Default 30s.
    *
    * Neither donor bounded its authenticated requests at all — both bounded only their keyless
@@ -108,7 +125,19 @@ export interface ApiClient {
   post<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>;
   put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>;
   patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>;
-  del<T>(path: string, options?: RequestOptions): Promise<T>;
+  /**
+   * DELETE, discarding whatever comes back. Returns `void` because 204 is the usual answer and
+   * a 204 has NO BODY — `res.json()` on one throws `Unexpected end of JSON input`, which reads
+   * like a malformed response and is really just a success nobody was allowed to parse.
+   *
+   * Split from {@link ApiClient.delJson} rather than guessing per response, because the guess is
+   * the part that hides a bug: a route that was supposed to answer with data and returned
+   * nothing should fail loudly here, not hand back a silent `undefined` that surfaces three
+   * layers away. The donor that hit this had written exactly these two functions.
+   */
+  del(path: string, options?: RequestOptions): Promise<void>;
+  /** The DELETE that answers with something worth reading — a queue entry it handed back. */
+  delJson<T>(path: string, options?: RequestOptions): Promise<T>;
   /** The whole envelope, for a list route whose counts live in `meta`. */
   page<T, M>(path: string, options?: RequestOptions): Promise<ApiSuccess<T, M>>;
 }
@@ -120,6 +149,7 @@ export function createApiClient({
   session,
   headers: extraHeaders,
   onSessionDead,
+  onError,
   timeoutMs = 30_000,
   maxRefreshAttempts = 2,
   refreshRetryDelayMs = 500,
@@ -163,7 +193,11 @@ export function createApiClient({
       setTimeout(go, signOutTimeoutMs);
     }
     // Thrown even though the redirect is under way: see `onSessionDead`.
-    throw new ApiError(401, { code: "UNAUTHORIZED", message: "Session expired" }, { expected: true });
+    throw new ApiError(
+      401,
+      { code: "UNAUTHORIZED", message: "Session expired" },
+      { expected: true },
+    );
   }
 
   function buildHeaders(token: string | null, extra?: Record<string, string>): Headers {
@@ -178,7 +212,8 @@ export function createApiClient({
     { headers, timeoutMs: perCall, signal, ...init }: RequestOptions,
   ): Promise<Response> {
     const budget = perCall === undefined ? timeoutMs : perCall;
-    if (budget === null) return fetch(`${baseUrl}${path}`, { ...init, signal, headers: buildHeaders(token, headers) });
+    if (budget === null)
+      return fetch(`${baseUrl}${path}`, { ...init, signal, headers: buildHeaders(token, headers) });
 
     // `AbortSignal.any` rather than a listener: it also catches the already-aborted race, where
     // a caller's signal fired before we ever attached. It keeps the caller's abort and our
@@ -212,9 +247,18 @@ export function createApiClient({
 
     if (!res.ok) {
       const body: unknown = await res.json().catch(() => null);
-      throw new ApiError(res.status, isApiError(body) ? body.error : null, {
+      const error = new ApiError(res.status, isApiError(body) ? body.error : null, {
         requestId: res.headers.get(requestIdHeader) ?? undefined,
       });
+      // A listener that throws must not become the error the caller sees: the API failure is
+      // the real news, and swallowing it for a bug in a side effect would send everyone
+      // debugging the wrong thing.
+      try {
+        onError?.(error);
+      } catch {
+        // ignored on purpose — see above
+      }
+      throw error;
     }
     return res;
   }
@@ -242,15 +286,18 @@ export function createApiClient({
 
   return {
     request,
-    get: <T,>(path: string, options: RequestOptions = {}) =>
+    get: <T>(path: string, options: RequestOptions = {}) =>
       data<T>(path, { ...options, method: "GET" }),
-    post: <T,>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    post: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
       data<T>(path, json(body, { ...options, method: "POST" })),
-    put: <T,>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    put: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
       data<T>(path, json(body, { ...options, method: "PUT" })),
-    patch: <T,>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    patch: <T>(path: string, body?: unknown, options: RequestOptions = {}) =>
       data<T>(path, json(body, { ...options, method: "PATCH" })),
-    del: <T,>(path: string, options: RequestOptions = {}) =>
+    del: async (path: string, options: RequestOptions = {}) => {
+      await request(path, { ...options, method: "DELETE" });
+    },
+    delJson: <T>(path: string, options: RequestOptions = {}) =>
       data<T>(path, { ...options, method: "DELETE" }),
     page: async <T, M>(path: string, options: RequestOptions = {}) =>
       envelope<T, M>(await request(path, { ...options, method: "GET" })),

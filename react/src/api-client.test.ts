@@ -183,4 +183,74 @@ describe("createApiClient", () => {
     controller.abort();
     expect(isAbortError(await cancelled)).toBe(true);
   });
+
+  // A 204 has no body, so `res.json()` on one throws `Unexpected end of JSON input` — which
+  // reads like a malformed response and is really a success nobody was allowed to parse. The
+  // donor's dashboard DELETEs all answer 204, so `del` must not go looking for data.
+  it("deletes without reading the body, and reads it only when asked", async () => {
+    const fetched = stubFetch((_url, init) =>
+      init.method === "DELETE" && !String(_url).endsWith("/queue/1")
+        ? new Response(null, { status: 204 })
+        : ok({ removed: true }),
+    );
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+    });
+
+    await expect(api.del("/keys/1")).resolves.toBeUndefined();
+    await expect(api.delJson<{ removed: boolean }>("/queue/1")).resolves.toEqual({ removed: true });
+    expect(fetched).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a failure to onError once, and still throws it", async () => {
+    stubFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "FORBIDDEN",
+              message: "suspended",
+              messageKey: "serverErrors.suspended",
+            },
+          }),
+          { status: 403 },
+        ),
+    );
+    const seen: ApiError[] = [];
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+      onError: (error) => seen.push(error),
+    });
+
+    const thrown = await api.get("/numbers").catch((e: unknown) => e);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.messageKey).toBe("serverErrors.suspended");
+    // The same object, not a copy: a listener that stashes it can compare identity later.
+    expect(thrown).toBe(seen[0]);
+  });
+
+  it("does not let a broken listener replace the API failure", async () => {
+    stubFetch(
+      () =>
+        new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "no" } }), {
+          status: 404,
+        }),
+    );
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+      onError: () => {
+        throw new Error("the listener is buggy");
+      },
+    });
+
+    const thrown = await api.get("/x").catch((e: unknown) => e);
+    expect(thrown).toBeInstanceOf(ApiError);
+    expect((thrown as ApiError).status).toBe(404);
+  });
 });
