@@ -98,13 +98,13 @@ these was checked against the code, not assumed.
 - **`packages/ui/src/brand/` stays in each product.** One product has a colibri, one has a
   mascot named Jack, one has a Scene set. That is the product, not the plumbing.
 - **Styled `Button.tsx` stays put.** The two best copies are 104 lines (cva, 11 variants, 10
-  sizes, a loading spinner) and 60 lines (4 variants, 3 sizes, no cva, and deliberately *no*
+  sizes, a loading spinner) and 60 lines (4 variants, 3 sizes, no cva, and deliberately _no_
   `focus-visible:` styles because its one focus ring lives in the theme). They overlap on the
   idea and nothing else. A shared styled Button satisfying eight brands grows variant props
   forever. Share behavior, skin per product.
 - **`EmptyState` / `ErrorState` ship as a contract, not a component.** They share a prop shape
   and one class string; the visual is a tinted icon badge, a branded Scene, or a mascot board.
-  What ships is `EmptyStateProps` / `ErrorStateProps` — the *type* is what enforces "never dead
+  What ships is `EmptyStateProps` / `ErrorStateProps` — the _type_ is what enforces "never dead
   end the user" — plus the error→copy machinery behind them. The rendering stays home.
 - **App scaffolding** (`main.tsx`, `App.tsx`, folder layout) is a template copied once, not a
   dependency.
@@ -285,7 +285,7 @@ these.)_
   by knowing something, never by styling something.
 - **The best finding was not a bug in one repo, it was a landmine in another.** One repo
   prerenders with `react-dom/static` and documents why. A second uses `renderToString` and is
-  safe *today* only because its site happens to have no `lazy()` routes. That is not a bug to
+  safe _today_ only because its site happens to have no `lazy()` routes. That is not a bug to
   file; it is a trap to remove for everyone, which is what a package can do and a code review
   cannot.
 - **When two donors disagree, check before taking the older one.** One repo's missing

@@ -13,7 +13,10 @@ describe("isChunkLoadError", () => {
     ["webpack", "Loading chunk 42 failed."],
     // The one that actually fires on a static host: the missing .js is answered with the SPA
     // fallback, so the browser refuses the HTML rather than reporting a 404.
-    ["SPA fallback", "Expected a JavaScript module script but the server responded with a MIME type of text/html"],
+    [
+      "SPA fallback",
+      "Expected a JavaScript module script but the server responded with a MIME type of text/html",
+    ],
   ])("matches %s", (_browser, message) => {
     expect(isChunkLoadError(new Error(message))).toBe(true);
   });
@@ -36,8 +39,8 @@ describe("isChunkLoadError", () => {
 describe("isPreloadHintFailure", () => {
   it("matches Vite's CSS preload hint and nothing else", () => {
     expect(isPreloadHintFailure(new Error("Unable to preload CSS for /assets/a.css"))).toBe(true);
-    expect(
-      isPreloadHintFailure(new Error("Failed to fetch dynamically imported module")),
-    ).toBe(false);
+    expect(isPreloadHintFailure(new Error("Failed to fetch dynamically imported module"))).toBe(
+      false,
+    );
   });
 });

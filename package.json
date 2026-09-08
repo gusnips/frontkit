@@ -17,7 +17,7 @@
     "purity": "bun run scripts/check-purity.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "bun run build && bun run lint && bun run typecheck && bun run purity && bun run test"
+    "check": "bun run format:check && bun run build && bun run lint && bun run typecheck && bun run purity && bun run test"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

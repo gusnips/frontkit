@@ -31,9 +31,7 @@ export interface SessionState {
  * that and fixed it; the other still has the collapsed version.
  */
 export type MeQuery<TMe> =
-  | { status: "loading" }
-  | { status: "error"; error: unknown }
-  | { status: "success"; data: TMe };
+  { status: "loading" } | { status: "error"; error: unknown } | { status: "success"; data: TMe };
 
 export interface GuardOptions {
   /** Drawn while the session or the profile is still resolving. */
@@ -84,10 +82,7 @@ export function createRequireAnonymous(
  * showing the first when the second is true is how an outage becomes a support ticket about
  * permissions.
  */
-export function createRequireProfile<TMe>(
-  useMe: () => MeQuery<TMe>,
-  { loading }: GuardOptions,
-) {
+export function createRequireProfile<TMe>(useMe: () => MeQuery<TMe>, { loading }: GuardOptions) {
   return function requireProfile(
     allow: (me: TMe) => boolean,
     onDenied: ReactNode | (() => ReactNode),

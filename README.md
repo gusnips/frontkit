@@ -19,12 +19,12 @@ cn("p-2", "p-4"); // → "p-4"
 
 ## Four packages
 
-| Package            | What it is                                        | Depends on   |
-| ------------------ | ------------------------------------------------- | ------------ |
-| `@gusnips/tokens`  | one Tailwind 4 `@theme` file                       | nothing      |
-| `@gusnips/http`    | the request/response envelope, as types            | nothing      |
-| `@gusnips/react`   | the headless runtime                               | react        |
-| `@gusnips/vite`    | the prerender rig and the vite preset              | node, react  |
+| Package           | What it is                              | Depends on  |
+| ----------------- | --------------------------------------- | ----------- |
+| `@gusnips/tokens` | one Tailwind 4 `@theme` file            | nothing     |
+| `@gusnips/http`   | the request/response envelope, as types | nothing     |
+| `@gusnips/react`  | the headless runtime                    | react       |
+| `@gusnips/vite`   | the prerender rig and the vite preset   | node, react |
 
 They are four and not one because of what each consumer can afford to install. An Astro
 marketing site wants the tokens and no JavaScript. An API server wants the envelope and no
@@ -50,7 +50,7 @@ const user = await api.get<User>("/me");
 
 Two things in there took a production incident each to learn. Six queries firing at once send
 **one** refresh, not six — the auth server rotates the refresh token, so the losers of that race
-each invalidate the winner and sign the person out mid-load. And a refresh that never *reached*
+each invalidate the winner and sign the person out mid-load. And a refresh that never _reached_
 the auth server does not count as a refusal: dropping a packet says nothing about whether a
 session is good, so a Wi-Fi blip no longer signs anyone out.
 

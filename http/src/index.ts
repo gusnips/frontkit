@@ -63,8 +63,7 @@ export interface ApiError<Code extends string = string> {
 }
 
 export type ApiResponse<T, Code extends string = string, M = PaginationMeta> =
-  | ApiSuccess<T, M>
-  | ApiError<Code>;
+  ApiSuccess<T, M> | ApiError<Code>;
 
 /** True when a parsed body is the error half of the envelope. */
 export function isApiError<Code extends string>(body: unknown): body is ApiError<Code> {

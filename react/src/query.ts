@@ -46,10 +46,7 @@ export interface QueryDefaultsOptions {
  * Exported on its own because an app with its own QueryClient config still wants this rule, and
  * because it is the part worth testing.
  */
-export function shouldRetry(
-  error: unknown,
-  durableLimitCodes: readonly string[] = [],
-): boolean {
+export function shouldRetry(error: unknown, durableLimitCodes: readonly string[] = []): boolean {
   // No response at all — offline, DNS, a dropped connection. The request never landed, so
   // nothing about it is an answer, and a second attempt is exactly right.
   if (!(error instanceof ApiError)) return true;

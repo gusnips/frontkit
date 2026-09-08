@@ -24,8 +24,16 @@ describe("humanizeWait", () => {
 
 describe("retryAfterSecs", () => {
   it("reads the number out of details, and refuses anything else", () => {
-    expect(retryAfterSecs(new ApiError(429, { code: "X", message: "", details: { retryAfterSecs: 30 } }))).toBe(30);
-    expect(retryAfterSecs(new ApiError(429, { code: "X", message: "", details: { retryAfterSecs: "30" } }))).toBeNull();
+    expect(
+      retryAfterSecs(
+        new ApiError(429, { code: "X", message: "", details: { retryAfterSecs: 30 } }),
+      ),
+    ).toBe(30);
+    expect(
+      retryAfterSecs(
+        new ApiError(429, { code: "X", message: "", details: { retryAfterSecs: "30" } }),
+      ),
+    ).toBeNull();
     expect(retryAfterSecs(new ApiError(429, { code: "X", message: "", details: null }))).toBeNull();
     expect(retryAfterSecs(new ApiError(429, null))).toBeNull();
   });
