@@ -18,10 +18,16 @@
     "build": "bun run scripts/compile-check.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun run scripts/compile-check.ts",
-    "lint": "eslint scripts"
+    "lint": "eslint scripts",
+    "sync:docs": "cp ../README.md ../LICENSE .",
+    "prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run sync:docs",
+    "release:patch": "bun pm version patch && bun publish --access public",
+    "release:minor": "bun pm version minor && bun publish --access public",
+    "release:major": "bun pm version major && bun publish --access public"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
+    "@types/node": "^24.12.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3"
   },

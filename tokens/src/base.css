@@ -1,0 +1,116 @@
+/*
+ * The base rules every app needs and nobody remembers to write.
+ *
+ * Each rule below is here because a product shipped without it and something broke. No
+ * colours and no brand: every value reads a token from theme.css, so import that first —
+ * or import index.css, which does both in the right order.
+ */
+
+@layer base {
+  /* The browser paints two areas itself: the overscroll rubber-band, and the strip a
+     100svh surface leaves uncovered when a mobile toolbar retracts. With no explicit
+     `color-scheme` it paints them its own default near-black, a hair off our surface —
+     a hard two-tone seam across every full-height loading and error screen. Painting
+     `html` (not just `body`) and declaring the scheme makes those UA-painted areas match.
+     `color-scheme` also fixes form controls, scrollbars and the caret, which is the
+     second half of the same win. */
+  html {
+    color-scheme: light;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  /* Matches wherever the class lives. Products put it on <html>, which is what makes the
+     canvas follow; on <body> it still corrects controls and scrollbars in the subtree. */
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* A browser's default cursor for <button> is the arrow — links get the hand for free,
+     buttons never do — and Tailwind's preflight does not say otherwise. So nothing built
+     out of a Button primitive read as clickable on hover. Saying it once here beats
+     sprinkling `cursor-pointer` across every primitive and every call site.
+     In `@layer base` on purpose: cursor utilities live in the utilities layer, which the
+     cascade puts after base, so a component that deliberately asks for `cursor-default`
+     or `cursor-not-allowed` on an enabled button still wins. `:not(:disabled)` leaves the
+     disabled cursor alone, since that element sets its own. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  /* One focus ring for the whole app, drawn with the ring token so it follows the theme
+     into dark mode with no second rule. No `border-radius` here: an outline already
+     traces the element's own radius, and forcing a value squares a pill or a segmented
+     control back into a rectangle. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /* Text fields draw their own focus treatment — a border colour plus a ring — and the
+     global outline landed on top of it as a doubled, heavy frame. Checkboxes and radios
+     keep the outline; it is their only keyboard-focus affordance.
+     If your field has no focus styling of its own, put the ring back with
+     `focus-visible:outline-2` — a utility beats this, because utilities sit in a later
+     cascade layer. Never leave a focusable control with neither. */
+  input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role="combobox"]:focus-visible {
+    outline: none;
+  }
+
+  /* A thin scrollbar, because the OS default is a wide light bar that stays light on a
+     dark app. The thumb reads `--color-input`, the one token defined to clear 3:1 against
+     the surface behind it — exactly what a scrollbar needs — and it is rebound in `.dark`,
+     so the thumb follows the theme without a second rule.
+     WebKit pseudo-elements only, deliberately: setting the standard `scrollbar-width`
+     makes Chrome ignore these rules entirely, so asking for both gets neither. */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-input);
+    border-radius: 3px;
+  }
+}
+
+@layer utilities {
+  /* Hide the bar, keep the scroll — for a tab strip or filter row that scrolls sideways,
+     where the scrollbar is chrome nobody drags. Here `scrollbar-width` is the right tool
+     and it deliberately overrides the rule above; the WebKit line covers Safari before
+     18.2, which does not support the standard property. */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Reduced motion. Clamped to 0.01ms rather than `none` so every animation still FIRES and
+   lands on its end pose — an element whose visible state is a keyframe's `to` block would
+   otherwise never appear at all.
+   The two delay properties are the half that is easy to miss: without them a staggered
+   list still waits out its full stagger before anything shows up, which is the delay with
+   none of the motion that explained it. One of the three donor themes clamped the
+   durations and forgot the delays. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0.01ms !important;
+  }
+}

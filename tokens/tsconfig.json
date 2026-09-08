@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // The package itself is CSS — nothing is compiled. This config covers `scripts/` only,
+    // which runs the Tailwind CLI over the token files, so it is the one place in the repo
+    // where `tokens/` gets to see Node. Nothing here is published: `files` in package.json
+    // ships `src/` alone.
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["scripts/**/*"],
+  "exclude": ["node_modules"]
+}

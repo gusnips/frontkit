@@ -3,6 +3,10 @@ dist
 *.tsbuildinfo
 .DS_Store
 
+# The token compile check builds here. Cleared on success, kept on failure so the CSS
+# that broke is there to read.
+tokens/.compile-check
+
 # Copied in at publish time from the repo root — one source of truth.
 tokens/README.md
 tokens/LICENSE

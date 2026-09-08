@@ -1,0 +1,39 @@
+/*
+ * The tokens and the base rules together. Import this unless you have a reason not to.
+ *
+ * An app entry is three lines:
+ *
+ *   @import "tailwindcss";
+ *   @import "@gusnips/tokens/index.css";
+ *   @source "../../../packages/ui/src";   // one per package Tailwind must scan for classes
+ *
+ * Then your own colours, after those. Override a name in `@theme` for light and in `.dark`
+ * for dark — both halves, every time, or the light value stays on screen at night:
+ *
+ *   @theme { --color-primary: #7c3aed; }
+ *   .dark  { --color-primary: #a78bfa; }
+ *
+ * That is two lines, and it changes every component that ever wrote `bg-primary`.
+ *
+ * Keep this import AFTER `@import "tailwindcss"`. It uses `@theme`, `@layer` and
+ * `@custom-variant`, and Tailwind only understands those once it has been imported.
+ *
+ * You do not need to declare `@custom-variant dark` yourself — theme.css ships it.
+ *
+ * Take the halves separately if you need to: `@gusnips/tokens/theme.css` is the tokens
+ * with no rules, `@gusnips/tokens/base.css` the rules with no tokens.
+ *
+ * Not here, on purpose: fonts, shadows, radii, a type scale, motion, keyframes. Radii,
+ * type sizes and easings already have Tailwind's own `--radius-*`, `--text-*` and
+ * `--ease-*` names — retune those in your `@theme` and every `rounded-lg` in every
+ * component follows. The rest is what your product looks like, and it stays in your
+ * product.
+ *
+ * One trap worth knowing before you write your own `@theme`: `--duration-*` is NOT a
+ * Tailwind namespace. `duration-standard` compiles to nothing at all, silently, and the
+ * transition falls back to 150ms. `duration-250` works; so does `var(--duration-standard)`
+ * inside a hand-written rule. The compile check pins this so nobody rediscovers it.
+ */
+
+@import "./theme.css";
+@import "./base.css";

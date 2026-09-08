@@ -1,0 +1,101 @@
+/*
+ * The colour contract, and the dark-mode mechanism.
+ *
+ * Twenty names. Nineteen of them were already defined, independently, in three separate
+ * product themes — that agreement is what makes this a contract rather than a preference.
+ * A component writes `bg-card text-card-foreground` once and renders correctly in both
+ * modes, in every product that imports this file.
+ *
+ * Dark mode is class-strategy: the SAME names are rebound under `.dark`, so `bg-card`
+ * resolves differently below a `.dark` ancestor and no component ever writes a `dark:`
+ * variant. That is the entire mechanism, and it is the reason the names are worth sharing.
+ * The alternative one product tried — a parallel `--color-dark-*` namespace — makes every
+ * component spell out both halves, which is a `dark:` variant with extra steps.
+ *
+ * The VALUES are placeholders: a plain grey scale, accessible and deliberately
+ * characterless. A product overrides them in its own `@theme` block AFTER importing this
+ * one. Colour is where a product lives; it does not belong in a shared package.
+ *
+ * Two traps, both of which cost real time to find:
+ *   - Do NOT change this to `@theme inline`. Inline bakes each value into the utility, and
+ *     the `.dark` rebinding below silently stops working.
+ *   - A name added here must be added to `.dark` too. Forgetting leaves one colour stuck at
+ *     its light value in dark mode, on one screen, which is how a theme rots. The compile
+ *     check fails on that.
+ */
+
+/* `:where()` keeps the variant at zero specificity, so `dark:bg-card` and `bg-card` weigh
+   the same and source order decides — the ordinary Tailwind behaviour every other variant
+   has. Without it the dark variant would quietly outrank hover and focus styles. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ─── Light ───
+     Contrast measured, not guessed: foreground on background 17.2:1, muted-foreground on
+     background 7.5:1 and on muted 7.2:1, every `-foreground` on its own surface above
+     14:1. `input` is the odd one — it is a control BOUNDARY, so it answers WCAG 1.4.11's
+     3:1 rather than a text ratio, and it is deliberately much darker than `border`. */
+  --color-background: #fafafa;
+  --color-foreground: #171717;
+  --color-card: #ffffff;
+  --color-card-foreground: #171717;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #171717;
+  --color-primary: #171717;
+  --color-primary-foreground: #fafafa;
+  --color-secondary: #f5f5f5;
+  --color-secondary-foreground: #171717;
+  --color-muted: #f5f5f5;
+  --color-muted-foreground: #525252;
+  /* `accent` is the NEUTRAL highlight — a menu row under the cursor, a hovered list item.
+     Brand tinting is always explicit, never the ambient default. Two of the three donor
+     themes say this in their own words, and the third had to fix it later. */
+  --color-accent: #e5e5e5;
+  --color-accent-foreground: #171717;
+  /* The one placeholder that is not grey. `destructive` is a MEANING, not a brand choice:
+     a grey delete button is indistinguishable from a secondary one, so a product that
+     never overrides this still gets a warning that reads as a warning. 4.8:1 under white. */
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e5e5e5;
+  --color-input: #8c8c8c; /* 3.2:1 on background, 3.4:1 on card */
+  --color-ring: #171717;
+  /* What a dialog dims the page with. A token rather than `black/40`, because the two
+     modes need different scrims: over a light ground a wash of ink reads as shade, and
+     over a dark ground the same wash reads as nothing at all. */
+  --color-scrim: rgb(23 23 23 / 0.5);
+}
+
+/*
+ * Dark. Stays after `@theme` on purpose: `@theme` compiles to a `:root` rule, and `:root`
+ * and `.dark` carry equal specificity, so source order is the only thing making the dark
+ * values win.
+ *
+ * Elevation here is lightness, not shadow — a drop shadow barely reads on a near-black
+ * ground. background → card → accent climb in even steps so a popover lifts off the page
+ * without needing one.
+ */
+.dark {
+  --color-background: #0a0a0a;
+  --color-foreground: #fafafa;
+  --color-card: #171717;
+  --color-card-foreground: #fafafa;
+  --color-popover: #171717;
+  --color-popover-foreground: #fafafa;
+  --color-primary: #fafafa;
+  --color-primary-foreground: #171717;
+  --color-secondary: #262626;
+  --color-secondary-foreground: #fafafa;
+  --color-muted: #262626;
+  --color-muted-foreground: #a3a3a3;
+  --color-accent: #333333;
+  --color-accent-foreground: #fafafa;
+  /* Inverted, not darkened: a saturated red on a near-black ground is unreadable, so the
+     fill lifts and the label goes dark. 5.8:1. */
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #450a0a;
+  --color-border: #262626;
+  --color-input: #6b6b6b; /* 3.7:1 on background, 3.4:1 on card */
+  --color-ring: #fafafa;
+  --color-scrim: rgb(0 0 0 / 0.65);
+}
