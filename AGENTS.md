@@ -334,3 +334,9 @@ your own slice per file, by pathspec, and never touch a foreign dirty file.
 - Comments explain **why**, especially the non-obvious production reason. That is most of the
   value being preserved here — a rule without its reason gets "simplified" away next quarter.
   When a comment in a donor file names a real incident, it comes across with the code.
+- **Correcting a comment means grepping for its sentence, not fixing its line.** A comment good
+  enough to be true and memorable gets quoted into this file, so the copy that misleads someone
+  is usually the one you are not looking at. That already happened once here: `menu.tsx` said a
+  Base UI production error arrives as "the bare number 31", the fix landed in `menu.tsx`, and the
+  same sentence sat uncorrected in "What the migrations taught" — the document people read
+  BEFORE the code.
