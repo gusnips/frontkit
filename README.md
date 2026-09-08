@@ -19,12 +19,12 @@ cn("p-2", "p-4"); // → "p-4"
 
 ## Four packages
 
-| Package           | What it is                              | Needs            |
-| ----------------- | --------------------------------------- | ---------------- |
-| `@gusnips/tokens` | one Tailwind 4 `@theme` file            | nothing          |
-| `@gusnips/http`   | the request/response envelope, as types | nothing          |
-| `@gusnips/react`  | the headless runtime                    | react, react-dom |
-| `@gusnips/vite`   | the prerender rig and the vite preset   | node             |
+| Package                               | What it is                              | Needs            |
+| ------------------------------------- | --------------------------------------- | ---------------- |
+| [`@gusnips/tokens`](tokens/README.md) | one Tailwind 4 `@theme` file            | nothing          |
+| [`@gusnips/http`](http/README.md)     | the request/response envelope, as types | nothing          |
+| [`@gusnips/react`](react/README.md)   | the headless runtime                    | react, react-dom |
+| [`@gusnips/vite`](vite/README.md)     | the prerender rig and the vite preset   | node             |
 
 They are four and not one because of what each consumer can afford to install. An Astro
 marketing site wants the tokens and no JavaScript. An API server wants the envelope and no

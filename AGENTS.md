@@ -42,12 +42,18 @@ knowing which they were.
 frontkit/               ← repo root (this folder), git root
 ├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
 ├── http/               ← @gusnips/http   — the envelope. Types only, zero deps, no framework.
-├── react/              ← @gusnips/react  — the headless runtime. Peer: react.
+├── react/              ← @gusnips/react  — the headless runtime. Peers: react, react-dom.
 │   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
 ├── vite/               ← @gusnips/vite   — the build rig. The ONLY package allowed node:fs.
-├── scripts/            ← check-purity.ts, which enforces exactly that
+├── scripts/            ← check-purity.ts and check-exports.ts, the two repo-level guards
 └── AGENTS.md           ← this file
 ```
+
+**Subpaths, and the rule that decides them.** Anything needing a peer the main entry does not
+already require lives behind one, so an adopter installs a dependency only by importing the thing
+that uses it — `@gusnips/react/ui` (`@base-ui/react`), `/store` (`zustand`), `/guards`
+(`react-router-dom`), `/contract` (nothing), `@gusnips/vite/preset` and `/render` (React). See
+invariant 15; `bun run exports` is what holds the line.
 
 **Four packages, split by dependency profile.** That split is not taste; it is what each
 consumer can afford to install:

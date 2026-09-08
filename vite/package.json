@@ -5,6 +5,10 @@
   "type": "module",
   "license": "MIT",
   "author": "Gustavo Salomé",
+  "homepage": "https://github.com/gusnips/frontkit/tree/main/vite#readme",
+  "bugs": {
+    "url": "https://github.com/gusnips/frontkit/issues"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

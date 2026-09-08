@@ -86,6 +86,17 @@ async function main(): Promise<void> {
     const manifest: PackageJson = JSON.parse(await readFile(join(dir, "package.json"), "utf-8"));
     const exportsMap = manifest.exports ?? {};
 
+    // A missing `dist/` means "not built yet", not "your exports map is wrong". Left to the
+    // check below it reports the second — one line per entry point, each sending somebody to
+    // hunt a typo in a path that is correct. Say the real cause once instead, and name the fix.
+    const built = Object.values(exportsMap).some((entry) =>
+      targetsOf(entry).some((target) => target.startsWith("./dist/")),
+    );
+    if (built && !(await stat(join(dir, "dist")).catch(() => null))) {
+      problems.push(`${manifest.name}: nothing built yet — run \`bun run build\` first`);
+      continue;
+    }
+
     // Every declared export must exist. A typo here surfaces only on someone else's install.
     for (const [subpath, entry] of Object.entries(exportsMap)) {
       for (const target of targetsOf(entry)) {
