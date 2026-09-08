@@ -6,10 +6,12 @@ import { CheckGlyph } from "./glyphs.tsx";
 // The parts — every one of them EXCEPT `GroupLabel`, and every one except `Group` and
 // `RadioGroup`, which are wrapped below. That omission is not tidying: it is the only thing
 // that actually prevents the bug. `Menu.GroupLabel` reads its group's context, so a caption
-// written as a SIBLING of the group throws at render — and in a production build the message
-// is the bare number 31, with nothing naming the file or the part. A comment cannot stop
-// that; not shipping the part can. The caption is a prop on the group instead, so the wrong
-// arrangement has nowhere to be written.
+// written as a SIBLING of the group throws at render, and a production build reports that as
+// `Base UI error #31` plus a link — a number to go look up, naming neither the file, nor the
+// part, nor the component it came from. A comment cannot stop that; not shipping the part
+// can. The caption is a prop on the group instead, so the wrong arrangement has nowhere to be
+// written. `Select.GroupLabel` and `Combobox.GroupLabel` throw the same way (#56 and #18) and
+// ARE exported — see the note beside them in index.ts for why that is the right call there.
 export const Menu = Primitive.Root;
 export const MenuTrigger = Primitive.Trigger;
 export const MenuPortal = Primitive.Portal;

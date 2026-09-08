@@ -59,6 +59,16 @@ export {
   type DrawerSide,
 } from "./drawer.tsx";
 
+// `SelectGroupLabel` and `ComboboxGroupLabel` below ARE exported, and the menu's is not. The
+// hazard is identical — all three read their group's context and throw when written outside
+// it, reported in production as `Base UI error #56` for select, `#18` for combobox and `#31`
+// for the menu — so the difference is a decision, not an oversight.
+//
+// It turns on what the wrapper already covers. `MenuGroup` composes the caption as a `label`
+// prop, so the raw part has no job left and withholding it is free. `Select` and `Combobox`
+// take a flat option list and cannot express a grouped one at all, so these are the escape
+// hatch for that shape — and a caller reaching for `SelectGroup` is writing its
+// `SelectGroupLabel` in the same breath, which is the arrangement that works.
 export {
   Select,
   SelectGroup,
