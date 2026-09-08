@@ -7,14 +7,12 @@ dist
 # that broke is there to read.
 tokens/.compile-check
 
-# Copied in at publish time from the repo root — one source of truth.
-tokens/README.md
+# Copied in at publish time from the repo root, so the licence has one source of truth.
+# The READMEs are NOT here: each package has its own, committed, because they are what npm
+# shows and a reader landing on @gusnips/tokens needs a CSS import, not `bun add @gusnips/react`.
 tokens/LICENSE
-http/README.md
 http/LICENSE
-react/README.md
 react/LICENSE
-vite/README.md
 vite/LICENSE
 
 # Internal: names private codebases. Stays on disk, out of the repo.

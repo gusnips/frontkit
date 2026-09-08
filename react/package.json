@@ -20,18 +20,36 @@
     }
   },
   "types": "./dist/index.d.ts",
-  "files": ["dist", "src", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
-  "engines": { "node": ">=22" },
-  "publishConfig": { "access": "public" },
-  "keywords": ["react", "vite", "spa", "zustand", "react-query", "i18next", "base-ui", "headless"],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "react",
+    "vite",
+    "spa",
+    "zustand",
+    "react-query",
+    "i18next",
+    "base-ui",
+    "headless"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "sync:docs": "cp ../README.md ../LICENSE .",
+    "sync:docs": "cp ../LICENSE .",
     "prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run build && bun run sync:docs",
     "release:patch": "bun pm version patch && bun publish --access public",
     "release:minor": "bun pm version minor && bun publish --access public",
@@ -53,12 +71,24 @@
     "zustand": "^5"
   },
   "peerDependenciesMeta": {
-    "@base-ui/react": { "optional": true },
-    "@tanstack/react-query": { "optional": true },
-    "i18next": { "optional": true },
-    "react-i18next": { "optional": true },
-    "react-router-dom": { "optional": true },
-    "zustand": { "optional": true }
+    "@base-ui/react": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "i18next": {
+      "optional": true
+    },
+    "react-i18next": {
+      "optional": true
+    },
+    "react-router-dom": {
+      "optional": true
+    },
+    "zustand": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@base-ui/react": "^1.8.0",
