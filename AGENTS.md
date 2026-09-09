@@ -365,6 +365,54 @@ _(The audit that preceded the first line of code already taught these.)_
   a React Native app shares — and it silently overwrites repeated `data:` lines. Neither is the
   answer alone. Export the parser beside the client, and expect the same shape elsewhere.
 
+### Migration 2 (in progress)
+
+The first repo with three apps and a phone, and the first that is a **donor** rather than only an
+adopter. That changes what a migration finds: instead of one app missing a lesson, there are two
+siblings in one tree and only one of them ever got the fix.
+
+- **A fleet-wide bug hid in `turbo.json`.** The `build` task hashed one env var, and the four
+  `VITE_*` ones — which Vite **inlines into the bundle**, and one of which the prerender reads for
+  every canonical, every `og:url` and the whole sitemap — were not in the hash. Staging and
+  production pass different values. A build right after a staging build is a cache hit, so
+  production ships pointing at `stg.` on every address and talking to the staging API, and nothing
+  about it looks wrong. `"env": ["VITE_*"]` as a wildcard, because every variable with that prefix
+  goes into the bundle by definition. **Every repo on this stack has the same file. Check it.**
+- **The sibling app is the finding.** Three times over, in one tree: the admin's own
+  `isChunkLoadError` matched Chrome's phrasing and not Firefox's, so a stale deploy read as a hard
+  crash on Firefox; the admin's `vite:preloadError` handler reloaded the whole page for a CSS
+  *hint* failure and swallowed real ones; and the admin's `themeStore` still read `localStorage`
+  unguarded at module scope, the white screen the web app had fixed two days earlier. All three
+  were already right in the app next door. Nothing merged them, so nothing found them.
+- **The invariant-12 bug was live in a THIRD repo.** `404.html` advertised
+  `og:image = /og/__not-found__.png`, a file the card generator has never rendered because it only
+  renders pages in the registry. Same as the first adopter, found the same way — by reading the
+  shell branch rather than the browser.
+- **`og:url` on a shell was the half nobody wrote down.** This repo did not blank it (which
+  invariant 12 warns about); it set it to the ORIGIN, which is a different wrong: every share of a
+  dead link unfurls as the home page. The package strips it, and the app's two other shells —
+  `app.html` and `record.html`, which are the raw template rather than a bake — needed the same
+  three tags removed by hand.
+- **A rule can only be enforced if the template carries the tag.** The old rig APPENDED a canonical
+  before `</head>`; the package REPLACES one, and refuses a template without it. So `index.html`
+  gained a `<link rel="canonical">` it never had. That is the point: `String.replace` with no match
+  succeeds, so the enforceable version needs something to fail against.
+- **An adopter's API convention came up into the package.** The first adopter's server names a
+  sentence with `messageKey`; this one has no such field and lets the **`code`** name it — 98 of
+  them, `errors.FORECAST_NOT_FOUND` and siblings — which its client resolved itself. That is how
+  i18n ended up inside a transport. `serverSentence` now reads the code under the same prefix and
+  through the same `knownMessageKeys` gate, after `messageKey`. Second convention, same claim.
+- **A version bump can be forced by a pin you cannot see.** `@gusnips/vite` depends on
+  `@gusnips/react` at `workspace:*`, and npm rewrites that to an EXACT version at pack time. A
+  react release therefore obsoletes the published vite: left alone, an adopter taking the new react
+  gets a second nested copy of it under vite, with a second `PRERENDERED_ROUTE_ATTR`. The two ship
+  in lockstep, react first.
+- **Two audit findings did not survive contact with the code.** The audit said this repo sends no
+  `og:locale` (it does, `pt_BR` plus two alternates, in `index.html`) and that its two robots files
+  disagree about the domain (both name the same one). Neither went into a commit message. **Re-read
+  before you write the finding down** — an audit note ages, and a bug claimed in a commit that was
+  never true is worse than one that was never found.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
