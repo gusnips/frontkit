@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { isChunkLoadError, isPreloadHintFailure } from "./chunk-reload.ts";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isChunkLoadError, isPreloadHintFailure, reloadOnceForChunkError } from "./chunk-reload.ts";
 
 // No browser gives a failed dynamic import a shared type, so this is matched by message and
 // every phrasing has to be here. A miss is a white screen after a deploy — the exact failure
@@ -42,5 +42,69 @@ describe("isPreloadHintFailure", () => {
     expect(isPreloadHintFailure(new Error("Failed to fetch dynamically imported module"))).toBe(
       false,
     );
+  });
+});
+
+/**
+ * The guard, which is the whole reason this function exists rather than a bare
+ * `location.reload()` at the call site. Reloading on a chunk error the reload does not fix is
+ * an infinite loop with a person inside it, and it only reproduces on a real broken deploy —
+ * so this is the only place the rule gets checked.
+ *
+ * Two globals, stubbed rather than run under a DOM: `window` and `sessionStorage` are the only
+ * ones this module touches, and adding jsdom to a package whose whole point is a small
+ * dependency list would cost more than it explains.
+ */
+describe("reloadOnceForChunkError", () => {
+  const reload = vi.fn();
+  let store: Record<string, string> = {};
+  /** Throws from both methods, the way a browser does when site data is blocked. */
+  let blocked = false;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    reload.mockClear();
+    store = {};
+    blocked = false;
+    vi.stubGlobal("window", { location: { reload } });
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string): string | null => {
+        if (blocked) throw new Error("site data blocked");
+        return store[key] ?? null;
+      },
+      setItem: (key: string, value: string): void => {
+        if (blocked) throw new Error("site data blocked");
+        store[key] = value;
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("reloads on the first chunk failure", () => {
+    expect(reloadOnceForChunkError()).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a second reload inside the window, so a dead chunk cannot loop", () => {
+    expect(reloadOnceForChunkError()).toBe(true);
+    expect(reloadOnceForChunkError()).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows another one after the window, because the next deploy is a new problem", () => {
+    expect(reloadOnceForChunkError()).toBe(true);
+    vi.setSystemTime(Date.now() + 61_000);
+    expect(reloadOnceForChunkError()).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
+
+  it("still reloads when storage is blocked — a privacy setting is not a reason to strand", () => {
+    blocked = true;
+    expect(reloadOnceForChunkError()).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 });
