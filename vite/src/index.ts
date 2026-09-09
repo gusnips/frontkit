@@ -15,6 +15,7 @@
  * imports React or vite, so a prerender script, an OG generator and a repo that only wants a
  * sitemap all install exactly what they use.
  */
+export { resolveKey } from "./catalog.ts";
 export {
   assertRendered,
   bakeHead,
