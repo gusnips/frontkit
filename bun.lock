@@ -24,7 +24,7 @@
     },
     "react": {
       "name": "@gusnips/react",
-      "version": "0.2.0",
+      "version": "0.4.0",
       "dependencies": {
         "@gusnips/http": "workspace:*",
         "clsx": "^2.1.1",
@@ -58,6 +58,7 @@
         "@base-ui/react",
         "@tanstack/react-query",
         "i18next",
+        "react-dom",
         "react-i18next",
         "react-router-dom",
         "zustand",
@@ -75,7 +76,7 @@
     },
     "vite": {
       "name": "@gusnips/vite",
-      "version": "0.2.0",
+      "version": "0.4.0",
       "dependencies": {
         "@gusnips/react": "workspace:*",
       },

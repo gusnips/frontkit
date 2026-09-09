@@ -45,7 +45,7 @@ frontkit/               ← repo root (this folder), git root
 ├── react/              ← @gusnips/react  — the headless runtime. One required peer: react.
 │   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
 ├── vite/               ← @gusnips/vite   — the build rig. The ONLY package allowed node:fs.
-├── scripts/            ← check-purity.ts and check-exports.ts, the two repo-level guards
+├── scripts/            ← check-purity.ts, check-exports.ts and check-release.ts, the guards
 └── AGENTS.md           ← this file
 ```
 
@@ -82,6 +82,7 @@ bun install                  # workspace root
 
 bun run check                # lint → typecheck → purity → test, all four packages
 bun run purity               # the platform guard on its own
+bun run release:check        # what the REGISTRY would get — run before every publish
 bun run build
 bun run format
 ```
@@ -99,6 +100,19 @@ Per package: `cd react && bun run test`, etc.
 - **Adopters resolve from the registry** — never `link:` or `file:`. providerkit's lesson: a
   `file:` dependency resolves on exactly one machine, and it drags the package's own
   devDependencies into the adopter's lockfile.
+- **Release with `bun publish`, never `npm publish`, and run `bun install` first.** `@gusnips/vite`
+  depends on `@gusnips/react` at `workspace:*`, which npm cannot resolve — something has to rewrite
+  it to a real version at pack time, and both ways of getting that wrong have already shipped.
+  `npm publish` does not rewrite it at all, so `@gusnips/vite@0.4.0` went out with the literal
+  string `workspace:*` and cannot be installed. `bun publish` rewrites it **from `bun.lock`, not
+  from the sibling's package.json**, so a version bumped without re-running `bun install` publishes
+  the version the lock still remembers — which is why `@gusnips/vite@0.3.0` pins
+  `@gusnips/react@0.2.0` and gives an adopter a second, older copy of react nested under vite.
+  Neither is visible from the source tree, where the workspace link makes every version correct.
+  **`bun run release:check` packs each package and reads the manifest that comes out**; it is the
+  only thing here that looks at what the registry will actually receive.
+- **Publish in dependency order** — `tokens`, `http`, `react`, `vite` — and bump `vite` whenever
+  `react` ships, because the pin inside it changed even when none of its own code did.
 
 ## What must NOT be shared
 
@@ -381,7 +395,7 @@ siblings in one tree and only one of them ever got the fix.
 - **The sibling app is the finding.** Three times over, in one tree: the admin's own
   `isChunkLoadError` matched Chrome's phrasing and not Firefox's, so a stale deploy read as a hard
   crash on Firefox; the admin's `vite:preloadError` handler reloaded the whole page for a CSS
-  *hint* failure and swallowed real ones; and the admin's `themeStore` still read `localStorage`
+  _hint_ failure and swallowed real ones; and the admin's `themeStore` still read `localStorage`
   unguarded at module scope, the white screen the web app had fixed two days earlier. All three
   were already right in the app next door. Nothing merged them, so nothing found them.
 - **The invariant-12 bug was live in a THIRD repo.** `404.html` advertised
