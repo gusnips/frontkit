@@ -283,7 +283,7 @@ And one trap that is not about contrast at all:
 
 ## What the migrations taught
 
-### Migration 1 (−446 lines, 8 commits)
+### Migration 1 (−502 lines, 10 commits)
 
 - **An API this package got wrong shows up as an adapter in the adopter.** `MeQuery`'s first
   state was `"loading"`, so wiring `createRequireProfile` to a react-query hook needed six
