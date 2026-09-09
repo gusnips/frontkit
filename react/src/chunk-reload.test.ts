@@ -30,6 +30,9 @@ describe("isChunkLoadError", () => {
   it("does not match an ordinary render error", () => {
     expect(isChunkLoadError(new TypeError("Cannot read properties of undefined"))).toBe(false);
     expect(isChunkLoadError(null)).toBe(false);
+    // A thrown string reaches the `String(error)` branch, which is the one a non-Error throw
+    // takes — and the one that would blow up if it were written `error.message`.
+    expect(isChunkLoadError("something failed")).toBe(false);
   });
 });
 
