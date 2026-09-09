@@ -121,6 +121,12 @@ export interface ErrorDescriberOptions<
   /**
    * The server's own catalog namespace, e.g. `"serverErrors."`. A `messageKey` outside it is
    * ignored — the server names a sentence, it does not get to name any key in the app.
+   *
+   * The `code` is read under this prefix too, for an API that has no `messageKey` field and
+   * lets the code name the sentence — one repo in the fleet has 98 of those, `errors.NOT_FOUND`
+   * and its siblings, against another repo's `messageKey`. Both are the same claim ("the server
+   * named a sentence this app carries"), both pass the same gate below, and an app that uses
+   * neither is unaffected because nothing matches.
    */
   messageKeyPrefix: ServerPrefix;
   /**
@@ -168,10 +174,18 @@ export function createErrorDescriber<
   const has = (name: string): name is ServerName => known.has(name);
 
   function serverSentence(error: ApiError): string | null {
-    const messageKey = error.messageKey;
-    if (messageKey === undefined || !messageKey.startsWith(messageKeyPrefix)) return null;
-    const name = messageKey.slice(messageKeyPrefix.length);
-    return has(name) ? t(`${messageKeyPrefix}${name}`, error.params) : null;
+    const lookup = (named: string | undefined): string | null => {
+      if (named === undefined || !named.startsWith(messageKeyPrefix)) return null;
+      const name = named.slice(messageKeyPrefix.length);
+      return has(name) ? t(`${messageKeyPrefix}${name}`, error.params) : null;
+    };
+    // `messageKey` first: an API that sends both means the key, and the code is what the UI
+    // switches on. The code is only consulted when there is no key to prefer, and it is spelled
+    // under the same prefix so the gate is identical.
+    return (
+      lookup(error.messageKey) ??
+      (error.code === undefined ? null : lookup(`${messageKeyPrefix}${error.code}`))
+    );
   }
 
   return function describeError(error: unknown): DescribedError {

@@ -102,3 +102,39 @@ describe("createErrorDescriber", () => {
     expect(describeError(new ApiError(403, null)).hint).toBeUndefined();
   });
 });
+
+/**
+ * The second convention in the fleet: an API with no `messageKey` field at all, whose CODE
+ * names the sentence. One repo has 98 of them — `errors.FORECAST_NOT_FOUND` and its siblings —
+ * and its client used to resolve them itself, which is how the translation ended up inside the
+ * transport.
+ */
+describe("createErrorDescriber, when the code names the sentence", () => {
+  const describeError = createErrorDescriber({
+    t,
+    copyPrefix: "errors.",
+    messageKeyPrefix: "errors.",
+    knownMessageKeys: { FORECAST_NOT_FOUND: "", network: "" },
+  });
+
+  it("resolves a code this build has copy for", () => {
+    const error = new ApiError(404, { code: "FORECAST_NOT_FOUND", message: "Forecast not found" });
+    expect(describeError(error).cause).toBe("errors.FORECAST_NOT_FOUND");
+  });
+
+  it("falls back to the server's own message for a code with no copy", () => {
+    // The server writes for a developer, so this is the worse of the two — but it is still the
+    // most specific thing anyone has, and support can act on it.
+    const error = new ApiError(429, { code: "RESEARCH_LIMIT", message: "Concurrent limit hit" });
+    expect(describeError(error).cause).toBe("Concurrent limit hit");
+  });
+
+  it("prefers messageKey when the server sends both", () => {
+    const error = new ApiError(404, {
+      code: "FORECAST_NOT_FOUND",
+      message: "Forecast not found",
+      messageKey: "errors.network",
+    });
+    expect(describeError(error).cause).toBe("errors.network");
+  });
+});
