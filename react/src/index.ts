@@ -29,7 +29,7 @@
 
 export { cn } from "./cn.ts";
 
-export { ApiError, isAbortError } from "./api-error.ts";
+export { ApiError, isAbortError, retryAfterSecs } from "./api-error.ts";
 export {
   createApiClient,
   type ApiClient,
@@ -40,7 +40,7 @@ export {
 } from "./api-client.ts";
 export { createSseParser, readSseStream, type SseFrame } from "./sse.ts";
 
-export { queryDefaults, shouldRetry, type QueryDefaultsOptions } from "./query.ts";
+export { queryDefaults, retryDelayMs, shouldRetry, type QueryDefaultsOptions } from "./query.ts";
 
 export {
   ErrorBoundary,
@@ -50,7 +50,6 @@ export {
 export {
   createErrorDescriber,
   humanizeWait,
-  retryAfterSecs,
   type DescribedError,
   type ErrorArm,
   type ErrorContext,

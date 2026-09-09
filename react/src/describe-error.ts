@@ -1,4 +1,4 @@
-import { ApiError } from "./api-error.ts";
+import { ApiError, retryAfterSecs } from "./api-error.ts";
 
 /**
  * Turning anything thrown into copy a person can act on.
@@ -74,14 +74,6 @@ type _TypedCatalogNeedsNoCast = Satisfied<
     ? true
     : false
 >;
-
-/** Seconds until a refusal clears, when the envelope carries them. */
-export function retryAfterSecs(error: ApiError): number | null {
-  const details = error.details;
-  if (typeof details !== "object" || details === null) return null;
-  const value = (details as { retryAfterSecs?: unknown }).retryAfterSecs;
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
 
 /**
  * "in 4 minutes" / "in 2 hours" — a wait nobody has to convert from seconds.

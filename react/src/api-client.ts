@@ -1,5 +1,5 @@
 import { isApiError, type ApiSuccess } from "@gusnips/http";
-import { ApiError } from "./api-error.ts";
+import { ApiError, parseRetryAfter } from "./api-error.ts";
 
 /**
  * The app's one door to the API. Nothing else should call `fetch`.
@@ -311,6 +311,7 @@ export function createApiClient({
       const body: unknown = await res.json().catch(() => null);
       const error = new ApiError(res.status, isApiError(body) ? body.error : null, {
         requestId: res.headers.get(requestIdHeader) ?? undefined,
+        retryAfterSecs: parseRetryAfter(res.headers.get("retry-after")),
       });
       // A listener that throws must not become the error the caller sees: the API failure is
       // the real news, and swallowing it for a bug in a side effect would send everyone

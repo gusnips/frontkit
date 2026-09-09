@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, isAbortError } from "./api-error.ts";
+import { ApiError, isAbortError, retryAfterSecs } from "./api-error.ts";
 import { createApiClient, type RefreshResult, type SessionAdapter } from "./api-client.ts";
 
 function stubFetch(handler: (url: string, init: RequestInit) => Response | Promise<Response>) {
@@ -63,6 +63,43 @@ describe("createApiClient", () => {
       details: { retryAfterSecs: 60 },
       requestId: "req_1",
     });
+  });
+
+  /**
+   * The second migration's API states the wait in the HEADER and puts nothing in the body — the
+   * standard place, and the one this package did not read. `retryAfterSecs` now answers for
+   * either convention, which is what lets one retry rule and one piece of copy serve both.
+   */
+  it("reads the wait off the Retry-After header", async () => {
+    stubFetch(
+      () =>
+        new Response(JSON.stringify({ error: { code: "RATE_LIMIT_EXCEEDED", message: "slow" } }), {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        }),
+    );
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+    });
+
+    const error = await api.get("/x").catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 429, retryAfterSecs: 60 });
+    expect(retryAfterSecs(error as ApiError)).toBe(60);
+  });
+
+  it("leaves the wait unset when the answer did not state one", async () => {
+    stubFetch(() => new Response("{}", { status: 500 }));
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+    });
+
+    const error = await api.get("/x").catch((e: unknown) => e);
+    expect((error as ApiError).retryAfterSecs).toBeUndefined();
+    expect(retryAfterSecs(error as ApiError)).toBeNull();
   });
 
   /**

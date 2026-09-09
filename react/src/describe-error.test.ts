@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api-error.ts";
-import { createErrorDescriber, humanizeWait, retryAfterSecs } from "./describe-error.ts";
+import { createErrorDescriber, humanizeWait } from "./describe-error.ts";
 
 /** A translator that echoes the key, so a test can see exactly which one was asked for. */
 const t = (key: string, params?: Record<string, unknown>) =>
@@ -19,23 +19,6 @@ describe("humanizeWait", () => {
 
   it("never says 'in 0 seconds'", () => {
     expect(humanizeWait(t, 0.2, "errors.")).toBe('errors.waitSeconds({"count":1})');
-  });
-});
-
-describe("retryAfterSecs", () => {
-  it("reads the number out of details, and refuses anything else", () => {
-    expect(
-      retryAfterSecs(
-        new ApiError(429, { code: "X", message: "", details: { retryAfterSecs: 30 } }),
-      ),
-    ).toBe(30);
-    expect(
-      retryAfterSecs(
-        new ApiError(429, { code: "X", message: "", details: { retryAfterSecs: "30" } }),
-      ),
-    ).toBeNull();
-    expect(retryAfterSecs(new ApiError(429, { code: "X", message: "", details: null }))).toBeNull();
-    expect(retryAfterSecs(new ApiError(429, null))).toBeNull();
   });
 });
 

@@ -111,7 +111,7 @@ Per package: `cd react && bun run test`, etc.
 - **Bumping a version does not update the lockfile. Delete `bun.lock` and re-install.** This is the
   sharp edge under the bullet above, and "run `bun install` first" — what this file said before —
   does not do it. bun rewrites a workspace's recorded `version` only when that workspace's
-  *dependencies* change; a version-only bump changes nothing bun looks at, so `bun install`,
+  _dependencies_ change; a version-only bump changes nothing bun looks at, so `bun install`,
   `bun install --force` and `bun install --lockfile-only` all report success and leave the old
   number in place. `bun publish` then pins the sibling to it. The only thing that reconciles the two
   is `rm bun.lock && bun install`, which also floats every unpinned dependency — do it deliberately,
@@ -182,10 +182,18 @@ pin them; if one fails, a lesson is being un-learned.
 7. **`isLoading` starts false where there is no window.** A session bootstrap can only be in
    flight in a browser. `true` during a build is a wait that never ends: it shipped a spinner as
    the indexable body of a page whose whole purpose was to be found.
-8. **Never retry what waiting cannot fix.** 402 and a durable 429 (`QUOTA_EXCEEDED`,
-   `PAYMENT_REQUIRED`) clear by buying, not by waiting; retrying them burns another request
-   against the limiter and says the same thing three times. Retry 408, a transient 429, 5xx, and
-   no-response-at-all — nothing else.
+8. **Never retry what waiting cannot fix, and when it says how long, believe it.** 402 and a
+   durable 429 (`QUOTA_EXCEEDED`, `PAYMENT_REQUIRED`) clear by buying, not by waiting; retrying
+   them burns another request against the limiter and says the same thing three times. Retry 408,
+   a transient 429, 5xx, and no-response-at-all — nothing else. The second half arrived with the
+   second migration: a refusal that states its own expiry has already answered the question, so a
+   short wait is WAITED OUT (`retryDelay` takes the stated seconds over the backoff) and a long
+   one is an answer (`shouldRetry` refuses past `maxRetryWaitSecs`, default 10s). Without it a
+   per-minute limiter answering `Retry-After: 60` got retried at 1s and 2s — two more requests
+   that could not succeed, charged against the same limiter, and three seconds of spinner before
+   the screen said anything. **Read the wait from the HEADER first**: it is where HTTP puts it,
+   and the package looked only in `details.retryAfterSecs` — one donor's body convention — so for
+   every API that follows the spec, the one refusal that states its expiry read as silent.
 9. **A wrapper forwards its rest props.** A closed prop list removes `name`, `required`, `form`
    and `data-*` from a form control. Four wrappers in the donor repo did exactly this: they did
    not add form integration, they removed it.
