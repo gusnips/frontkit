@@ -150,15 +150,15 @@ describe("createApiClient", () => {
 
   /**
    * providerkit's invariant 2, on the web side: a caller's Stop and our deadline must stay
-   * distinguishable. `AbortSignal.timeout` rejects with a **TimeoutError**, not an AbortError,
-   * so `isAbortError` stays false for it — which is what lets a timeout be retried and reported
+   * distinguishable. The deadline aborts with a **TimeoutError**, not an AbortError, so
+   * `isAbortError` stays false for it — which is what lets a timeout be retried and reported
    * while a navigation-cancelled request is silently dropped.
    */
   it("distinguishes its own timeout from the caller's abort", async () => {
     // Note the `aborted` check before the listener. A signal that fired before fetch was ever
     // called never emits the event, so a listener alone hangs forever — real `fetch` checks the
-    // flag first, and so must anything standing in for it. That already-aborted race is exactly
-    // what `AbortSignal.any` in the client exists to cover.
+    // flag first, and so must anything standing in for it. That already-aborted race is one of
+    // the three things `withDeadline` exists to get right.
     stubFetch(
       (_url, init) =>
         new Promise<Response>((_resolve, reject) => {
@@ -175,13 +175,44 @@ describe("createApiClient", () => {
     });
 
     const timedOut = await api.get("/slow").catch((e: unknown) => e);
-    expect((timedOut as DOMException).name).toBe("TimeoutError");
+    expect((timedOut as Error).name).toBe("TimeoutError");
     expect(isAbortError(timedOut)).toBe(false);
 
     const controller = new AbortController();
     const cancelled = api.get("/slow", { signal: controller.signal }).catch((e: unknown) => e);
     controller.abort();
     expect(isAbortError(await cancelled)).toBe(true);
+
+    // The already-aborted race: a signal that fired BEFORE the call. A listener alone never
+    // hears it, so the request would go out and run to full term with nobody waiting.
+    const already = new AbortController();
+    already.abort();
+    const dead = await api.get("/slow", { signal: already.signal }).catch((e: unknown) => e);
+    expect(isAbortError(dead)).toBe(true);
+  });
+
+  /**
+   * React Native replaces the global `AbortSignal` with abort-controller@3, which has neither
+   * `timeout` nor `any`. The client used both, so `createApiClient` threw
+   * `AbortSignal.timeout is not a function` on the phone's first request — in the main entry,
+   * the one this package promises works there. Deleting the statics is the cheapest honest
+   * stand-in for that runtime.
+   */
+  it("works where AbortSignal has no static helpers, as on a phone", async () => {
+    const { timeout, any } = AbortSignal as unknown as Record<string, unknown>;
+    delete (AbortSignal as unknown as Record<string, unknown>).timeout;
+    delete (AbortSignal as unknown as Record<string, unknown>).any;
+    try {
+      stubFetch(() => ok({ id: "1" }));
+      const api = createApiClient({
+        baseUrl: "https://api.test",
+        session: session(),
+        onSessionDead: () => {},
+      });
+      await expect(api.get("/me")).resolves.toEqual({ id: "1" });
+    } finally {
+      Object.assign(AbortSignal, { timeout, any });
+    }
   });
 
   // A 204 has no body, so `res.json()` on one throws `Unexpected end of JSON input` — which

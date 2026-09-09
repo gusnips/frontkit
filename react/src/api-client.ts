@@ -144,6 +144,67 @@ export interface ApiClient {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * One signal that fires on the caller's abort or on the deadline, whichever comes first.
+ *
+ * `AbortSignal.timeout` plus `AbortSignal.any` is the obvious way to write this, and it is
+ * not portable: React Native replaces the global `AbortSignal` with abort-controller@3, which
+ * has neither static — so the phone got `AbortSignal.timeout is not a function` on its very
+ * first request. This is the same two rules with an `AbortController`, which every runtime
+ * this package targets does have, and it is the ONLY path rather than a fallback: one branch
+ * cannot drift from the other.
+ *
+ * Three details that are the whole reason this is not three lines:
+ *
+ * - **The already-aborted race.** A caller whose signal fired before we attached would never
+ *   fire the listener, so the request would go out and run to full term. Checked first.
+ * - **A timeout must not look like a cancellation.** `isAbortError` exists so a request nobody
+ *   is waiting for stays silent; a request that ran out of time is a real failure somebody
+ *   should see. A bare `controller.abort()` raises an `AbortError` and would be swallowed, so
+ *   the deadline aborts with a plain `Error` — not a `DOMException`, which `isAbortError` is
+ *   the one thing that checks for.
+ * - **The timer is cleared.** Otherwise every completed request leaves a pending timeout for
+ *   the rest of its budget, which on a phone is a wake-up nobody asked for.
+ */
+function withDeadline(
+  ms: number,
+  caller: AbortSignal | null | undefined,
+): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    // Named, not typed: callers identify a deadline by `name === "TimeoutError"`, the same
+    // way `AbortSignal.timeout` reports it. A `DOMException` would be the faithful copy and is
+    // not constructible everywhere this runs.
+    const expired = new Error(`Request timed out after ${String(ms)}ms`);
+    expired.name = "TimeoutError";
+    controller.abort(expired);
+  }, ms);
+
+  let detach = (): void => {};
+  if (caller) {
+    if (caller.aborted) {
+      clearTimeout(timer);
+      controller.abort(caller.reason);
+    } else {
+      const onAbort = (): void => {
+        controller.abort(caller.reason);
+      };
+      caller.addEventListener("abort", onAbort, { once: true });
+      detach = () => {
+        caller.removeEventListener("abort", onAbort);
+      };
+    }
+  }
+
+  return {
+    signal: controller.signal,
+    clear: () => {
+      clearTimeout(timer);
+      detach();
+    },
+  };
+}
+
 export function createApiClient({
   baseUrl,
   session,
@@ -215,15 +276,16 @@ export function createApiClient({
     if (budget === null)
       return fetch(`${baseUrl}${path}`, { ...init, signal, headers: buildHeaders(token, headers) });
 
-    // `AbortSignal.any` rather than a listener: it also catches the already-aborted race, where
-    // a caller's signal fired before we ever attached. It keeps the caller's abort and our
-    // timeout distinguishable at the source, which is what lets `isAbortError` stay honest.
-    const timeout = AbortSignal.timeout(budget);
-    return fetch(`${baseUrl}${path}`, {
-      ...init,
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      headers: buildHeaders(token, headers),
-    });
+    const deadline = withDeadline(budget, signal);
+    try {
+      return await fetch(`${baseUrl}${path}`, {
+        ...init,
+        signal: deadline.signal,
+        headers: buildHeaders(token, headers),
+      });
+    } finally {
+      deadline.clear();
+    }
   }
 
   async function request(path: string, options: RequestOptions = {}): Promise<Response> {
