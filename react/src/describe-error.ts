@@ -26,8 +26,54 @@ export interface DescribedError {
   hint?: string;
 }
 
-/** The subset of i18next's `t` this module needs — typed here so `i18next` stays optional. */
-export type Translate = (key: string, params?: Record<string, unknown>) => string;
+/**
+ * The subset of i18next's `t` this module needs — typed here so `i18next` stays optional.
+ *
+ * `Key` is a parameter and not plain `string` for a reason the first migration found. Every app
+ * on this stack declares `CustomTypeOptions.resources`, which types `t` to accept ONLY the keys
+ * its catalog has — so a `t` is not assignable to anything asking for `(key: string) => string`,
+ * and the adopter is left with a cast. Naming the keys instead turns that around: each function
+ * below asks for exactly the keys it looks up, a typed `t` accepts a superset of them and goes
+ * in directly, and a catalog missing one is a compile error rather than a raw key on screen.
+ */
+export type Translate<Key extends string = string> = (
+  key: Key,
+  params?: Record<string, unknown>,
+) => string;
+
+/** The three names {@link humanizeWait} looks up, under whatever prefix you pass it. */
+type WaitName = "waitSeconds" | "waitMinutes" | "waitHours";
+
+/** Every name {@link createErrorDescriber} looks up itself. Your catalog carries all of them. */
+type CopyName = WaitName | "network" | "networkHint" | "unexpected" | "retrySoon";
+
+/**
+ * The paragraph above, pinned so it cannot quietly stop being true.
+ *
+ * `ClosedCatalog` is what an app's `t` looks like once it declares `CustomTypeOptions.resources`:
+ * a closed union, nothing else accepted. It must go straight into the options below. Widen `Key`
+ * back to `string` and this stops compiling HERE, rather than at the eleventh adopter reaching
+ * for the cast the house rules forbid.
+ */
+type Satisfied<T extends true> = T;
+type ClosedCatalog = (
+  key:
+    | "errors.network"
+    | "errors.networkHint"
+    | "errors.unexpected"
+    | "errors.retrySoon"
+    | "errors.waitSeconds"
+    | "errors.waitMinutes"
+    | "errors.waitHours"
+    | "serverErrors.quotaDay"
+    | "billing.plan",
+  params?: Record<string, unknown>,
+) => string;
+type _TypedCatalogNeedsNoCast = Satisfied<
+  ClosedCatalog extends ErrorDescriberOptions<"errors.", "serverErrors.", "quotaDay">["t"]
+    ? true
+    : false
+>;
 
 /** Seconds until a refusal clears, when the envelope carries them. */
 export function retryAfterSecs(error: ApiError): number | null {
@@ -42,36 +88,17 @@ export function retryAfterSecs(error: ApiError): number | null {
  *
  * The thresholds are deliberately not round: 90 seconds rather than 60, so "in 75 seconds" does
  * not become the less precise "in 1 minute", and 90 minutes rather than 60 for the same reason
- * one rung up. Needs `waitSeconds` / `waitMinutes` / `waitHours` in the catalog, each with a
+ * one rung up. Needs `waitSeconds` / `waitMinutes` / `waitHours` under `prefix`, each with a
  * `count` plural.
  */
-export function humanizeWait(t: Translate, secs: number, prefix = ""): string {
-  const key = (name: string): string => `${prefix}${name}`;
-  if (secs < 90) return t(key("waitSeconds"), { count: Math.max(1, Math.round(secs)) });
-  if (secs < 90 * 60) return t(key("waitMinutes"), { count: Math.round(secs / 60) });
-  return t(key("waitHours"), { count: Math.round(secs / 3600) });
-}
-
-export interface ErrorDescriberOptions<Code extends string> {
-  t: Translate;
-  /**
-   * The server's own catalog namespace, e.g. `"serverErrors."`. A `messageKey` outside it is
-   * ignored — the server names a sentence, it does not get to name any key in the app.
-   */
-  messageKeyPrefix?: string;
-  /**
-   * The keys this build actually carries, usually `Object.keys(en.serverErrors)`.
-   *
-   * Membership is checked with `hasOwnProperty` and not `in`, which would accept `"toString"`.
-   * A key that is absent falls back to the server's English `message`, because a deploy can land
-   * ahead of the bundle a tab is still running and a missing translation must degrade to
-   * readable rather than render the key itself at somebody.
-   */
-  knownMessageKeys?: readonly string[] | Record<string, unknown>;
-  /** Catalog namespace for this module's own copy. Defaults to `"errors."`. */
-  copyPrefix?: string;
-  /** Per-code copy. Everything not listed falls through to the default arm below. */
-  codes?: Partial<Record<Code, (ctx: ErrorContext) => DescribedError>>;
+export function humanizeWait<Prefix extends string>(
+  t: Translate<`${Prefix}${WaitName}`>,
+  secs: number,
+  prefix: Prefix,
+): string {
+  if (secs < 90) return t(`${prefix}waitSeconds`, { count: Math.max(1, Math.round(secs)) });
+  if (secs < 90 * 60) return t(`${prefix}waitMinutes`, { count: Math.round(secs / 60) });
+  return t(`${prefix}waitHours`, { count: Math.round(secs / 3600) });
 }
 
 export interface ErrorContext {
@@ -81,39 +108,77 @@ export interface ErrorContext {
   /** Seconds until it clears, already humanized. Null when the envelope did not say. */
   wait: string | null;
   waitSecs: number | null;
-  t: Translate;
 }
 
-/**
- * Build the describer. Needs `network`, `networkHint`, `unexpected`, `retrySoon`,
- * `waitSeconds`, `waitMinutes` and `waitHours` under `copyPrefix` in every locale.
- */
-export function createErrorDescriber<Code extends string>({
-  t,
-  messageKeyPrefix = "serverErrors.",
-  knownMessageKeys,
-  copyPrefix = "errors.",
-  codes = {},
-}: ErrorDescriberOptions<Code>): (error: unknown) => DescribedError {
-  const known = Array.isArray(knownMessageKeys)
-    ? new Set<string>(knownMessageKeys)
-    : new Set(Object.keys(knownMessageKeys ?? {}));
+export interface ErrorDescriberOptions<
+  Prefix extends string,
+  ServerPrefix extends string,
+  ServerName extends string,
+> {
+  t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName}`>;
+  /** Catalog namespace for this module's own copy, e.g. `"errors."`. */
+  copyPrefix: Prefix;
+  /**
+   * The server's own catalog namespace, e.g. `"serverErrors."`. A `messageKey` outside it is
+   * ignored — the server names a sentence, it does not get to name any key in the app.
+   */
+  messageKeyPrefix: ServerPrefix;
+  /**
+   * The keys this build actually carries, usually the `serverErrors` object out of the English
+   * catalog. Passing the catalog itself is both the membership test and the proof the compiler
+   * wants: a name that is in it IS a key, so the lookup below needs no cast.
+   *
+   * It is required because leaving it out is not a smaller version of this — it is the bug the
+   * option exists to prevent. i18next answers a key it does not have with the key itself, so a
+   * deploy landing ahead of the bundle a tab is still running would render `serverErrors.foo` at
+   * somebody. A name that is absent falls back to the server's English `message` instead.
+   */
+  knownMessageKeys: Record<ServerName, unknown>;
+  /**
+   * Per-code copy. Everything not listed falls through to the default arm.
+   *
+   * The arms look up the app's own keys, so they close over the app's `t` rather than being
+   * handed one — this module has no names for that copy and no business typing it.
+   *
+   * Annotate your object `Partial<Record<YourErrorCode, ErrorArm>>` where you write it, and a
+   * code that does not exist is a compile error at the arm rather than a branch that never runs.
+   */
+  codes?: Partial<Record<string, ErrorArm>>;
+}
 
-  const has = (name: string): boolean => known.size === 0 || known.has(name);
-  const key = (name: string): string => `${copyPrefix}${name}`;
+export type ErrorArm = (ctx: ErrorContext) => DescribedError;
+
+/** Build the describer. */
+export function createErrorDescriber<
+  Prefix extends string,
+  ServerPrefix extends string,
+  ServerName extends string,
+>({
+  t,
+  copyPrefix,
+  messageKeyPrefix,
+  knownMessageKeys,
+  codes = {},
+}: ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>): (error: unknown) => DescribedError {
+  const known = new Set<string>(Object.keys(knownMessageKeys));
+
+  // Sound, and the reason nothing here needs a cast: the set was built from the keys of
+  // `knownMessageKeys`, so membership really does establish the claim. `Object.keys` and not
+  // `in`, which would have accepted "toString".
+  const has = (name: string): name is ServerName => known.has(name);
 
   function serverSentence(error: ApiError): string | null {
     const messageKey = error.messageKey;
     if (messageKey === undefined || !messageKey.startsWith(messageKeyPrefix)) return null;
     const name = messageKey.slice(messageKeyPrefix.length);
-    return has(name) ? t(messageKey, error.params) : null;
+    return has(name) ? t(`${messageKeyPrefix}${name}`, error.params) : null;
   }
 
   return function describeError(error: unknown): DescribedError {
     if (!(error instanceof ApiError)) {
       // Not a response at all — the request never landed. Almost always the network, and almost
       // never worth showing a stack trace for.
-      return { cause: t(key("network")), hint: t(key("networkHint")) };
+      return { cause: t(`${copyPrefix}network`), hint: t(`${copyPrefix}networkHint`) };
     }
 
     const waitSecs = retryAfterSecs(error);
@@ -122,10 +187,9 @@ export function createErrorDescriber<Code extends string>({
       says: serverSentence(error),
       wait: waitSecs === null ? null : humanizeWait(t, waitSecs, copyPrefix),
       waitSecs,
-      t,
     };
 
-    const arm = error.code === undefined ? undefined : codes[error.code as Code];
+    const arm = error.code === undefined ? undefined : codes[error.code];
     if (arm) return arm(ctx);
 
     // Anything unmapped: the server's own sentence is still the most specific thing we have,
@@ -133,8 +197,8 @@ export function createErrorDescriber<Code extends string>({
     // genuinely does clear on its own — a 4xx does not, and saying so would be a lie that costs
     // the reader another attempt.
     return {
-      cause: ctx.says ?? (error.message || t(key("unexpected"))),
-      hint: error.status >= 500 ? t(key("retrySoon")) : undefined,
+      cause: ctx.says ?? (error.message || t(`${copyPrefix}unexpected`)),
+      hint: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
     };
   };
 }

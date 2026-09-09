@@ -42,7 +42,9 @@ describe("retryAfterSecs", () => {
 describe("createErrorDescriber", () => {
   const describeError = createErrorDescriber({
     t,
-    knownMessageKeys: ["quotaDay", "suspended"],
+    copyPrefix: "errors.",
+    messageKeyPrefix: "serverErrors.",
+    knownMessageKeys: { quotaDay: "", suspended: "" },
     codes: {
       QUOTA_EXCEEDED: ({ says, wait }) => ({
         cause: says ?? "errors.quota",

@@ -44,6 +44,7 @@ export {
   humanizeWait,
   retryAfterSecs,
   type DescribedError,
+  type ErrorArm,
   type ErrorContext,
   type ErrorDescriberOptions,
   type Translate,
