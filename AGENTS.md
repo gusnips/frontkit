@@ -283,8 +283,53 @@ And one trap that is not about contrast at all:
 
 ## What the migrations taught
 
-_(Filled in as migrations land. The audit that preceded the first line of code already taught
-these.)_
+### Migration 1 (−446 lines, 8 commits)
+
+- **An API this package got wrong shows up as an adapter in the adopter.** `MeQuery`'s first
+  state was `"loading"`, so wiring `createRequireProfile` to a react-query hook needed six
+  hand-written lines whose entire job was renaming one string. Eight of the twelve repos are on
+  react-query and would each have written it, with three states to map and three chances to map
+  one wrong. react-query's own word is `"pending"`; with the words matching, a `UseQueryResult`
+  satisfies `MeQuery` structurally and the hook goes in directly. **A six-line adapter in the
+  first adopter is a design review, not a chore.** Pin the shape with a type-level assertion so
+  it cannot drift back.
+- **The house's own patterns are part of the contract.** `createErrorDescriber` took
+  `t: (key: string) => string`, which no app on this stack can supply: every one declares
+  i18next's `CustomTypeOptions.resources`, which types `t` to accept only the keys its catalog
+  has — so a typed `t` is not assignable to anything asking for `string`, and the only way
+  through is the cast the house rules forbid. The fix was to name the keys each function looks
+  up. That is strictly better anyway: the doc comment listing seven required catalog keys became
+  a type, so a catalog missing one is a compile error rather than a raw key on screen.
+- **The whole point is the third repo.** The audit found `og:image` surviving onto a shell in one
+  donor (invariant 12). This adopter — not a donor, not read during the audit — was shipping three
+  404 shells advertising `/og/__not-found__.png`, a file its card generator has never rendered
+  because it only renders pages in the registry. Every share of a dead link unfurled broken, in
+  three languages, and nothing in a browser shows it.
+- **A rig written twice in ONE repo is the strongest possible signal.** This adopter had two
+  prerender rigs — site and docs — each with its own `escapeAttr`, `setMeta`, `pageFile`,
+  `assertRendered`, `loadTemplate`, `loadRenderer` and sitemap writer. `resolve` was
+  byte-identical between them, comment included. Both are the package now, and both sitemaps came
+  out byte-identical to the previous build, which is the check that says the merge lost nothing.
+- **Migrating a file rereads it, which is what finds the dead code.** The site's `index.html`
+  carried 43 lines of `FAQPage` JSON-LD that the baker stripped from every page and rebuilt from
+  the catalog — dead, and already drifted to four questions where the page renders seven. The
+  site's error boundary had `crash.title`, `crash.body` and `crash.reload` written in all three
+  locales and rendered none of them, showing a hardcoded English "Reload" instead. The
+  dashboard's crash text had `{...rise(0.15)}` followed by `className="…"`, so JSX's later prop
+  won and the animation class was silently dropped.
+- **A contract can be a lint the adopter never ran.** `@gusnips/tokens` was NOT imported —
+  its 808-line theme already defines 19 of the 20 semantic names, and the values are the
+  brand, so importing placeholder greys to override them all would have been net-positive in
+  lines for nothing. Reading the contract against the theme was still worth the whole exercise:
+  `--color-input` measured **1.43:1** in light and **1.58:1** in dark against a 3:1 floor, so
+  every field border in the product failed WCAG 1.4.11 in both modes. **Not importing a package
+  and still using it is a real outcome.**
+- **A silent no-op is worse than a missing feature.** `bakeHead` threw on a `<meta>` it was asked
+  to set and could not find, but wrote the canonical with `String.replace` — which succeeds when
+  it matches nothing. A template with no canonical would have shipped every page without one,
+  quietly. Found because the docs template is exactly that template.
+
+_(The audit that preceded the first line of code already taught these.)_
 
 - **The audit finds bugs in repos that are not the extraction source.** Reading the two donors
   against each other found a sign-out-on-a-Wi-Fi-blip in one, a `RequireStaff` in a third repo
