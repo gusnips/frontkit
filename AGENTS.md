@@ -442,6 +442,29 @@ siblings in one tree and only one of them ever got the fix.
   disagree about the domain (both name the same one). Neither went into a commit message. **Re-read
   before you write the finding down** — an audit note ages, and a bug claimed in a commit that was
   never true is worse than one that was never found.
+- **The dead code was in the CALLERS, not the file.** The app's second SSE transport carried a
+  reconnect loop with backoff, a retry ceiling and three toasts — and both call sites passed
+  `maxRetries: 0`, because the store above them has its own reconnect loop with its own deadline.
+  Two dozen lines that had never run once, including a toast-per-attempt bug that could therefore
+  never fire. Its `onClose` option was the same story: forwarded through two layers, set by nobody.
+  Reading the file tells you what it does; reading its callers tells you what it does HERE.
+- **A second transport does not stay a copy — it stays the OLD copy.** That same file had its own
+  fetch, its own auth header, its own 401 retry and its own toasts, and not one fix made to the
+  real client had ever reached it: the retry re-sent the token that had just been refused rather
+  than refreshing it, nothing bounded the handshake, a dead session never redirected, and a fresh
+  OAuth sign-in opened a stream before the account row existed. None of it was visible as a bug
+  in that file — every line was reasonable when it was written. Routing it through the app's one
+  client fixed four things at once and deleted 84 lines. It also killed the app's last
+  `getAuthHeaders()`, which existed only to hand that transport a token.
+- **Not migrating something is a result, and it is measured, not felt.** This repo's three auth
+  stores are a strict superset of `createAuthStore`: each adds `isAnonymous` (denormalized from
+  the user), and two add real product state the kit's fixed shape has no slot for — a
+  post-login layout-restore guard, a one-shot sign-out notice. Adopting the factory would save
+  about 25 lines and rewrite ~70 call sites (39 read `isAnonymous` off the store, 33 call
+  `clearUser`). That is a migration that grows the risk and not the value, so it did not happen —
+  and the finding is what the kit is missing, not that the adopter is wrong: a fixed store shape
+  fits an app with no extras and nothing else. The first adopter's is one line; this one's cannot
+  be.
 
 ### How to migrate a repo — the check that is not optional
 
