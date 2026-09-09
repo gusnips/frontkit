@@ -100,17 +100,25 @@ Per package: `cd react && bun run test`, etc.
 - **Adopters resolve from the registry** — never `link:` or `file:`. providerkit's lesson: a
   `file:` dependency resolves on exactly one machine, and it drags the package's own
   devDependencies into the adopter's lockfile.
-- **Release with `bun publish`, never `npm publish`, and run `bun install` first.** `@gusnips/vite`
-  depends on `@gusnips/react` at `workspace:*`, which npm cannot resolve — something has to rewrite
-  it to a real version at pack time, and both ways of getting that wrong have already shipped.
-  `npm publish` does not rewrite it at all, so `@gusnips/vite@0.4.0` went out with the literal
-  string `workspace:*` and cannot be installed. `bun publish` rewrites it **from `bun.lock`, not
-  from the sibling's package.json**, so a version bumped without re-running `bun install` publishes
-  the version the lock still remembers — which is why `@gusnips/vite@0.3.0` pins
-  `@gusnips/react@0.2.0` and gives an adopter a second, older copy of react nested under vite.
-  Neither is visible from the source tree, where the workspace link makes every version correct.
-  **`bun run release:check` packs each package and reads the manifest that comes out**; it is the
-  only thing here that looks at what the registry will actually receive.
+- **Release with `bun publish`, never `npm publish`.** `@gusnips/vite` depends on `@gusnips/react`
+  at `workspace:*`, which npm cannot resolve — something has to rewrite it to a real version at pack
+  time, and both ways of getting that wrong have already shipped. `npm publish` does not rewrite it
+  at all, so `@gusnips/vite@0.4.0` went out with the literal string `workspace:*` and cannot be
+  installed. `bun publish` rewrites it **from `bun.lock`, not from the sibling's package.json** —
+  which is why `@gusnips/vite@0.3.0` pins `@gusnips/react@0.2.0` and gives an adopter a second,
+  older copy of react nested under vite. Neither is visible from the source tree, where the
+  workspace link makes every version correct.
+- **Bumping a version does not update the lockfile. Delete `bun.lock` and re-install.** This is the
+  sharp edge under the bullet above, and "run `bun install` first" — what this file said before —
+  does not do it. bun rewrites a workspace's recorded `version` only when that workspace's
+  *dependencies* change; a version-only bump changes nothing bun looks at, so `bun install`,
+  `bun install --force` and `bun install --lockfile-only` all report success and leave the old
+  number in place. `bun publish` then pins the sibling to it. The only thing that reconciles the two
+  is `rm bun.lock && bun install`, which also floats every unpinned dependency — do it deliberately,
+  at release time, and run `bun run check` after.
+- **`bun run release:check` packs each package and reads the manifest that comes out.** It is the
+  only thing here that looks at what the registry will actually receive, and the only reason the
+  bug above is a caught error rather than a broken tarball.
 - **Publish in dependency order** — `tokens`, `http`, `react`, `vite` — and bump `vite` whenever
   `react` ships, because the pin inside it changed even when none of its own code did.
 
