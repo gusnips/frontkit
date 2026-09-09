@@ -160,10 +160,13 @@ export function bakeHead(template: string, tags: HeadTags): string {
   } else {
     html = setMeta(html, 'property="og:url"', tags.canonical);
     html = setMetaIfPresent(html, 'property="twitter:url"', tags.canonical);
-    html = html.replace(
-      /(<link rel="canonical" href=")[^"]*(")/,
-      `$1${escapeAttr(tags.canonical)}$2`,
-    );
+    // Demanded, like every meta tag a crawler depends on. `String.replace` with no match is a
+    // silent no-op, so a template that never had a canonical would get one on no page at all
+    // and say nothing about it — the exact failure `setMeta` exists to turn into a red build.
+    const canonicalRe = /(<link rel="canonical" href=")[^"]*(")/;
+    if (!canonicalRe.test(html))
+      throw new Error('prerender: <link rel="canonical"> not found in index.html');
+    html = html.replace(canonicalRe, `$1${escapeAttr(tags.canonical)}$2`);
   }
 
   if (tags.alternates?.length) {

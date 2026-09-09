@@ -79,6 +79,14 @@ describe("bakeHead", () => {
     expect(() => bakeHead(stripped, BASE)).toThrow(/og:title/);
   });
 
+  // The canonical is a `<link>`, so it is written with `String.replace` rather than `setMeta` —
+  // and a replace that matches nothing succeeds silently. Without this, a template that never
+  // carried a canonical would ship every page without one and say nothing.
+  it("refuses a template with no canonical to write into", () => {
+    const stripped = TEMPLATE.replace(/<link rel="canonical"[^>]*>/, "");
+    expect(() => bakeHead(stripped, BASE)).toThrow(/canonical/);
+  });
+
   // …and the exception: nothing reads `name="title"`, and X reads `og:` when `twitter:` is
   // absent. A template without them is correct, so demanding them would break a real app.
   it("skips the optional tags a template does not carry", () => {
