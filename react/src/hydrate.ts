@@ -8,6 +8,11 @@
  *
  * The constants themselves live in `prerender-contract.ts`, which imports nothing, because the
  * BUILD needs them too and must not pull `react-dom/client` into a Node process to get a string.
+ *
+ * This module sits behind `@gusnips/react/hydrate` rather than in the barrel for the same reason
+ * one rung further out: it is the package's ONLY `react-dom` import, and a React Native app has
+ * no react-dom to give. Leaving it in the barrel made `react-dom` a required peer and shut the
+ * whole package out of every phone — for one function a phone would never call.
  */
 import type { ReactNode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";

@@ -11,13 +11,21 @@
 //   @gusnips/react/ui       the Base UI wrappers   → @base-ui/react
 //   @gusnips/react/store    createAuthStore        → zustand
 //   @gusnips/react/guards   the route guards       → react-router-dom
+//   @gusnips/react/hydrate  hydrateOrMount         → react-dom
 //
-// So what is left here imports `react`, `react-dom` and `@gusnips/http` and nothing else, and an
-// app on TanStack Router or on Redux takes the fetch client without installing a router or a
-// store it will never call. `@tanstack/react-query`, `i18next` and `react-i18next` stay optional
-// AND stay here, because `query.ts`, `i18n.ts` and `states.ts` import only their TYPES — which
-// erase, so the built barrel does not reference them at runtime. Check that claim against
-// `dist/`, never against this file: a type-only re-export looks identical in source.
+// `react-dom` is the one the second migration added, and it is the sharpest case yet: that
+// adopter ships a REACT NATIVE app beside its two web apps, and React Native has no react-dom to
+// give. A required peer nobody can satisfy is not a strict contract, it is a closed door — the
+// whole package was unusable there, for one function no phone would ever call. The rule did not
+// need changing to catch it; `react-dom` simply had to stop being required.
+//
+// So what is left here imports `react` and `@gusnips/http` and nothing else, and an app on
+// TanStack Router, on Redux, or on a phone takes the fetch client without installing a router, a
+// store or a DOM renderer it will never call. `@tanstack/react-query`, `i18next` and
+// `react-i18next` stay optional AND stay here, because `query.ts`, `i18n.ts` and `states.ts`
+// import only their TYPES — which erase, so the built barrel does not reference them at runtime.
+// Check that claim against `dist/`, never against this file: a type-only re-export looks
+// identical in source.
 
 export { cn } from "./cn.ts";
 
@@ -57,7 +65,10 @@ export {
   reloadOnceForChunkError,
 } from "./chunk-reload.ts";
 
-export { hydrateOrMount, PRERENDERED_ROUTE_ATTR, SHELL_ROUTE } from "./hydrate.ts";
+// The two constants, but NOT `hydrateOrMount` — that one is at `@gusnips/react/hydrate`, because
+// it is the package's only `react-dom` import. These come from the contract module, which imports
+// nothing at all, so they are free to everyone: a build script, a browser entry, or a phone.
+export { PRERENDERED_ROUTE_ATTR, SHELL_ROUTE } from "./prerender-contract.ts";
 
 export { applyBrandVars, i18nInitOptions, type I18nInitOptions } from "./i18n.ts";
 

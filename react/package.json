@@ -1,10 +1,10 @@
 {
   "name": "@gusnips/react",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "The headless runtime under a Vite + React SPA: typed fetch client with single-flight refresh, auth store, query defaults, route guards, error boundary, chunk-reload recovery, i18n bootstrap.",
   "type": "module",
   "license": "MIT",
-  "author": "Gustavo Salomé",
+  "author": "Gustavo Salom\u00e9",
   "homepage": "https://github.com/gusnips/frontkit/tree/main/react#readme",
   "bugs": {
     "url": "https://github.com/gusnips/frontkit/issues"
@@ -25,6 +25,10 @@
     "./guards": {
       "types": "./dist/guards.d.ts",
       "default": "./dist/guards.js"
+    },
+    "./hydrate": {
+      "types": "./dist/hydrate.d.ts",
+      "default": "./dist/hydrate.js"
     },
     "./contract": {
       "types": "./dist/prerender-contract.d.ts",
@@ -90,6 +94,9 @@
       "optional": true
     },
     "i18next": {
+      "optional": true
+    },
+    "react-dom": {
       "optional": true
     },
     "react-i18next": {

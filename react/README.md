@@ -128,13 +128,21 @@ hurry cannot skip.
 
 ## Also here
 
-`hydrateOrMount` for prerendered pages, `ErrorBoundary`, an SSE reader split into a platform-free
-parser and a stream wrapper, `i18nInitOptions`, and `cn`.
+`ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
+`i18nInitOptions`, and `cn`.
 
 `createAuthStore` is at `@gusnips/react/store` — a zustand store whose `isLoading` starts `false`
 where there is no window. A session bootstrap can only be in flight in a browser, and `true`
 during a build is a wait that never ends: it once shipped a spinner as the indexable body of a
 page whose whole job was to be found.
+
+`hydrateOrMount` is at `@gusnips/react/hydrate`, and the guards are at `@gusnips/react/guards`.
+
+## On a phone
+
+The main entry works in React Native. It imports `react` and nothing else you would have to go
+find — no `react-dom`, no router, no store — so the fetch client, the retry rule and the SSE
+parser all come along, and the four things that need a browser stay behind the subpaths above.
 
 ## The Base UI wrappers
 
