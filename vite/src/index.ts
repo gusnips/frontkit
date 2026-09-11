@@ -26,6 +26,7 @@ export {
   type RenderedChecks,
 } from "./head.ts";
 export {
+  assertOgImages,
   loadRenderer,
   loadTemplate,
   writeDist,

@@ -11,13 +11,14 @@
  * policy the product owns. What is identical in every one of them is these four functions and
  * the gate in `assertRendered`, so those ship and the ~40-line loop stays in the app.
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { EMPTY_ROOT } from "./head.ts";
 import type { OgOverflow } from "./og.ts";
 import { describeOverflow } from "./og.ts";
 import type { PageRenderer } from "./render.ts";
+import { siteOrigin } from "./sitemap.ts";
 
 /**
  * The built `index.html`, and a refusal to bake one twice.
@@ -137,4 +138,108 @@ export async function writeOgCards<Page>({
   await mkdir(outDir, { recursive: true });
   for (const entry of laid) await writeFile(join(outDir, entry.file), entry.png);
   return laid.map((entry) => entry.file);
+}
+
+/** Where a page says its share card is, and the page that says it. */
+interface AdvertisedCard {
+  page: string;
+  url: string;
+}
+
+const CARD_META =
+  /<meta[^>]+(?:property|name)="(?:og:image|twitter:image)"[^>]+content="([^"]*)"[^>]*>/gi;
+
+function advertisedCards(page: string, html: string): AdvertisedCard[] {
+  const seen = new Set<string>();
+  const cards: AdvertisedCard[] = [];
+  for (const match of html.matchAll(CARD_META)) {
+    const url = match[1];
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      cards.push({ page, url });
+    }
+  }
+  return cards;
+}
+
+/**
+ * The path a card URL points at inside `dist`, or null when the card is not this build's to
+ * serve. A `?v=2` or a `#` is addressing, not a file name, so both come off.
+ */
+function distPathOf(url: string, origin: string): string | null {
+  if (url.startsWith("/")) return decodeURIComponent(url.split(/[?#]/)[0] ?? "");
+  try {
+    const parsed = new URL(url);
+    return parsed.origin === origin ? decodeURIComponent(parsed.pathname) : null;
+  } catch {
+    // Not an address at all. A card URL relative to the page's own folder cannot be resolved
+    // without knowing where that page sits, and Open Graph asks for an absolute URL anyway.
+    return null;
+  }
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every share card a built page advertises is a file that exists.
+ *
+ * Three repos shipped a page whose `og:image` named a card nothing had ever rendered. All three
+ * were `404.html`, all three for the same reason: a card generator walks the page registry, and
+ * a not-found shell is not in the registry, so a head built from the same template inherits a
+ * card address with no card behind it. Every share of a dead link unfurled broken, in one case
+ * in three languages, and **nothing in a browser shows it** — the page looks perfect, and the
+ * only reader who finds out is whoever the link was sent to.
+ *
+ * `bakeHead` cannot catch it: it is handed an `image` and writes it, and a shell carrying the
+ * brand card is correct, so it has no way to tell a right image from a wrong one (invariant 12).
+ * The build can, because by then the cards are either on disk or they are not. Run it last,
+ * after the pages and the cards are written:
+ *
+ * ```ts
+ * await assertOgImages("dist", "https://example.com");
+ * ```
+ *
+ * Cards on another host are somebody else's to serve and are skipped — but a build whose pages
+ * all advertise cards and whose origin matches NONE of them has been given the wrong origin,
+ * and a check that silently passes is worse than no check, so that is an error too.
+ */
+export async function assertOgImages(distDir: string, origin: string): Promise<number> {
+  const root = siteOrigin(origin);
+  const entries = await readdir(distDir, { recursive: true, withFileTypes: true });
+  const pages = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".html"))
+    .map((entry) => join(entry.parentPath, entry.name));
+
+  const advertised: AdvertisedCard[] = [];
+  for (const page of pages) advertised.push(...advertisedCards(page, await readFile(page, "utf8")));
+
+  const mine = advertised
+    .map((card) => ({ ...card, file: distPathOf(card.url, root) }))
+    .filter((card): card is AdvertisedCard & { file: string } => card.file !== null);
+
+  if (advertised.length > 0 && mine.length === 0)
+    throw new Error(
+      `og: ${String(advertised.length)} page(s) advertise a share card and none is under ` +
+        `${root}, so nothing was checked. Pass the origin this build renders for.`,
+    );
+
+  const missing: (AdvertisedCard & { file: string })[] = [];
+  for (const card of mine) {
+    if (!(await isFile(join(distDir, card.file)))) missing.push(card);
+  }
+
+  if (missing.length > 0)
+    throw new Error(
+      `og: ${String(missing.length)} page(s) advertise a share card that is not in ${distDir} —\n\n` +
+        missing.map((card) => `  · ${card.page} → ${card.url}`).join("\n") +
+        "\n\n  Either render the card, or leave `image` out of the head for that page.",
+    );
+
+  return mine.length;
 }

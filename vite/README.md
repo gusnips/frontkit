@@ -111,6 +111,19 @@ text-fitting maths. When copy does not fit, it **records the overflow and refuse
 rather than appending an ellipsis — an ellipsis makes every string "fit", so copy that outgrew
 its column has no failing case and ships.
 
+`assertOgImages("dist", origin)` reads every page the build wrote and checks that each share card
+it advertises is a file that exists. Run it last:
+
+```ts
+await assertOgImages("dist", "https://example.com");
+```
+
+Three codebases shipped a `404.html` whose `og:image` named a card nothing had ever rendered —
+the card generator walks the page registry, and a not-found shell is not in it. Every share of a
+dead link unfurled broken, and nothing in a browser shows it. `bakeHead` cannot catch this: it
+writes the image it is handed, and a shell carrying the brand card is correct. The build can,
+because by then the card is on disk or it is not. Cards on another host are skipped.
+
 `loadTemplate` refuses a `dist/index.html` that is already a rendered page. `dist/index.html` is
 both the file every page is baked _from_ and the home page's own output, so a second pass over a
 written `dist/` reads a finished page as its blank and nests one render inside another. `vite
