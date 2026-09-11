@@ -407,7 +407,8 @@ siblings in one tree and only one of them ever got the fix.
   production pass different values. A build right after a staging build is a cache hit, so
   production ships pointing at `stg.` on every address and talking to the staging API, and nothing
   about it looks wrong. `"env": ["VITE_*"]` as a wildcard, because every variable with that prefix
-  goes into the bundle by definition. **Every repo on this stack has the same file. Check it.**
+  goes into the bundle by definition. **Every repo on this stack had the same file — all eleven
+  carry the fix now (2026-09-11).** Check it only when a new repo joins the stack.
 - **The sibling app is the finding.** Three times over, in one tree: the admin's own
   `isChunkLoadError` matched Chrome's phrasing and not Firefox's, so a stale deploy read as a hard
   crash on Firefox; the admin's `vite:preloadError` handler reloaded the whole page for a CSS
