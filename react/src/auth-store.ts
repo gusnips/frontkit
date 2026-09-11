@@ -48,12 +48,56 @@ export interface AuthState<TUser> {
  * Only one of the three donors knew this. It is invariant 7.
  */
 export function createAuthStore<TUser>(): UseBoundStore<StoreApi<AuthState<TUser>>> {
-  return create<AuthState<TUser>>((set) => ({
+  return create<AuthState<TUser>>((set) => authSlice<TUser, EmptyExtra>(set, () => ({})));
+}
+
+/** What `authSlice` derives when a product adds nothing of its own. */
+type EmptyExtra = Record<never, never>;
+
+/**
+ * zustand's `set`, narrowed to the two writes this slice makes.
+ *
+ * Not `Partial<AuthState<TUser> & TExtra>`, which is what it means and what a caller passes:
+ * inside a generic function TypeScript cannot check `{ isLoading }` against a partial of an
+ * unresolved type parameter, because `TExtra` might yet declare an `isLoading` of its own. The
+ * union says the same thing in terms it can check at both ends. Any real store's setter
+ * satisfies it, where `TExtra` is a concrete type.
+ */
+type AuthSet<TUser, TExtra> = (
+  partial: (TExtra & Partial<AuthState<TUser>>) | Pick<AuthState<TUser>, "isLoading">,
+) => void;
+
+/**
+ * The session flags as a plain object, for a product whose store needs more than them.
+ *
+ * `createAuthStore` owns its `create()` call, which means it owns the whole store: a product
+ * cannot wrap it in `persist`, cannot add an action, and cannot add a field. Both adopters that
+ * met it had a superset and neither could use it. One holds a remember-me choice, a profile row
+ * and the sign-in methods themselves, under `persist`. The other adds `isAnonymous` — and that
+ * one is the reason this takes a `derive` function rather than just letting the caller spread
+ * extra keys in: `isAnonymous` is read off the user, so it has to be rewritten by `setUser` and
+ * `clear`, which are exactly the two writes the product does not own.
+ *
+ * The caller keeps `create`, so middleware, extra actions and the store's own name stay theirs:
+ *
+ * ```ts
+ * const useAuthStore = create<AuthState<User> & { isAnonymous: boolean }>((set) => ({
+ *   ...authSlice<User, { isAnonymous: boolean }>(set, (user) => ({ isAnonymous: !!user?.isAnonymous })),
+ * }));
+ * ```
+ */
+export function authSlice<TUser, TExtra extends object>(
+  set: AuthSet<TUser, TExtra>,
+  derive: (user: TUser | null) => TExtra,
+): AuthState<TUser> & TExtra {
+  return {
+    ...derive(null),
     user: null,
     isAuthenticated: false,
     isLoading: typeof window !== "undefined",
-    setUser: (user) => set({ user, isAuthenticated: Boolean(user), isLoading: false }),
+    setUser: (user) =>
+      set({ ...derive(user), user, isAuthenticated: Boolean(user), isLoading: false }),
     setLoading: (isLoading) => set({ isLoading }),
-    clear: () => set({ user: null, isAuthenticated: false, isLoading: false }),
-  }));
+    clear: () => set({ ...derive(null), user: null, isAuthenticated: false, isLoading: false }),
+  };
 }

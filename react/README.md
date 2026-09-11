@@ -136,6 +136,22 @@ where there is no window. A session bootstrap can only be in flight in a browser
 during a build is a wait that never ends: it once shipped a spinner as the indexable body of a
 page whose whole job was to be found.
 
+When your store needs more than those flags, `authSlice` in the same place gives you them as a
+plain object to spread, so `create` stays yours — and with it `persist`, your own actions, and
+fields of your own:
+
+```ts
+const useAuthStore = create<AuthState<User> & { isAnonymous: boolean }>((set) => ({
+  ...authSlice<User, { isAnonymous: boolean }>(set, (user) => ({
+    isAnonymous: !!user?.isAnonymous,
+  })),
+}));
+```
+
+The second argument is what makes this more than spreading extra keys in yourself: a field read
+off the user has to be rewritten whenever the user changes, and `setUser` and `clear` are the two
+writes you no longer own.
+
 `hydrateOrMount` is at `@gusnips/react/hydrate`, and the guards are at `@gusnips/react/guards`.
 
 ## On a phone
@@ -169,13 +185,13 @@ something.
 `@gusnips/react` itself needs `react`, `react-dom` and nothing else. Anything that needs more
 lives behind a subpath, so you install a dependency only if you import the thing that uses it:
 
-| Import from               | What is in it       | What you must have |
-| ------------------------- | ------------------- | ------------------ |
-| `@gusnips/react`          | the client and rest | react, react-dom   |
-| `@gusnips/react/store`    | `createAuthStore`   | zustand            |
-| `@gusnips/react/guards`   | the route guards    | react-router-dom   |
-| `@gusnips/react/ui`       | the seven wrappers  | @base-ui/react     |
-| `@gusnips/react/contract` | two prerender names | nothing            |
+| Import from               | What is in it                  | What you must have |
+| ------------------------- | ------------------------------ | ------------------ |
+| `@gusnips/react`          | the client and rest            | react, react-dom   |
+| `@gusnips/react/store`    | `createAuthStore`, `authSlice` | zustand            |
+| `@gusnips/react/guards`   | the route guards               | react-router-dom   |
+| `@gusnips/react/ui`       | the seven wrappers             | @base-ui/react     |
+| `@gusnips/react/contract` | two prerender names            | nothing            |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
 point.** An optional peer the barrel imports anyway is not optional — it is a required one whose
