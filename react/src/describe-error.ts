@@ -202,8 +202,14 @@ export function createErrorDescriber<
     // and support can act on it. A 5xx additionally gets "try again shortly", because that one
     // genuinely does clear on its own — a 4xx does not, and saying so would be a lie that costs
     // the reader another attempt.
+    //
+    // No `code` means no envelope, and then `message` is not the server's: it is the client's
+    // own `Request failed (502)`, written for a log. A gateway answering with HTML while the API
+    // restarts is exactly when that happens, so it reached screens — until the second migration,
+    // whose three apps each guarded against that one string by hand.
+    const serverWords = error.code === undefined ? "" : error.message;
     return {
-      cause: ctx.says ?? (error.message || t(`${copyPrefix}unexpected`)),
+      cause: ctx.says ?? (serverWords || t(`${copyPrefix}unexpected`)),
       hint: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
     };
   };

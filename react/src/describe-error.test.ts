@@ -84,6 +84,14 @@ describe("createErrorDescriber", () => {
     expect(describeError(new ApiError(503, null)).hint).toBe("errors.retrySoon");
     expect(describeError(new ApiError(403, null)).hint).toBeUndefined();
   });
+
+  it("never puts the client's own log line on screen", () => {
+    // A gateway answers with HTML, so there is no envelope and `message` is the client's
+    // `Request failed (502)` — English, and written for a log.
+    const { cause, hint } = describeError(new ApiError(502, null));
+    expect(cause).toBe("errors.unexpected");
+    expect(hint).toBe("errors.retrySoon");
+  });
 });
 
 /**
