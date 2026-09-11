@@ -317,7 +317,7 @@ And one trap that is not about contrast at all:
 
 ## What the migrations taught
 
-### Migration 1 (−502 lines, 10 commits)
+### Migration 1 (−513 lines, 12 commits)
 
 - **An API this package got wrong shows up as an adapter in the adopter.** `MeQuery`'s first
   state was `"loading"`, so wiring `createRequireProfile` to a react-query hook needed six
@@ -480,6 +480,13 @@ siblings in one tree and only one of them ever got the fix.
   for "you already own this". Rethrow the error itself; turn it into words where it is shown.
   The same feature on the phone had its own translator, too, and the two disagreed about what an
   unknown code says — one showed the server's sentence, the other a flat "something went wrong".
+- **The describer's one assumption is wrong for a second vendor.** Anything that is not an
+  `ApiError` reads as "the request never landed", which is true for `fetch` and false for
+  supabase-js: its `AuthError` is an answer, with a status and a `code`. Handed over as-is, a wrong
+  password says "check your connection". This repo converts at its own edge — the `code` into an
+  `ApiError`, the message dropped, because GoTrue's is English-only and often names the wrong
+  cause — and resolves it under a second prefix. One adopter does not make that the kit's job;
+  the second repo on Supabase Auth that needs the same six lines does.
 
 ### How to migrate a repo — the check that is not optional
 
