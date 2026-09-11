@@ -524,7 +524,9 @@ whose CI runs no tests. Each of those moved a lesson somewhere it had not been b
   said `canonical: null` "takes `og:image` with it", and the code never did. The docs were fixed,
   not the code, because a shell carrying the brand card is correct and `bakeHead` cannot tell a
   right `image` from a wrong one. The build can — an advertised card that is not a file in
-  `dist/` — and nothing checks that yet. Every adopter so far has shipped it.
+  `dist/` — and now does: `assertOgImages(distDir, origin)` (0.4.6) reads the pages the build
+  wrote and checks each card it advertises against the disk. It reads the OUTPUT rather than the
+  registry on purpose, because the registry is exactly what the broken pages are missing from.
 - **An old rig can know a tag the package does not.** This one wrote `og:image:alt` per page.
   `bakeHead` swapped the image and kept the template's alt, so every card would have been
   described with the front page's title, on the one tag written for somebody who cannot see the
@@ -572,6 +574,18 @@ whose CI runs no tests. Each of those moved a lesson somewhere it had not been b
   themselves, with a React context beside it. Migration 2's stores added other fields for the
   same reason: the kit's shape is fixed and product state has nowhere to go. Two adopters in a
   row makes that the package's gap to close, not an adopter's quirk.
+
+  Closed in 0.4.6, and the shape came from reading both supersets rather than from the phrase
+  "extension point". `createAuthStore` owns its `create()` call, so it owns the whole store: no
+  middleware, no extra action, no extra field. `authSlice` returns the same flags as a plain
+  object to spread, and the adopter keeps `create`. The second argument is the part a generic
+  slot would have missed — migration 2's stores derive `isAnonymous` from the user, which means
+  it has to be rewritten by `setUser` and `clear`, the two writes the product no longer owns.
+  That flips migration 2's measurement: the ~70 call sites it would have had to rewrite were
+  only in play because `isAnonymous` had nowhere to live. **The gap was not "a fixed shape", it
+  was "a fixed shape AND fixed writers"** — and only the second one costs call sites. The other
+  superset still does not adopt, and that is the honest result: a 235-line store of sign-in
+  methods under `persist` is product code that happens to hold a session, not plumbing.
 
 ### How to migrate a repo — the check that is not optional
 
