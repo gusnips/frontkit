@@ -431,7 +431,7 @@ siblings in one tree and only one of them ever got the fix.
   `og:image = /og/__not-found__.png`, a file the card generator has never rendered because it only
   renders pages in the registry. Same as the first adopter, found the same way — by reading the
   shell branch rather than the browser. (This bullet used to say "a THIRD repo". It was the donor
-  invariant 12 describes, so it was the second repo, not a third.)
+  invariant 12 describes, so it was the same repo, not a third.)
 - **`og:url` on a shell was the half nobody wrote down.** This repo did not blank it (which
   invariant 12 warns about); it set it to the ORIGIN, which is a different wrong: every share of a
   dead link unfurls as the home page. The package strips it, and the app's two other shells —
