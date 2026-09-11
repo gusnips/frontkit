@@ -175,9 +175,13 @@ pin them; if one fails, a lesson is being un-learned.
    operator arriving while `/auth/me` is down is told the page does not exist — the wrong cause,
    no retry, no request id to quote. A guard decides between waiting, failing and answering; only
    a real `false` reaches the refusal.
-5. **Flat page files** (`pricing.html`), not `pricing/index.html`. Cloudflare Pages serves the
-   directory form at `/pricing/` and answers `/pricing` with a 308 — so every address the app
-   advertises in its canonical and its sitemap would be a redirect rather than a page.
+5. **Every address the app advertises answers 200 — on Cloudflare Pages, that means flat page
+   files** (`pricing.html`), not `pricing/index.html`. Cloudflare Pages serves the directory form
+   at `/pricing/` and answers `/pricing` with a 308 — so every address the app advertises in its
+   canonical and its sitemap would be a redirect rather than a page. The file form is the host's
+   call: Firebase Hosting redirects the other way by default and serves the directory form as
+   itself with `trailingSlash: false`. A redirect costs twice, once for the crawler and once in the
+   entry, where the address bar stops matching the route the file names (invariant 2).
 6. **`og:locale` is not optional on a non-English page.** Absent, the Open Graph spec does not
    default it to "unknown" — it defaults to `en_US`, so a Portuguese page with a Portuguese
    `og:title` tells every share crawler the card is English.
@@ -495,6 +499,78 @@ siblings in one tree and only one of them ever got the fix.
   `ApiError`, the message dropped, because GoTrue's is English-only and often names the wrong
   cause — and resolves it under a second prefix. One adopter does not make that the kit's job;
   the second repo on Supabase Auth that needs the same six lines does.
+
+### Migration 3 (−108 lines, 4 commits)
+
+The first adopter on Firebase Hosting, the first whose apps have no react-query, and the first
+whose CI runs no tests. Each of those moved a lesson somewhere it had not been before.
+
+- **The file form is the host's call; the rule under it is not.** Invariant 5 said flat files,
+  and that turned out to be a fact about Cloudflare Pages. Firebase Hosting redirects `/precos`
+  to `/precos/` by default, and serves `precos/index.html` at `/precos` itself once
+  `trailingSlash: false` is set. This adopter keeps the directory form, with the reason beside
+  the line that names the file. Invariant 5 now leads with the rule that holds on both hosts: an
+  address the app advertises answers 200.
+- **The host's redirect also broke hydration, and nothing showed it.** Before that flag, the
+  address bar said `/precos/` and the file said `/precos`. The entry compared them exactly, so
+  every prerendered body was thrown away and drawn again, on a page that looks the same either
+  way. The adopter had written its own slash-tolerant compare; `hydrateOrMount` has it now
+  (0.4.4), so the next host cannot bring it back. The same adopter needed `null` for the other
+  reader no file fits: its site prerenders one language and picks the reader's at runtime.
+- **Invariant 12's bug was live in a fourth repo, and in this file.** The 404 advertised
+  `/og/__not-found__.png`, a file its card generator has never rendered, and an `og:url` at the
+  dead address. Reading the shell branch against the package found the other half: invariant 12
+  said `canonical: null` "takes `og:image` with it", and the code never did. The docs were fixed,
+  not the code, because a shell carrying the brand card is correct and `bakeHead` cannot tell a
+  right `image` from a wrong one. The build can — an advertised card that is not a file in
+  `dist/` — and nothing checks that yet. Three adopters and a donor have shipped it.
+- **An old rig can know a tag the package does not.** This one wrote `og:image:alt` per page.
+  `bakeHead` swapped the image and kept the template's alt, so every card would have been
+  described with the front page's title, on the one tag written for somebody who cannot see the
+  picture (0.4.4).
+- **Check the deployed page, not only the diff.** Built before and after, every head was
+  byte-identical except the 404's. `curl` on the live 404 then showed two robots tags: the
+  template's `index, follow` and an appended `noindex`. The old rig appended it, and so did
+  `bakeHead` — the extraction copied the bug faithfully. It now rewrites the template's tag
+  (0.4.5). A byte-identical diff proves a migration kept the behaviour. It cannot tell you the
+  behaviour was right.
+- **Two donors named one way an i18n flag breaks; the third migration found the other.** Both
+  donors' comments say `nonExplicitSupportedLngs` renders a region-coded `pt-BR` catalog in
+  English. This adopter's catalogs use base codes, so its copy was right. But an `en-US` browser
+  kept `"en-US"` as `i18n.language`, the site's `<html lang>` lookup keyed by `"en"` missed, and
+  English and Spanish readers got `lang="pt-BR"` over their own language. The package's test had
+  only asserted that the flag was absent. It now starts a real i18next and checks both the
+  language and the catalog that answers, for both catalog shapes.
+- **The package already had the fix; adopting it is what found the bug.** The shared error
+  boundary reloaded after any chunk failure with no memory of having done it, so a chunk that was
+  really gone reloaded the page every three seconds, forever, with the person inside.
+  `reloadOnceForChunkError` has guarded that since the audit. The same class's matcher missed
+  Firefox's wording, the second hand-written matcher to do so after migration 2's sibling app,
+  and it never cleared, so a crash on one screen was still there after the back button.
+- **An error screen's words are a claim, and this one was false.** The crash page said the
+  engineering team had already been notified. Nothing in the web app, the admin or the shared UI
+  package reports an error anywhere. It now says what happened and what to do next.
+- **Put a guard where CI will run it.** `--color-input` measured 1.12:1 in light, the third
+  adopter of three under the token contract's floor, and the controls did not use it anyway: the
+  shared ones drew `border-gray-300` at 1.24:1, and 21 fields bypassed the shared controls with
+  class strings of their own. The first guard written was a contrast test. This repo's CI runs
+  lint, typecheck and build, and no tests, so the test would have passed on a laptop and never
+  run where it counts. The token generator refuses to write a value under 3:1 instead. **Read
+  what CI runs before you choose where a check lives.**
+- **Not migrating the transport, measured.** Web, admin and the phone each carry an axios client
+  (525, 455 and 466 lines) that 29 service classes extend, with no react-query over them and no
+  tests in CI. Replacing it means rewriting every service with nothing to catch a regression, so
+  it waits for a migration of its own. Reading it still found four bugs for that list. It counts
+  401s rather than failed refreshes and signs out on the third, so three requests that 401
+  together sign the person out while the refresh they are waiting on is still in flight — the
+  invariant 3 bug, reached a new way. Every web request carries a 16-minute timeout, sized for the
+  largest report upload. With no token stored, a request still sends a `Bearer undefined`
+  header. And a gateway 5xx with no body shows generic text.
+- **`createAuthStore` met its second superset.** This adopter's store holds the session, a
+  profile row, a remember-me choice that decides where the token is kept, and the sign-in methods
+  themselves, with a React context beside it. Migration 2's stores added other fields for the
+  same reason: the kit's shape is fixed and product state has nowhere to go. Two adopters in a
+  row makes that the package's gap to close, not an adopter's quirk.
 
 ### How to migrate a repo — the check that is not optional
 

@@ -86,9 +86,14 @@ build instead of shipping.
 That `pageFile` at the top writes `pricing.html`, not `pricing/index.html`. Nested routes keep
 their folders — `/guides/errors` → `guides/errors.html`.
 
-The directory form looks tidier and is a trap. Cloudflare Pages serves it at `/pricing/` and
-answers `/pricing` with a 308, so every address your app advertises in its own canonical and its
-own sitemap would be a redirect rather than a page. A flat file answers both, 200 either way.
+Every address your app puts in a canonical or a sitemap has to answer 200 rather than redirect. On
+Cloudflare Pages that means flat files: it serves `pricing/index.html` at `/pricing/` and answers
+`/pricing` with a 308. A flat file answers both.
+
+Hosts differ, though. Firebase Hosting redirects `/pricing` to `/pricing/` by default, and serves
+`pricing/index.html` at `/pricing` itself once `trailingSlash` is `false`. On a host like that,
+write the directory form and set the flag. Either way, run `curl -I` on one page before you trust
+the sitemap.
 
 ## Sitemap, robots, OG cards
 

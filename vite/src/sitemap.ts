@@ -17,6 +17,10 @@ import type { Alternate } from "./head.ts";
  * the app advertises in its canonical and its sitemap would be a redirect rather than a page.
  * A flat file is served at `/pricing` AND `/pricing/`, 200 either way.
  *
+ * That is Cloudflare Pages, not every host. Firebase Hosting serves the directory form at
+ * `/pricing` itself with `trailingSlash: false`, and an adopter there names its own files. What
+ * holds on every host is the rule underneath: an advertised address answers 200.
+ *
  * A nested route keeps its folders: `/guides/errors` → `guides/errors.html`.
  */
 export function pageFile(routePath: string): string {
