@@ -34,7 +34,9 @@ dedup. Three examples from the first audit alone:
   something the other two get wrong** (see invariant 8).
 
 The source repos are private and are not named here; nothing about the package depends on
-knowing which they were.
+knowing which they were. **That covers every file, code comment and commit message, because this
+repo is public.** Say "the first adopter", "a donor" or "the second migration". Names already got
+into the history once, and the only fix was rewriting all of it before the first push.
 
 ## Layout
 
