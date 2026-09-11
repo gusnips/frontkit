@@ -569,6 +569,18 @@ whose CI runs no tests. Each of those moved a lesson somewhere it had not been b
   invariant 3 bug, reached a new way. Every web request carries a 16-minute timeout, sized for the
   largest report upload. With no token stored, a request still sends a `Bearer undefined`
   header. And a gateway 5xx with no body shows generic text.
+
+  **All four were then fixed in place, and that is the lesson: a migration you decline still pays,
+  if you write the bugs down.** None of the four needed the package. What they needed was somebody
+  reading three copies of one file against each other, which is what a migration is even when it
+  ends in "no". Two of them only came out that way: removing the 401 counter was impossible until
+  the apps could tell a dead session from an unreachable one, and the counter turned out to be the
+  only thing ending a dead session in the admin app — which had no dead-session path at all,
+  because the app next door had one and nothing merged them. **The sibling app is the finding, for
+  the third migration running.** The fix that landed is the one the package already teaches
+  (invariant 3, `reachedAuth`), arrived at from the other end: not "adopt `createApiClient`", but
+  "only auth answering no ends a session", applied to the transport the repo keeps.
+
 - **`createAuthStore` met its second superset.** This adopter's store holds the session, a
   profile row, a remember-me choice that decides where the token is kept, and the sign-in methods
   themselves, with a React context beside it. Migration 2's stores added other fields for the
