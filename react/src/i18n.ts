@@ -58,11 +58,13 @@ export function i18nInitOptions({
       lookupLocalStorage: storageKey,
     },
     react: { useSuspense: false },
-    // `nonExplicitSupportedLngs` is omitted deliberately, and both donors say so in the same
-    // words. Enabling it validates the BASE subtag against `supportedLngs`, which rejects a
-    // region-coded "pt-BR" (its base "pt" is not in the list) and silently falls the whole app
-    // back to English. Detected sub-locales like "en-US" already resolve to their base through
-    // i18next's ordinary fallback hierarchy, so the flag buys nothing and breaks pt-BR.
+    // `nonExplicitSupportedLngs` is omitted deliberately. It breaks both shapes a catalog comes in.
+    // Region-coded: it validates the BASE subtag against `supportedLngs`, "pt" is not in a list
+    // that says "pt-BR", and the whole app silently renders English — both donors say so in the
+    // same words. Base codes: an "en-US" browser keeps "en-US" as `i18n.language`. Beside
+    // `currentOnly` no catalog matches it, so the reader gets the fallback language; beside
+    // `languageOnly` the copy is right and every map an app keys by the tag misses — the third
+    // migration shipped English copy as `lang="pt-BR"`. Without the flag "en-US" settles on "en".
   };
 }
 
