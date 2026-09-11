@@ -34,8 +34,25 @@ export { PRERENDERED_ROUTE_ATTR, SHELL_ROUTE } from "./prerender-contract.ts";
  * serves `/pt/pricing` from a file rendered for `/pricing`, with the locale carried in the
  * router's `basename` — so the address and the route are different strings, and only the caller
  * knows which one the build wrote.
+ *
+ * **A trailing slash is not a different page.** The router renders `/precos/` and `/precos` alike,
+ * and which one is in the address bar is the host's call: a host serving `precos/index.html`
+ * redirects `/precos` to `/precos/` by default (Firebase Hosting does). Compared exactly, that was
+ * false on every page of one adopter: every prerendered body was thrown away and drawn again, on a
+ * page that looks the same either way.
+ *
+ * **`null` means nothing the build wrote can be this reader's page.** The case is a site that
+ * prerenders one language and detects the reader's at runtime: Portuguese markup hydrated with
+ * Spanish strings is the wrong-page mismatch again, spread across every string on the page.
  */
-export function hydrateOrMount(rootEl: Element, tree: ReactNode, route: string): void {
-  if (rootEl.getAttribute(PRERENDERED_ROUTE_ATTR) === route) hydrateRoot(rootEl, tree);
+export function hydrateOrMount(rootEl: Element, tree: ReactNode, route: string | null): void {
+  const rendered = rootEl.getAttribute(PRERENDERED_ROUTE_ATTR);
+  if (route !== null && rendered !== null && samePath(rendered, route)) hydrateRoot(rootEl, tree);
   else createRoot(rootEl).render(tree);
+}
+
+/** `/precos/` and `/precos` are one page; `/` stays `/`. */
+function samePath(a: string, b: string): boolean {
+  const trim = (path: string): string => path.replace(/(.)\/+$/, "$1");
+  return trim(a) === trim(b);
 }
