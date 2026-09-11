@@ -290,7 +290,9 @@ to find. Two of those names carry a floor rather than a preference, and a brand 
 needs to know it:
 
 - `--color-input` must clear **3:1 against `--color-background`** (WCAG 1.4.11 — it is a
-  control boundary). One donor's is ~1.6:1, so every field border in two of its apps fails.
+  control boundary). One donor's was ~1.6:1, so every field border in two of its apps failed.
+  Fixing the token did not reach its marketing site: that site passes its own `border-white/15`
+  over the field, so it measured 1.5–1.8:1 until someone read the class string.
 - `--color-primary` must be **re-tuned in dark mode, not reused**. Holding one brand colour in
   both modes is the trap; the donor that lifts it and flips `--color-primary-foreground` to a
   near-black is the one whose primary control is legible on a card either way.
