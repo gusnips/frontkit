@@ -165,7 +165,11 @@ function compile(): string {
   const run = spawnSync(process.execPath, [cli, "-i", join(workDir, "entry.css"), "-o", out], {
     cwd: workDir,
     encoding: "utf-8",
+    // The compile takes well under a second. The CLI has hung once with no output, and with no
+    // deadline that held `bun run check` open for five minutes instead of failing it.
+    timeout: 60_000,
   });
+  if (run.error) throw new Error(`tailwindcss did not finish: ${run.error.message}`);
   if (run.status !== 0) {
     console.error(run.stderr || run.stdout);
     throw new Error("tailwindcss failed to compile the fixture");
