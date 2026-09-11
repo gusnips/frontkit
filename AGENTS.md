@@ -206,12 +206,16 @@ pin them; if one fails, a lesson is being un-learned.
     prerender rather than a bundle. That one is checked by eye at every extraction.
 11. **Never `import.meta.dir`.** It is bun-only, and two donor scripts used it. Use
     `fileURLToPath(import.meta.url)`.
-12. **A shell strips its canonical, and takes `og:image` with it.** Blanking is not stripping:
-    an empty canonical is a claim about `""` and an empty `og:url` is a card pointing at the
-    origin root. The image is the half that gets missed — one donor sets it before it branches
-    on the shell, so its `404.html` advertises a card at `/og/__not-found__.png`, a file that
-    has never existed. Every share of a missing address unfurls broken, and nothing in a browser
-    shows it.
+12. **A shell strips its canonical and its share URL, and names no card of its own.** Blanking
+    is not stripping: an empty canonical is a claim about `""` and an empty `og:url` is a card
+    pointing at the origin root. The image is the half that gets missed — one donor sets it
+    before it branches on the shell, so its `404.html` advertises a card at
+    `/og/__not-found__.png`, a file that has never existed. Every share of a missing address
+    unfurls broken, and nothing in a browser shows it. **`bakeHead` strips the first two and
+    cannot do the third**: it writes whatever `image` it is handed, and a shell with the brand
+    card (`/og.png`, which exists) is correct, so an `image` beside `canonical: null` is not an
+    error it can raise. The caller leaves `image` out. This invariant used to say the package
+    "takes `og:image` with it", which the code never did.
 13. **Sitemap `priority` arrives pre-formatted.** The two donors rank pages by different rules —
     one reads a field off its registry, the other gives the front door 1.0 and every guide 0.8
     flat, because ranking one guide above another would be a guess about a reader. A function

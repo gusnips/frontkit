@@ -41,12 +41,14 @@ const html = bakeHead(template, {
 
 Four rules in there are load-bearing:
 
-- **`canonical: null` strips the tag, and takes `og:image` and `og:url` with it.** For the 404
-  shell, which is served for every address that does not exist. Blanking is not stripping: an
-  empty canonical is a claim about `""`, and an empty `og:url` is a card pointing at your front
-  page. The image is the half people miss — one codebase set it before it branched on the shell,
-  so its `404.html` advertised a card at `/og/__not-found__.png`, a file that has never existed.
-  Every share of a dead link unfurled broken, and nothing in a browser showed it.
+- **`canonical: null` strips the tag, and `og:url` with it.** For the 404 shell, which is served
+  for every address that does not exist. Blanking is not stripping: an empty canonical is a claim
+  about `""`, and an empty `og:url` is a card pointing at your front page. **Leave `image` out
+  there too**, and the shell keeps the card your template already has. The image is the half
+  people miss, and `bakeHead` cannot catch it for you — it writes whatever card you name. Three
+  codebases named the shell's card after its made-up path, so their `404.html` advertised
+  `/og/__not-found__.png`, a file that has never existed. Every share of a dead link unfurled
+  broken, and nothing in a browser showed it.
 - **`og:locale` is not optional on a non-English page.** Leave it out and the spec does not
   default it to "unknown" — it defaults to `en_US`. A Portuguese page with a Portuguese
   `og:title` then tells every share crawler the card is English. `ogLocale("pt-BR")` gives you
