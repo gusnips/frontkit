@@ -119,6 +119,18 @@ describe("bakeHead", () => {
     expect(html).toContain('<meta property="og:image" content="https://acme.com/og.png" />');
   });
 
+  // Left alone, every page's card was described as the front page's card.
+  it("describes the page's own card, and leaves the brand card's description with it", () => {
+    const withAlt = TEMPLATE.replace(
+      "</head>",
+      '  <meta property="og:image:alt" content="front" />\n  </head>',
+    );
+    const page = bakeHead(withAlt, { ...BASE, image: "https://acme.com/og/pricing.png" });
+    expect(page).toContain('<meta property="og:image:alt" content="T" />');
+    const shell = bakeHead(withAlt, { ...BASE, canonical: null });
+    expect(shell).toContain('<meta property="og:image:alt" content="front" />');
+  });
+
   it("lists every alternate, reciprocally, including this page's own", () => {
     const html = bakeHead(TEMPLATE, {
       ...BASE,

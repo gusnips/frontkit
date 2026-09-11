@@ -36,11 +36,12 @@ function setMeta(html: string, selector: string, value: string): string {
 /**
  * The same, for a tag a template is allowed not to carry.
  *
- * Only the `twitter:` pair and `name="title"` get this. X reads the `og:` tags when the
- * `twitter:` ones are absent, and no crawler reads `name="title"` at all — so a template that
- * omits them is correct, and demanding them would break an app that never had them. A template
- * that DOES carry one and gets a stale value is still a bug, which is why they are written
- * rather than ignored. Everything a crawler actually depends on goes through `setMeta`.
+ * Only the `twitter:` tags, `og:image:alt` and `name="title"` get this. X reads the `og:` tags when
+ * the `twitter:` ones are absent, no crawler reads `name="title"` at all, and most templates carry
+ * no image alt — so a template that omits them is correct, and demanding them would break an app
+ * that never had them. A template that DOES carry one and gets a stale value is still a bug, which
+ * is why they are written rather than ignored. Everything a crawler actually depends on goes
+ * through `setMeta`.
  */
 function setMetaIfPresent(html: string, selector: string, value: string): string {
   const re = metaRe(selector);
@@ -148,6 +149,10 @@ export function bakeHead(template: string, tags: HeadTags): string {
   if (tags.image !== undefined) {
     html = setMeta(html, 'property="og:image"', tags.image);
     html = setMetaIfPresent(html, 'property="twitter:image"', tags.image);
+    // A card's description goes with the card. Left alone, every page's own card was described
+    // with the front page's title — the stale value this function exists to prevent, on the one
+    // tag written for somebody who cannot see the picture.
+    html = setMetaIfPresent(html, 'property="og:image:alt"', shareTitle);
   }
 
   if (tags.canonical === null) {
