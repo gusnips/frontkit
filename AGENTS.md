@@ -395,7 +395,7 @@ _(The audit that preceded the first line of code already taught these.)_
   a React Native app shares — and it silently overwrites repeated `data:` lines. Neither is the
   answer alone. Export the parser beside the client, and expect the same shape elsewhere.
 
-### Migration 2 (in progress)
+### Migration 2 (−735 lines, 14 commits)
 
 The first repo with three apps and a phone, and the first that is a **donor** rather than only an
 adopter. That changes what a migration finds: instead of one app missing a lesson, there are two
@@ -466,6 +466,20 @@ siblings in one tree and only one of them ever got the fix.
   and the finding is what the kit is missing, not that the adopter is wrong: a fixed store shape
   fits an app with no extras and nothing else. The first adopter's is one line; this one's cannot
   be.
+- **A guard every adopter writes is a bug in the package.** Web, admin and mobile each checked
+  `!message.startsWith("Request failed (")` before showing an error — three copies of one test
+  against a string the PACKAGE writes, when an answer has no envelope and so no words of its own.
+  The describer had no such check, so in the first adopter a gateway answering with HTML while the
+  API restarts would put `Request failed (502)` on screen as the cause. The fix went into the
+  describer (0.4.2) and all three copies were deleted. When the same defensive line shows up in
+  every adopter, the thing it defends against is ours.
+- **Describe at the edge that renders, never earlier.** The rewards store caught an API refusal,
+  translated it, and rethrew `new Error(translatedText)` so a modal could show `err.message`.
+  That works until anything reads the error as data: to a describer, an error that is not an
+  `ApiError` is a request that never landed, so the modal would have said "check your internet"
+  for "you already own this". Rethrow the error itself; turn it into words where it is shown.
+  The same feature on the phone had its own translator, too, and the two disagreed about what an
+  unknown code says — one showed the server's sentence, the other a flat "something went wrong".
 
 ### How to migrate a repo — the check that is not optional
 
