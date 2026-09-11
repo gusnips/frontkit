@@ -204,8 +204,15 @@ export function bakeHead(template: string, tags: HeadTags): string {
     );
   }
 
-  if (tags.noindex)
-    html = html.replace("</head>", `    <meta name="robots" content="noindex" />\n  </head>`);
+  // A template that says `index, follow` gets its tag rewritten, not a second one beside it. A head
+  // carrying both leaves a contradiction to each crawler's own tie-break rule, and one adopter's
+  // 404 shipped exactly that.
+  if (tags.noindex) {
+    const robots = metaRe('name="robots"');
+    html = robots.test(html)
+      ? html.replace(robots, "$1noindex$2")
+      : html.replace("</head>", `    <meta name="robots" content="noindex" />\n  </head>`);
+  }
   if (tags.headExtra) html = html.replace("</head>", `    ${tags.headExtra}\n  </head>`);
 
   if (tags.lang !== undefined) {

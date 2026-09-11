@@ -104,6 +104,16 @@ describe("bakeHead", () => {
     expect(html).toContain('<meta name="robots" content="noindex" />');
   });
 
+  it("rewrites the template's own robots tag rather than contradicting it", () => {
+    const indexable = TEMPLATE.replace(
+      "</head>",
+      '<meta name="robots" content="index, follow" />\n</head>',
+    );
+    const html = bakeHead(indexable, { ...BASE, canonical: null, noindex: true });
+    expect(html.match(/name="robots"/g)).toHaveLength(1);
+    expect(html).toContain('<meta name="robots" content="noindex" />');
+  });
+
   // An empty canonical is a claim about "" and an empty og:url is a share card pointing at the
   // origin root, which is what the strip exists to avoid.
   it("leaves no blank URL behind on a page with no canonical", () => {
