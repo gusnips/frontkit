@@ -427,10 +427,11 @@ siblings in one tree and only one of them ever got the fix.
   _hint_ failure and swallowed real ones; and the admin's `themeStore` still read `localStorage`
   unguarded at module scope, the white screen the web app had fixed two days earlier. All three
   were already right in the app next door. Nothing merged them, so nothing found them.
-- **The invariant-12 bug was live in a THIRD repo.** `404.html` advertised
+- **The invariant-12 bug the audit read in this repo's code was live.** `404.html` advertised
   `og:image = /og/__not-found__.png`, a file the card generator has never rendered because it only
   renders pages in the registry. Same as the first adopter, found the same way — by reading the
-  shell branch rather than the browser.
+  shell branch rather than the browser. (This bullet used to say "a THIRD repo". It was the donor
+  invariant 12 describes, so it was the second repo, not a third.)
 - **`og:url` on a shell was the half nobody wrote down.** This repo did not blank it (which
   invariant 12 warns about); it set it to the ORIGIN, which is a different wrong: every share of a
   dead link unfurls as the home page. The package strips it, and the app's two other shells —
@@ -517,13 +518,13 @@ whose CI runs no tests. Each of those moved a lesson somewhere it had not been b
   way. The adopter had written its own slash-tolerant compare; `hydrateOrMount` has it now
   (0.4.4), so the next host cannot bring it back. The same adopter needed `null` for the other
   reader no file fits: its site prerenders one language and picks the reader's at runtime.
-- **Invariant 12's bug was live in a fourth repo, and in this file.** The 404 advertised
+- **Invariant 12's bug was live in a third repo, and in this file.** The 404 advertised
   `/og/__not-found__.png`, a file its card generator has never rendered, and an `og:url` at the
   dead address. Reading the shell branch against the package found the other half: invariant 12
   said `canonical: null` "takes `og:image` with it", and the code never did. The docs were fixed,
   not the code, because a shell carrying the brand card is correct and `bakeHead` cannot tell a
   right `image` from a wrong one. The build can — an advertised card that is not a file in
-  `dist/` — and nothing checks that yet. Three adopters and a donor have shipped it.
+  `dist/` — and nothing checks that yet. Every adopter so far has shipped it.
 - **An old rig can know a tag the package does not.** This one wrote `og:image:alt` per page.
   `bakeHead` swapped the image and kept the template's alt, so every card would have been
   described with the front page's title, on the one tag written for somebody who cannot see the
