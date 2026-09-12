@@ -363,6 +363,30 @@ describe("assertRendered", () => {
     expect(() => assertRendered("pricing.html", page(link), shell)).not.toThrow();
   });
 
+  // The eighth migration's finding, in the exact shape it shipped: `renderToString` writing its
+  // own failure into a live, indexed page — quotes already escaped, the build machine's absolute
+  // paths in the trace. Every other check here passes it, because the error text makes the file
+  // BIGGER rather than smaller.
+  it("catches React's renderToString error baked into the body", () => {
+    const leaked =
+      `<div id="root"><main>The server used &quot;renderToString&quot; which does not support ` +
+      `Suspense. If you intended for this Suspense boundary to render the fallback content on the ` +
+      `server consider throwing an Error somewhere within the Suspense boundary. at Lazy ` +
+      `(&lt;anonymous&gt;) at RenderedRoute (/Users/someone/repo/node_modules/react-router/x.js:1:1)` +
+      `${"x".repeat(400)}</main></div>`;
+    expect(() => assertRendered("api.html", page(leaked), shell)).toThrow(/renderToString error/);
+  });
+
+  // The page that exposed this was a DOCUMENTATION site, which is why the pattern is React's whole
+  // sentence and not a memorable fragment of it: a guide is allowed to write about Suspense, and
+  // failing its build for saying the words would be a worse bug than the one being caught.
+  it("does not flag a guide that writes about Suspense", () => {
+    const guide =
+      `<div id="root"><main><p>renderToString does not support Suspense, which is why this build ` +
+      `uses renderTree instead.</p>${"x".repeat(800)}</main></div>`;
+    expect(() => assertRendered("guides/ssr.html", page(guide), shell)).not.toThrow();
+  });
+
   it("catches a file that is not marked as the language it was baked for", () => {
     const html = page(`<div id="root">${long}</div>`);
     expect(() => assertRendered("pt/pricing.html", html, shell, { lang: "pt-BR" })).toThrow(

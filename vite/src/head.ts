@@ -315,6 +315,17 @@ export interface RenderedChecks {
 const SPLASH_MAX_GROWTH = 2000;
 
 /**
+ * React's own words when `renderToString` meets a Suspense boundary it cannot render.
+ *
+ * Matched in both spellings because the quotes are escaped by the time the markup reaches a file,
+ * and matched as the WHOLE sentence rather than a memorable fragment of it: the page that exposed
+ * this was a documentation site, and "does not support Suspense" is a phrase a React guide may
+ * legitimately print. This one nobody writes on purpose.
+ */
+const RENDERER_ERROR =
+  /The server used (?:"|&quot;)renderToString(?:"|&quot;) which does not support Suspense/;
+
+/**
  * What every written file must be true of before the build is allowed to pass.
  *
  * The regression this exists for is a root that renders to nothing. A router whose location
@@ -354,6 +365,20 @@ export function assertRendered(
   // a broken build.
   const placeholder = /%[A-Z][A-Z0-9_]{2,}%/.exec(html);
   if (placeholder) fail(`still carries an unsubstituted placeholder, ${placeholder[0]}`);
+
+  // `renderToString` does not only render the fallback at a boundary it cannot handle — it can
+  // write its own ERROR into the markup, stack trace and all, including absolute paths from the
+  // machine that ran the build. The eighth migration found exactly that on a live, indexed page,
+  // and in only ONE of its two languages: the first render bails but also resolves the `lazy()`
+  // promise, so the next locale in the same loop rendered the real component and looked perfect.
+  // Checked against the whole document and NOT gated on size, because the error text makes the
+  // file bigger — which is why every other check here waves it through.
+  if (RENDERER_ERROR.test(html))
+    fail(
+      "carries React's renderToString error where its page should be. The entry is still on " +
+        "`renderToString`, which cannot render a Suspense boundary and writes the failure into " +
+        "the file instead — use `renderTree` (invariant 1).",
+    );
 
   // What the root ACTUALLY opens with. Sliced rather than matched in one pattern, because a
   // regex that skips React's `<!--$-->` Suspense markers with `(?:<!--.*?-->|\s)*` can backtrack

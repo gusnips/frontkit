@@ -161,6 +161,18 @@ pin them; if one fails, a lesson is being un-learned.
    inside the body when you are filling one `<div>` rather than assembling a document. Strip
    them, and rethrow `onError` so a render failure fails the build.
 
+   **And it does not always render the fallback — sometimes it renders its own ERROR.** The eighth
+   migration found a live, indexed reference page carrying React's "The server used renderToString
+   which does not support Suspense" text, a stack trace, and five copies of an absolute path from
+   the machine that built it. Nothing in a browser shows it: the bundle replaces the body on load,
+   so the only readers who ever saw it are the ones who do not run JavaScript — which is every
+   crawler the prerender exists for. It was in ONE language, and that half nobody would guess: the
+   first render suspends and bails, but it also resolves the `lazy()` promise, so the next locale in
+   the same loop rendered the real component. One loop, two language versions of one address, one of
+   them a stack trace. Every cheap check passes it — the error text makes the file BIGGER, so a size
+   floor reads it as a full page. `assertRendered` refuses that signature now, because the adopters
+   still on `renderToString` are the ones who need it and they are exactly the ones not reading this.
+
    One cost comes with it, and it belongs beside the rule rather than in a bug report: under bun,
    importing that renderer holds the event loop open, so a prerender script that has written every
    file and printed its summary **will not exit on its own**. It ends with `process.exit(0)`.

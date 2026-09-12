@@ -81,6 +81,14 @@ stream, which lands them inside your body when you are filling one `<div>` rathe
 a document — so those get stripped, and a render error is rethrown so a broken page fails the
 build instead of shipping.
 
+The fallback is not the worst case. `renderToString` can write its own ERROR into the page: one
+repo shipped a live, indexed reference page carrying React's "does not support Suspense" message,
+a stack trace, and five copies of an absolute path from the machine that built it. Nothing in a
+browser shows it, because the bundle replaces the body on load — so the only readers who ever saw
+it were the ones who run no JavaScript, which is every crawler the page was built for. It was in
+one of its two languages, too: the first render bails but resolves the `lazy()` promise, so the
+next locale rendered the real component and looked perfect. `assertRendered` refuses that text now.
+
 End your prerender script with `process.exit(0)`. Under bun, importing this renderer leaves the
 process alive after the last file is written: `react-dom/server` exits, `react-dom/static.browser`
 does not, and `process.getActiveResourcesInfo()` shows nothing either way, so the only symptom is a
