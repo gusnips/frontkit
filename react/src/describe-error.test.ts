@@ -221,6 +221,44 @@ describe("the recovery kind", () => {
 });
 
 /**
+ * The seventh migration's seam. The server names what IT knows — a role id, an action verb — and
+ * the sentence needs whatever the app's own screens call those. The substitution can only happen
+ * inside the lookup that reads `params`, which is why an arm cannot do it: by the time an arm
+ * runs, `ctx.says` is already resolved.
+ */
+describe("localizeParams", () => {
+  const options = {
+    t,
+    copyPrefix: "errors." as const,
+    formatWait: (secs: number) => humanizeWait(t, secs, "errors."),
+    messageKeyPrefix: "serverErrors." as const,
+    knownMessageKeys: { roleRequired: "" },
+  };
+  const refusal = new ApiError(403, {
+    code: "FORBIDDEN",
+    message: "Needs admin",
+    messageKey: "serverErrors.roleRequired",
+    params: { role: "admin" },
+  });
+
+  it("translates a param before it fills the sentence", () => {
+    const describeError = createErrorDescriber({
+      ...options,
+      localizeParams: (params) => ({
+        ...params,
+        ...(typeof params?.role === "string" && { role: t(`roles.${params.role}`) }),
+      }),
+    });
+    expect(describeError(refusal).cause).toBe('serverErrors.roleRequired({"role":"roles.admin"})');
+  });
+
+  it("is identity by default, so params already in words pass straight through", () => {
+    const describeError = createErrorDescriber(options);
+    expect(describeError(refusal).cause).toBe('serverErrors.roleRequired({"role":"admin"})');
+  });
+});
+
+/**
  * The second convention in the fleet: an API with no `messageKey` field at all, whose CODE
  * names the sentence. One repo has 98 of them — `errors.FORECAST_NOT_FOUND` and its siblings —
  * and its client used to resolve them itself, which is how the translation ended up inside the

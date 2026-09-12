@@ -198,6 +198,22 @@ export interface ErrorDescriberOptions<
    */
   knownMessageKeys: Record<ServerName, unknown>;
   /**
+   * Transform `params` before they fill the server's sentence.
+   *
+   * The envelope carries what the SERVER knows, which is not always a word anyone should read: a
+   * role id (`admin`), an action verb (`approve_content`). The sentence needs whatever the app's
+   * own screens call those things, and the substitution happens here — inside the one lookup that
+   * reads `params` — so there is nowhere else an adopter could intervene. Without this seam the
+   * choice is to ship the raw id into `{{role}}`, or to stop using the server's sentence at all
+   * and re-resolve every key by hand, which is how i18n ended up inside a transport once already.
+   *
+   * Optional, and identity by default: an API whose params are already words passes nothing. It
+   * deliberately takes only the params — an arm that needs the error has `ctx` for that.
+   */
+  localizeParams?: (
+    params: Record<string, string | number> | undefined,
+  ) => Record<string, unknown> | undefined;
+  /**
    * Per-code copy. Everything not listed falls through to the default arm.
    *
    * The arms look up the app's own keys, so they close over the app's `t` rather than being
@@ -230,6 +246,7 @@ export function createErrorDescriber<
   formatWait,
   messageKeyPrefix,
   knownMessageKeys,
+  localizeParams = (params) => params,
   codes = {},
   durableLimitCodes = [],
   maxRetryWaitSecs,
@@ -245,7 +262,7 @@ export function createErrorDescriber<
     const lookup = (named: string | undefined): string | null => {
       if (named === undefined || !named.startsWith(messageKeyPrefix)) return null;
       const name = named.slice(messageKeyPrefix.length);
-      return has(name) ? t(`${messageKeyPrefix}${name}`, error.params) : null;
+      return has(name) ? t(`${messageKeyPrefix}${name}`, localizeParams(error.params)) : null;
     };
     // `messageKey` first: an API that sends both means the key, and the code is what the UI
     // switches on. The code is only consulted when there is no key to prefer, and it is spelled
