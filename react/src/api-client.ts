@@ -138,8 +138,25 @@ export interface ApiClient {
   del(path: string, options?: RequestOptions): Promise<void>;
   /** The DELETE that answers with something worth reading — a queue entry it handed back. */
   delJson<T>(path: string, options?: RequestOptions): Promise<T>;
-  /** The whole envelope, for a list route whose counts live in `meta`. */
+  /**
+   * The whole envelope rather than just `data`, for a route whose `meta` is half the answer —
+   * a list's `total`, or a metered call's receipt.
+   */
   page<T, M>(path: string, options?: RequestOptions): Promise<ApiSuccess<T, M>>;
+  /**
+   * The same, off a POST.
+   *
+   * Two adopters needed this and both wrote the same workaround: `client.request(…)` followed by
+   * a hand-rolled `res.json()`, stepping around the client's own envelope reader and its one
+   * assertion about the success shape. One of them left the reason sitting in a comment — "the
+   * whole envelope is reachable off a GET and not off a POST, so this one reads the body itself"
+   * — which is this package describing its own gap in somebody else's file.
+   *
+   * A metered route takes a body whenever its input is too long or too punctuated to be a path
+   * segment (a URL, a search query), and then the receipt has to survive the POST too. When the
+   * same guard shows up in every adopter, the thing it guards against is ours.
+   */
+  postPage<T, M>(path: string, body?: unknown, options?: RequestOptions): Promise<ApiSuccess<T, M>>;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -364,5 +381,7 @@ export function createApiClient({
       data<T>(path, { ...options, method: "DELETE" }),
     page: async <T, M>(path: string, options: RequestOptions = {}) =>
       envelope<T, M>(await request(path, { ...options, method: "GET" })),
+    postPage: async <T, M>(path: string, body?: unknown, options: RequestOptions = {}) =>
+      envelope<T, M>(await request(path, json(body, { ...options, method: "POST" }))),
   };
 }

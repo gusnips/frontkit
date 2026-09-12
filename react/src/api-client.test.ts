@@ -272,6 +272,41 @@ describe("createApiClient", () => {
     expect(fetched).toHaveBeenCalledTimes(2);
   });
 
+  /**
+   * The metered POST. `post` keeps only `data`, and on a metered route the `meta` beside it is
+   * half the answer — what the call cost, whether a cache hit made it free. Two adopters wanted
+   * that off a POST (the input is a URL or a search query, too long and too punctuated for a path
+   * segment) and both reached past the client for `res.json()` to get it.
+   */
+  it("returns the whole envelope off a POST, with the body serialized", async () => {
+    const body = { data: { markdown: "# hi" }, meta: { cost: 0, cached: true } };
+    const fetched = stubFetch(
+      () =>
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+    });
+
+    await expect(
+      api.postPage<{ markdown: string }, { cost: number; cached: boolean }>("/v1/scrape", {
+        url: "https://example.com",
+      }),
+    ).resolves.toEqual(body);
+
+    const init = fetched.mock.calls[0]?.[1] as RequestInit;
+    expect(init.method).toBe("POST");
+    // Serialized and typed by the client, exactly as `post` does it — the half a hand-rolled
+    // `request()` call has to remember, and the reason this is not just `page` with a method.
+    expect(init.body).toBe(JSON.stringify({ url: "https://example.com" }));
+    expect(new Headers(init.headers).get("Content-Type")).toBe("application/json");
+  });
+
   it("reports a failure to onError once, and still throws it", async () => {
     stubFetch(
       () =>
