@@ -83,4 +83,19 @@ describe("i18nInitOptions", () => {
     expect(detection.order).toEqual(["localStorage", "navigator"]);
     expect(detection).not.toHaveProperty("lookupQuerystring");
   });
+
+  // An app with a "follow the browser" option has to own the key. Getting back to that state
+  // means clearing it and re-running detection — and a caching detector writes the language it
+  // just detected back into the key it was told to clear, so the choice re-pins itself and the
+  // option can never be reached again. The fourth adopter found this; the package had the write
+  // hardcoded on.
+  it("leaves the key alone when the app is the one writing it", () => {
+    const base = { fallbackLng: "en", supportedLngs: ["en"], storageKey: "app.locale" } as const;
+    const app = i18nInitOptions({ ...base, storageWriter: "app" });
+
+    expect(app.detection.caches).toEqual([]);
+    // Still READ: the app writes the key, the detector is what notices it.
+    expect(app.detection.lookupLocalStorage).toBe("app.locale");
+    expect(i18nInitOptions(base).detection.caches).toEqual(["localStorage"]);
+  });
 });

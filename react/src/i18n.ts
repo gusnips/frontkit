@@ -36,6 +36,20 @@ export interface I18nInitOptions {
    * Only one donor had this. The other has the same split-origin layout and the same problem.
    */
   queryKey?: string;
+  /**
+   * Who WRITES {@link storageKey}. The detector, by default.
+   *
+   * Pass `"app"` when your own language control writes it. That is not a preference — it is what
+   * a "follow the browser" option costs. Going back to following the browser means clearing the
+   * key and calling `changeLanguage(undefined)`, which re-runs detection; a detector that caches
+   * then writes the language it just detected straight back into the key it was told to clear.
+   * The choice re-pins itself and nothing can reach that state again.
+   *
+   * Three repos on this stack, three answers: one lets the detector write, one writes it from its
+   * own control, and one does both — harmless there only because it offers no "follow the
+   * browser" state. So the rule, rather than the default: one writer per key.
+   */
+  storageWriter?: "detector" | "app";
 }
 
 export function i18nInitOptions({
@@ -43,6 +57,7 @@ export function i18nInitOptions({
   supportedLngs,
   storageKey,
   queryKey,
+  storageWriter = "detector",
 }: I18nInitOptions) {
   return {
     fallbackLng,
@@ -53,7 +68,8 @@ export function i18nInitOptions({
       order: queryKey
         ? ["querystring", "localStorage", "navigator"]
         : ["localStorage", "navigator"],
-      caches: ["localStorage"],
+      // Read from always, written to only by whoever owns it — see `storageWriter`.
+      caches: storageWriter === "detector" ? ["localStorage"] : [],
       ...(queryKey ? { lookupQuerystring: queryKey } : {}),
       lookupLocalStorage: storageKey,
     },

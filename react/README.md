@@ -159,6 +159,11 @@ hurry cannot skip.
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
 `i18nInitOptions`, and `cn`.
 
+Pass `storageWriter: "app"` to `i18nInitOptions` when your own language control writes the stored
+locale. Leave it out and the detector writes it, which is right until you offer "follow the
+browser": going back to that means clearing the key and detecting again, and a detector that
+writes on every change puts the language it just detected straight back in. One writer per key.
+
 `createAuthStore` is at `@gusnips/react/store` — a zustand store whose `isLoading` starts `false`
 where there is no window. A session bootstrap can only be in flight in a browser, and `true`
 during a build is a wait that never ends: it once shipped a spinner as the indexable body of a
