@@ -113,6 +113,27 @@ describe("createErrorDescriber", () => {
   // The server names a SENTENCE, not any key in the app. A messageKey outside the namespace
   // is ignored rather than resolved — otherwise a compromised or careless server could point
   // the client at arbitrary copy.
+  // i18next stores a plural suffixed and the server names the base, so `Object.keys` alone does
+  // not contain the key the server sends. Before this, the two plan limits in the seventh
+  // migration's API — a seat limit and a profile limit — read as keys the build did not have,
+  // and each fell back to English on the one screen where the written sentence earns its keep.
+  it("admits the base name of a plural the catalog stores suffixed", () => {
+    const describePlural = createErrorDescriber({
+      t,
+      copyPrefix: "errors.",
+      formatWait: (secs) => humanizeWait(t, secs, "errors."),
+      messageKeyPrefix: "serverErrors.",
+      knownMessageKeys: { seatLimitReached_one: "", seatLimitReached_other: "" },
+    });
+    const error = new ApiError(402, {
+      code: "PAYMENT_REQUIRED",
+      message: "seat limit reached",
+      messageKey: "serverErrors.seatLimitReached",
+      params: { count: 3 },
+    });
+    expect(describePlural(error).cause).toBe('serverErrors.seatLimitReached({"count":3})');
+  });
+
   it("ignores a messageKey outside the server namespace", () => {
     const error = new ApiError(500, {
       code: "UNKNOWN",
@@ -255,6 +276,69 @@ describe("localizeParams", () => {
   it("is identity by default, so params already in words pass straight through", () => {
     const describeError = createErrorDescriber(options);
     expect(describeError(refusal).cause).toBe('serverErrors.roleRequired({"role":"admin"})');
+  });
+});
+
+/**
+ * The seventh migration's second seam, and the same lesson as the first: a default that was one
+ * adopter's convention, shipped as if it were a fact.
+ *
+ * The built-in arm hands an unmapped code the server's `message`. That is right for the API whose
+ * message IS the reader's sentence. It is wrong for the one whose own i18n rules call `message`
+ * "the English fallback for logs" while the app ships three languages — there the built-in puts
+ * developer English on screen, which is the single thing that repo's rules forbid.
+ */
+describe("fallback", () => {
+  const options = {
+    t,
+    copyPrefix: "errors." as const,
+    formatWait: (secs: number) => humanizeWait(t, secs, "errors."),
+    messageKeyPrefix: "serverErrors." as const,
+    knownMessageKeys: { quotaDay: "" },
+  };
+  const describeError = createErrorDescriber({
+    ...options,
+    fallback: ({ error, says, wait }) => ({
+      cause:
+        says ??
+        (error.code !== undefined && error.status < 500 ? "errors.invalid" : "errors.unexpected"),
+      fix: wait ? `errors.retryIn(${wait})` : undefined,
+    }),
+  });
+
+  it("keeps the server's English log line off the screen", () => {
+    const error = new ApiError(422, {
+      code: "SLIDE_TOO_LONG",
+      message: "slide 3 exceeds 2200 chars",
+    });
+    expect(describeError(error).cause).toBe("errors.invalid");
+    // What the built-in would have said, which is the whole reason the seam exists.
+    expect(createErrorDescriber(options)(error).cause).toBe("slide 3 exceeds 2200 chars");
+  });
+
+  it("still resolves a sentence this build carries", () => {
+    // The arm only runs for what `codes` left unnamed; it does not take over the key lookup.
+    const error = new ApiError(429, {
+      code: "SOMETHING_NEW",
+      message: "log line",
+      messageKey: "serverErrors.quotaDay",
+    });
+    expect(describeError(error).cause).toBe("serverErrors.quotaDay");
+  });
+
+  it("hands the arm a stated wait the built-in spends on nothing", () => {
+    const error = new ApiError(
+      503,
+      { code: "SOMETHING_NEW", message: "log line" },
+      { retryAfterSecs: 120 },
+    );
+    expect(describeError(error).fix).toBe('errors.retryIn(errors.waitMinutes({"count":2}))');
+    expect(createErrorDescriber(options)(error).fix).toBe("errors.retrySoon");
+  });
+
+  it("leaves the derived recovery kind alone unless the arm narrows it", () => {
+    const error = new ApiError(503, { code: "SOMETHING_NEW", message: "log line" });
+    expect(describeError(error).recover).toBe("retry");
   });
 });
 

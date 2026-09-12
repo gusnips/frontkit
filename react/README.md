@@ -179,6 +179,20 @@ It is required because the default hid its price: `humanizeWait` reads `waitSeco
 `waitMinutes` and `waitHours` out of your catalog, so an app that already formats relative time
 with `Intl` had to add six entries per language before it would compile.
 
+An error your `codes` map does not name falls back to the server's own `message`. Pass `fallback`
+when that message is written for a log rather than for a person:
+
+```ts
+fallback: ({ says, wait }) => ({
+  cause: says ?? t("errors.invalid"),
+  fix: wait ? t("errors.retryIn", { when: wait }) : undefined,
+});
+```
+
+Some APIs write `message` for whoever reads the screen. Some write it for whoever reads the log —
+in English, in an app that ships three languages. Your arm also gets the stated wait, which the
+default has nowhere to put.
+
 ## Also here
 
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,

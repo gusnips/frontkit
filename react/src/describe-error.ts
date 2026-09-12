@@ -94,6 +94,21 @@ type WaitName = "waitSeconds" | "waitMinutes" | "waitHours";
 type CopyName = "network" | "networkHint" | "unexpected" | "retrySoon";
 
 /**
+ * A plural is stored under suffixed names and named by its base, and the gate has to know both.
+ *
+ * i18next keeps `seatLimitReached_one` and `seatLimitReached_other`; the server sends
+ * `serverErrors.seatLimitReached`, because that is the key a person resolves with a `count`. So
+ * `Object.keys` on a catalog does NOT contain the name the server actually sends, and a gate
+ * built from it alone rejects a sentence the app is carrying — falling back to the server's
+ * English for the one refusal that had a written answer. Measured in the seventh migration: two
+ * of that API's 112 keys, both of them plan limits, both of them the exact screen where a
+ * specific sentence earns its keep.
+ */
+type PluralSuffix = "zero" | "one" | "two" | "few" | "many" | "other";
+type PluralBase<N extends string> = N extends `${infer Base}_${PluralSuffix}` ? Base : N;
+const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
+
+/**
  * The paragraph above, pinned so it cannot quietly stop being true.
  *
  * `ClosedCatalog` is what an app's `t` looks like once it declares `CustomTypeOptions.resources`:
@@ -162,7 +177,7 @@ export interface ErrorDescriberOptions<
   ServerPrefix extends string,
   ServerName extends string,
 > {
-  t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName}`>;
+  t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName | PluralBase<ServerName>}`>;
   /** Catalog namespace for this module's own copy, e.g. `"errors."`. */
   copyPrefix: Prefix;
   /**
@@ -195,6 +210,9 @@ export interface ErrorDescriberOptions<
    * option exists to prevent. i18next answers a key it does not have with the key itself, so a
    * deploy landing ahead of the bundle a tab is still running would render `serverErrors.foo` at
    * somebody. A name that is absent falls back to the server's English `message` instead.
+   *
+   * Hand it over as it is. A plural sits in the catalog under suffixed names while the server
+   * names the base, so the base is admitted too — see {@link PluralBase}.
    */
   knownMessageKeys: Record<ServerName, unknown>;
   /**
@@ -224,6 +242,21 @@ export interface ErrorDescriberOptions<
    */
   codes?: Partial<Record<string, ErrorArm>>;
   /**
+   * What to say when nothing in `codes` matches: a code this build has no arm for, or an answer
+   * with no envelope at all.
+   *
+   * The built-in arm hands the reader the server's own `message`, and for one API in the fleet
+   * that is right — its message IS the sentence a person should read. For another it is exactly
+   * wrong: that repo's own i18n rules say `message` is "the English fallback for logs", and it
+   * ships three languages, so the built-in would put developer English in front of a reader who
+   * does not speak it. One default cannot be right for both, and the one baked in here was
+   * simply the first adopter's convention, mistaken for a fact.
+   *
+   * An arm here is also handed the stated wait, which the built-in spends on nothing: a refusal
+   * with no arm of its own could state its expiry and have that go unsaid.
+   */
+  fallback?: ErrorArm;
+  /**
    * The codes that mean "this limit does not clear by waiting" — **the same list you hand
    * `queryDefaults`**, because it answers the same question and a second copy is a second
    * chance to disagree with the retry rule. Declare it once in the app and pass it twice.
@@ -248,15 +281,21 @@ export function createErrorDescriber<
   knownMessageKeys,
   localizeParams = (params) => params,
   codes = {},
+  fallback,
   durableLimitCodes = [],
   maxRetryWaitSecs,
 }: ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>): (error: unknown) => DescribedError {
-  const known = new Set<string>(Object.keys(knownMessageKeys));
+  // Both spellings of every name: the one the catalog stores, and — for a plural — the one the
+  // server sends. `Object.keys` and not `in`, which would have accepted "toString".
+  const known = new Set<string>();
+  for (const name of Object.keys(knownMessageKeys)) {
+    known.add(name);
+    known.add(name.replace(PLURAL_SUFFIX, ""));
+  }
 
-  // Sound, and the reason nothing here needs a cast: the set was built from the keys of
-  // `knownMessageKeys`, so membership really does establish the claim. `Object.keys` and not
-  // `in`, which would have accepted "toString".
-  const has = (name: string): name is ServerName => known.has(name);
+  // Still sound, and still the reason nothing here needs a cast: the set holds exactly the raw
+  // keys and their plural bases, which is exactly what the predicate claims.
+  const has = (name: string): name is ServerName | PluralBase<ServerName> => known.has(name);
 
   function serverSentence(error: ApiError): string | null {
     const lookup = (named: string | undefined): string | null => {
@@ -292,6 +331,28 @@ export function createErrorDescriber<
     return shouldRetry(error, durableLimitCodes, maxRetryWaitSecs) ? "retry" : "none";
   }
 
+  /**
+   * Anything `codes` does not name. The server's own sentence is still the most specific thing
+   * we have, and support can act on it. A 5xx additionally gets "try again shortly", because that
+   * one genuinely does clear on its own — a 4xx does not, and saying so would be a lie that costs
+   * the reader another attempt.
+   *
+   * No `code` means no envelope, and then `message` is not the server's: it is the client's own
+   * `Request failed (502)`, written for a log. A gateway answering with HTML while the API
+   * restarts is exactly when that happens, so it reached screens — until the second migration,
+   * whose three apps each guarded against that one string by hand.
+   *
+   * Replaceable, because reaching for `message` is a convention rather than a fact — see
+   * `fallback`.
+   */
+  const unmapped: ErrorArm =
+    fallback ??
+    (({ error, says }) => ({
+      cause:
+        says ?? ((error.code === undefined ? "" : error.message) || t(`${copyPrefix}unexpected`)),
+      fix: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
+    }));
+
   return function describeError(error: unknown): DescribedError {
     if (!(error instanceof ApiError)) {
       // Not a response at all — the request never landed. Almost always the network, and almost
@@ -315,24 +376,8 @@ export function createErrorDescriber<
       recover: recoveryFor(error, waitSecs),
     };
 
-    // Anything unmapped: the server's own sentence is still the most specific thing we have,
-    // and support can act on it. A 5xx additionally gets "try again shortly", because that one
-    // genuinely does clear on its own — a 4xx does not, and saying so would be a lie that costs
-    // the reader another attempt.
-    //
-    // No `code` means no envelope, and then `message` is not the server's: it is the client's
-    // own `Request failed (502)`, written for a log. A gateway answering with HTML while the API
-    // restarts is exactly when that happens, so it reached screens — until the second migration,
-    // whose three apps each guarded against that one string by hand.
-    const arm = error.code === undefined ? undefined : codes[error.code];
-    const copy: ErrorCopy = arm
-      ? arm(ctx)
-      : {
-          cause:
-            ctx.says ??
-            ((error.code === undefined ? "" : error.message) || t(`${copyPrefix}unexpected`)),
-          fix: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
-        };
+    const arm = (error.code === undefined ? undefined : codes[error.code]) ?? unmapped;
+    const copy: ErrorCopy = arm(ctx);
 
     // The arm wins where it spoke, the rule fills the rest. `requestId` is the one thing every
     // error surface asks for and nothing was producing — `ErrorStateProps` has reserved a
