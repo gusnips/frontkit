@@ -21,6 +21,7 @@
  *
  * Run: bun run release:check   (and `bun run release`, which runs it first)
  */
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,8 +41,11 @@ async function manifestOf(dir: string): Promise<Manifest> {
   return JSON.parse(await readFile(join(ROOT, dir, "package.json"), "utf8")) as Manifest;
 }
 
-/** The manifest as PACKED — the only version of it the registry ever sees. */
-async function packedManifest(dir: string, into: string): Promise<Manifest> {
+/** Pack the package and hand back both the manifest the registry sees and the tarball itself. */
+async function packedManifest(
+  dir: string,
+  into: string,
+): Promise<{ manifest: Manifest; tarball: string }> {
   const pack = Bun.spawn(["bun", "pm", "pack", "--destination", into], {
     cwd: join(ROOT, dir),
     stdout: "pipe",
@@ -54,7 +58,33 @@ async function packedManifest(dir: string, into: string): Promise<Manifest> {
   const tarball = join(into, `${name.replace("@", "").replace("/", "-")}-${version}.tgz`);
   // `tar -xzO` to stdout: no second temp directory, and nothing left behind to clean up.
   const read = Bun.spawn(["tar", "-xzOf", tarball, "package/package.json"], { stdout: "pipe" });
-  return JSON.parse(await new Response(read.stdout).text()) as Manifest;
+  return { manifest: JSON.parse(await new Response(read.stdout).text()) as Manifest, tarball };
+}
+
+/**
+ * Files in the tarball's `dist/` with no source file behind them any more.
+ *
+ * `tsc` never removes output it did not just write, so renaming a source file leaves its old
+ * compiled twin sitting in `dist/` — and `files: ["dist"]` ships it. That is how
+ * `@gusnips/react@0.5.0` reached the registry carrying both `deploy-recovery.js` and the
+ * `chunk-reload.js` it replaced, the dead one still declaring the sessionStorage key that same
+ * release had just renamed. The exports map made it unreachable so nothing broke, and that is
+ * the trap: a published artifact that quietly contradicts itself is one somebody greps a year
+ * from now and believes.
+ *
+ * The build scripts clean `dist/` now. This checks the TARBALL rather than the script, because
+ * a stale build directory is exactly what a clean script cannot prove it prevented — and
+ * `release:check` is the only thing here that ever looks inside what the registry receives.
+ */
+async function staleDistFiles(dir: string, tarball: string): Promise<string[]> {
+  const list = Bun.spawn(["tar", "-tzf", tarball], { stdout: "pipe" });
+  const entries = (await new Response(list.stdout).text()).split("\n");
+  const emitted = entries
+    .filter((entry) => /^package\/dist\/.+\.(js|d\.ts)(\.map)?$/.test(entry))
+    .map((entry) => entry.slice("package/dist/".length).replace(/\.(js|d\.ts)(\.map)?$/, ""));
+  return [...new Set(emitted)].filter(
+    (base) => !["ts", "tsx"].some((ext) => existsSync(join(ROOT, dir, "src", `${base}.${ext}`))),
+  );
 }
 
 const current = new Map<string, string>();
@@ -68,8 +98,14 @@ const workdir = await mkdtemp(join(tmpdir(), "frontkit-release-"));
 
 try {
   for (const dir of PACKAGES) {
-    const packed = await packedManifest(dir, workdir);
+    const { manifest: packed, tarball } = await packedManifest(dir, workdir);
     const ranges = { ...packed.dependencies, ...packed.peerDependencies };
+
+    for (const stale of await staleDistFiles(dir, tarball))
+      problems.push(
+        `${packed.name} would publish dist/${stale}.* with no src/${stale}.ts behind it — ` +
+          `stale output from a rename. Run \`bun run build\` (it cleans dist/ now) and pack again.`,
+      );
 
     for (const [dep, range] of Object.entries(ranges)) {
       if (range.startsWith("workspace:"))
