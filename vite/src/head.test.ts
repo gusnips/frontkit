@@ -48,6 +48,14 @@ const LEAN_TEMPLATE = `<!doctype html>
   </body>
 </html>`;
 
+/**
+ * A fourth adopter's spelling of the same tags. X's own documentation writes them `name=`, the
+ * Open Graph spec writes `property=`, and crawlers read both — so a template may use either, and
+ * two templates in this fleet use both in one head. Matching only `property=` turned the other
+ * spelling into a silent skip rather than a build error.
+ */
+const NAME_TWITTER_TEMPLATE = TEMPLATE.replace(/property="twitter:/g, 'name="twitter:');
+
 const BASE = { title: "T", description: "D", canonical: "https://acme.com/pricing" };
 
 describe("bakeHead", () => {
@@ -94,6 +102,22 @@ describe("bakeHead", () => {
     expect(html).toContain('<meta property="og:title" content="T" />');
     expect(html).not.toContain("twitter:");
     expect(html).not.toContain('name="title"');
+  });
+
+  // …and the trap right beside that exception. A template that DOES carry these, spelled the
+  // way X documents them, must not read as one that omits them: skipping is correct for an
+  // absent tag and silent data loss for a present one. An adopter on this spelling would have
+  // shipped every page wearing the front door's card.
+  it("writes the share tags whichever attribute the template spells them with", () => {
+    const html = bakeHead(NAME_TWITTER_TEMPLATE, { ...BASE, ogTitle: "share" });
+    expect(html).toContain('<meta name="twitter:title" content="share" />');
+    expect(html).toContain('<meta name="twitter:description" content="D" />');
+  });
+
+  it("strips a share URL spelled with either attribute", () => {
+    const html = bakeHead(NAME_TWITTER_TEMPLATE, { ...BASE, canonical: null });
+    expect(html).not.toContain("twitter:url");
+    expect(html).not.toContain('content=""');
   });
 
   it("strips the canonical and the share URL rather than blanking them", () => {
@@ -253,6 +277,21 @@ describe("assertRendered", () => {
   it("catches a file whose body is the loading screen", () => {
     const spinner = `<div id="root"><div role="status" aria-label="Loading">${"x".repeat(800)}</div></div>`;
     expect(() => assertRendered("pricing.html", page(spinner), shell)).toThrow(/loading screen/);
+  });
+
+  // The donor's splash IS the root's first element. A fourth adopter's centres the live region
+  // inside a `<main>`, so a check anchored at the first tag saw an ordinary wrapper and passed
+  // the file — while that repo's own guard looked for a spinner class its splash does not use.
+  it("catches a loading screen nested inside a wrapper element", () => {
+    const nested = `<div id="root"><main class="grid place-items-center"><p role="status">Loading${"x".repeat(700)}</p></main></div>`;
+    expect(() => assertRendered("pricing.html", page(nested), shell)).toThrow(/loading screen/);
+  });
+
+  // What makes the wider search safe: a page with this much in it has a page in it, whatever a
+  // live region at the top of it says. A real banner ("Saved", a connection notice) is ordinary.
+  it("does not flag a full page that opens with a live region", () => {
+    const banner = `<div id="root"><div role="status">Saved</div><main>${"x".repeat(2500)}</main></div>`;
+    expect(() => assertRendered("pricing.html", page(banner), shell)).not.toThrow();
   });
 
   // The reason the check slices rather than matching in one pattern: a regex that skips

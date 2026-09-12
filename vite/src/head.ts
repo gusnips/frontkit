@@ -34,7 +34,25 @@ function setMeta(html: string, selector: string, value: string): string {
 }
 
 /**
- * The same, for a tag a template is allowed not to carry.
+ * The same regex, for a key a template may spell with EITHER attribute.
+ *
+ * The `twitter:` family is written both ways in the wild and both work: X's own documentation
+ * says `name=`, the Open Graph spec says `property=`, and two adopters' templates carry
+ * `name="twitter:card"` in the same head as `property="twitter:title"`. Matching one spelling
+ * silently skips the other — and these tags go through `setMetaIfPresent`, where "skipped" is
+ * not an error but the intended behaviour for a template that does not have them.
+ *
+ * The fourth adopter spells the whole family `name=`. Baked with the narrow regex, every one of
+ * its 45 prerendered files — eleven pages in three languages — would have kept the template's
+ * card title and description, which is the front door's, and nothing in a browser shows it.
+ * That is the exact failure this file exists to prevent, arriving through the package rather
+ * than despite it.
+ */
+const eitherRe = (key: string): RegExp =>
+  new RegExp(`(<meta[^>]*(?:name|property)="${escapeRegex(key)}"[^>]*content=")[^"]*(")`);
+
+/**
+ * Replace the `content` of a tag a template is allowed not to carry.
  *
  * Only the `twitter:` tags, `og:image:alt` and `name="title"` get this. X reads the `og:` tags when
  * the `twitter:` ones are absent, no crawler reads `name="title"` at all, and most templates carry
@@ -42,9 +60,10 @@ function setMeta(html: string, selector: string, value: string): string {
  * that never had them. A template that DOES carry one and gets a stale value is still a bug, which
  * is why they are written rather than ignored. Everything a crawler actually depends on goes
  * through `setMeta`.
+ *
+ * Takes the regex rather than the selector, so each caller picks how strict the spelling is.
  */
-function setMetaIfPresent(html: string, selector: string, value: string): string {
-  const re = metaRe(selector);
+function setMetaIfPresent(html: string, re: RegExp, value: string): string {
   return re.test(html) ? html.replace(re, `$1${escapeAttr(value)}$2`) : html;
 }
 
@@ -142,17 +161,17 @@ export function bakeHead(template: string, tags: HeadTags): string {
   html = setMeta(html, 'name="description"', tags.description);
   html = setMeta(html, 'property="og:title"', shareTitle);
   html = setMeta(html, 'property="og:description"', shareDescription);
-  html = setMetaIfPresent(html, 'name="title"', tags.title);
-  html = setMetaIfPresent(html, 'property="twitter:title"', shareTitle);
-  html = setMetaIfPresent(html, 'property="twitter:description"', shareDescription);
+  html = setMetaIfPresent(html, metaRe('name="title"'), tags.title);
+  html = setMetaIfPresent(html, eitherRe("twitter:title"), shareTitle);
+  html = setMetaIfPresent(html, eitherRe("twitter:description"), shareDescription);
 
   if (tags.image !== undefined) {
     html = setMeta(html, 'property="og:image"', tags.image);
-    html = setMetaIfPresent(html, 'property="twitter:image"', tags.image);
+    html = setMetaIfPresent(html, eitherRe("twitter:image"), tags.image);
     // A card's description goes with the card. Left alone, every page's own card was described
     // with the front page's title — the stale value this function exists to prevent, on the one
     // tag written for somebody who cannot see the picture.
-    html = setMetaIfPresent(html, 'property="og:image:alt"', shareTitle);
+    html = setMetaIfPresent(html, eitherRe("og:image:alt"), shareTitle);
   }
 
   if (tags.canonical === null) {
@@ -161,10 +180,10 @@ export function bakeHead(template: string, tags: HeadTags): string {
     // claim about this address, and a dead link that still unfurls the brand card is fine.
     html = html
       .replace(/\s*<link rel="canonical"[^>]*>/, "")
-      .replace(/\s*<meta property="(?:og|twitter):url"[^>]*>/g, "");
+      .replace(/\s*<meta[^>]*(?:name|property)="(?:og|twitter):url"[^>]*>/g, "");
   } else {
     html = setMeta(html, 'property="og:url"', tags.canonical);
-    html = setMetaIfPresent(html, 'property="twitter:url"', tags.canonical);
+    html = setMetaIfPresent(html, eitherRe("twitter:url"), tags.canonical);
     // Demanded, like every meta tag a crawler depends on. `String.replace` with no match is a
     // silent no-op, so a template that never had a canonical would get one on no page at all
     // and say nothing about it — the exact failure `setMeta` exists to turn into a red build.
@@ -244,6 +263,15 @@ export interface RenderedChecks {
 }
 
 /**
+ * Past this much growth the file has a page in it, whatever else it also contains.
+ *
+ * It is what lets the loading-screen search below look at a whole slice rather than one tag: a
+ * real page that opens with a live region ("Saved", a connection banner) is far over this, and a
+ * splash never is. The donor's was 1,174 bytes.
+ */
+const SPLASH_MAX_GROWTH = 2000;
+
+/**
  * What every written file must be true of before the build is allowed to pass.
  *
  * The regression this exists for is a root that renders to nothing. A router whose location
@@ -298,6 +326,12 @@ export function assertRendered(
     .trimStart();
 
   if (!/^<[a-z]/.test(head)) fail("has no element inside its root");
-  if (/^<[^>]*role="status"/.test(head))
+  // Anywhere in that bounded slice, not only its first tag, and only while the file is small
+  // enough to BE a splash. Anchored at the root's first element this missed the fourth adopter's
+  // loading screen, which centres its live region inside a `<main>` — one element deeper than the
+  // donor's, and an ordinary-looking wrapper to a test that reads one tag. That adopter's own
+  // guard missed it from the other side: it failed a file containing a spinner class its splash
+  // does not use. Two checks written for one regression, neither of which could ever fire.
+  if (grew < SPLASH_MAX_GROWTH && head.includes('role="status"'))
     fail("rendered the loading screen, not the page — something suspended and never resolved");
 }
