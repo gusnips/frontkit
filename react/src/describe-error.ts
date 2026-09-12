@@ -10,10 +10,16 @@ import { shouldRetry } from "./query.ts";
  * "Monthly quota spent, upgrade or buy a pack" is right in a JSON body and wrong under a button
  * that could just say what to do next.
  *
- * `cause` is what happened. `hint` is what to do about it. **A surface that shows only the first
+ * `cause` is what happened. `fix` is what to do about it. **A surface that shows only the first
  * half is the dead end this exists to prevent** — which is why the type has two fields and not
- * one, and why `hint` being absent should be a deliberate choice at each call site rather than
+ * one, and why `fix` being absent should be a deliberate choice at each call site rather than
  * the default nobody noticed.
+ *
+ * `fix`, and not the `hint` this returned until 0.6.0. `ErrorStateProps` — the contract this same
+ * package ships for the component that renders this — has always called it `fix`, so every
+ * adopter wrote `fix={hint}` at every error surface: a rename adapter, which is the shape of an
+ * API we got wrong. It also clears a collision, because in at least one adopter a form field's
+ * `hint` is the requirement text under the input, which is a different thing entirely.
  *
  * The per-code switch stays in the product: two donors' switches shared their SHAPE and almost
  * no arms, because the arms are that API's vocabulary. What ships is the scaffolding around it,
@@ -46,7 +52,7 @@ export interface ErrorCopy {
   /** What happened, in the reader's words. */
   cause: string;
   /** What to do about it. Its absence should be a decision, not an oversight. */
-  hint?: string;
+  fix?: string;
   /** Override the derived kind — a 429 whose code means a spent quota is `"none"`, not `"wait"`. */
   recover?: RecoveryKind;
   /** Override the request id. Rarely wanted; the envelope's is used by default. */
@@ -76,8 +82,16 @@ export type Translate<Key extends string = string> = (
 /** The three names {@link humanizeWait} looks up, under whatever prefix you pass it. */
 type WaitName = "waitSeconds" | "waitMinutes" | "waitHours";
 
-/** Every name {@link createErrorDescriber} looks up itself. Your catalog carries all of them. */
-type CopyName = WaitName | "network" | "networkHint" | "unexpected" | "retrySoon";
+/**
+ * Every name {@link createErrorDescriber} looks up itself. Your catalog carries all of them.
+ *
+ * The three wait names are deliberately NOT here, which is the other half of 0.6.0. This module
+ * used to humanize a stated wait itself, so `waitSeconds`/`waitMinutes`/`waitHours` — each with
+ * an ICU plural — landed in the key union of every adopter's `t` whether or not a wait was ever
+ * rendered. An app that formats waits with `Intl.RelativeTimeFormat` needs none of them and was
+ * left adding six entries per language to satisfy a compiler. `formatWait` owns that now.
+ */
+type CopyName = "network" | "networkHint" | "unexpected" | "retrySoon";
 
 /**
  * The paragraph above, pinned so it cannot quietly stop being true.
@@ -94,9 +108,6 @@ type ClosedCatalog = (
     | "errors.networkHint"
     | "errors.unexpected"
     | "errors.retrySoon"
-    | "errors.waitSeconds"
-    | "errors.waitMinutes"
-    | "errors.waitHours"
     | "serverErrors.quotaDay"
     | "billing.plan",
   params?: Record<string, unknown>,
@@ -114,6 +125,11 @@ type _TypedCatalogNeedsNoCast = Satisfied<
  * not become the less precise "in 1 minute", and 90 minutes rather than 60 for the same reason
  * one rung up. Needs `waitSeconds` / `waitMinutes` / `waitHours` under `prefix`, each with a
  * `count` plural.
+ *
+ * This is what you pass as `formatWait` when your catalog carries those three:
+ * `formatWait: (secs) => humanizeWait(t, secs, "errors.")`. An app that formats a wait with
+ * `Intl.RelativeTimeFormat` passes its own one-liner instead and needs no wait keys at all —
+ * which also gets it correct plurals in languages with more than two forms, for free.
  */
 export function humanizeWait<Prefix extends string>(
   t: Translate<`${Prefix}${WaitName}`>,
@@ -149,6 +165,16 @@ export interface ErrorDescriberOptions<
   t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName}`>;
   /** Catalog namespace for this module's own copy, e.g. `"errors."`. */
   copyPrefix: Prefix;
+  /**
+   * How a stated wait becomes words, for the `wait` an arm reads off its context.
+   *
+   * Required rather than defaulted, because there is no answer that is right for everyone and a
+   * default hid the cost: {@link humanizeWait} reads three ICU plural keys out of your catalog,
+   * and an app that already formats relative time with `Intl` would have had to add them to
+   * compile. Say which you want — `(secs) => humanizeWait(t, secs, "errors.")`, or your own
+   * `(secs) => formatIn(secs, locale)` — and the catalog you need is the one you can see.
+   */
+  formatWait: (secs: number) => string;
   /**
    * The server's own catalog namespace, e.g. `"serverErrors."`. A `messageKey` outside it is
    * ignored — the server names a sentence, it does not get to name any key in the app.
@@ -201,6 +227,7 @@ export function createErrorDescriber<
 >({
   t,
   copyPrefix,
+  formatWait,
   messageKeyPrefix,
   knownMessageKeys,
   codes = {},
@@ -255,7 +282,9 @@ export function createErrorDescriber<
       // so these two agree here without either being told about the other.
       return {
         cause: t(`${copyPrefix}network`),
-        hint: t(`${copyPrefix}networkHint`),
+        // The catalog KEY keeps its name while the field becomes `fix`: renaming it would cost
+        // every adopter a JSON edit in every language, for a string no caller ever types.
+        fix: t(`${copyPrefix}networkHint`),
         recover: "retry",
       };
     }
@@ -264,7 +293,7 @@ export function createErrorDescriber<
     const ctx: ErrorContext = {
       error,
       says: serverSentence(error),
-      wait: waitSecs === null ? null : humanizeWait(t, waitSecs, copyPrefix),
+      wait: waitSecs === null ? null : formatWait(waitSecs),
       waitSecs,
       recover: recoveryFor(error, waitSecs),
     };
@@ -285,7 +314,7 @@ export function createErrorDescriber<
           cause:
             ctx.says ??
             ((error.code === undefined ? "" : error.message) || t(`${copyPrefix}unexpected`)),
-          hint: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
+          fix: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
         };
 
     // The arm wins where it spoke, the rule fills the rest. `requestId` is the one thing every

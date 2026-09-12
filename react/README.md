@@ -156,14 +156,28 @@ hurry cannot skip.
 which control to offer, and the request id to print under it:
 
 ```ts
-const { cause, hint, recover, reference } = describeError(error);
+const { cause, fix, recover, reference } = describeError(error);
 // recover: "retry" | "signin" | "wait" | "none"
 ```
+
+The field is `fix`, the same word as the prop above. It was `hint` until 0.6.0, which left every
+adopter writing `fix={hint}` at every error surface.
 
 `recover` is derived from `shouldRetry` — the same rule react-query retries on — so the button a
 reader sees and the retry that actually happens cannot disagree. Give it the same
 `durableLimitCodes` list you give `queryDefaults`, and a spent quota offers no button instead of
 one that cannot work.
+
+You also say how a stated wait becomes words:
+
+```ts
+formatWait: (secs) => humanizeWait(t, secs, "errors."); // three ICU plural keys
+formatWait: (secs) => formatIn(secs, locale); // or your own Intl formatter
+```
+
+It is required because the default hid its price: `humanizeWait` reads `waitSeconds`,
+`waitMinutes` and `waitHours` out of your catalog, so an app that already formats relative time
+with `Intl` had to add six entries per language before it would compile.
 
 ## Also here
 

@@ -23,25 +23,68 @@ describe("humanizeWait", () => {
   });
 });
 
+/**
+ * The seam 0.6.0 added, and why it is required rather than defaulted: this module used to
+ * humanize the wait itself, which put `waitSeconds`/`waitMinutes`/`waitHours` into the key union
+ * of every adopter's `t` — six ICU entries per language — even for an app that formats relative
+ * time with `Intl` and would never render one of them.
+ */
+describe("formatWait", () => {
+  const describeError = createErrorDescriber({
+    t,
+    copyPrefix: "errors.",
+    // What an adopter on `Intl.RelativeTimeFormat` passes. Its catalog has no wait keys at all,
+    // and it gets correct plurals in every language without writing one.
+    formatWait: (secs) =>
+      new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(
+        Math.round(secs / 60),
+        "minute",
+      ),
+    messageKeyPrefix: "serverErrors.",
+    knownMessageKeys: {},
+    codes: {
+      RATE_LIMIT_EXCEEDED: ({ wait }) => ({
+        cause: "errors.rateLimit",
+        fix: `wait:${String(wait)}`,
+      }),
+    },
+  });
+
+  it("hands an arm the wait in the app's own words, not the package's", () => {
+    const error = new ApiError(
+      429,
+      { code: "RATE_LIMIT_EXCEEDED", message: "slow down" },
+      { retryAfterSecs: 120 },
+    );
+    expect(describeError(error).fix).toBe("wait:in 2 minutes");
+  });
+
+  it("leaves the wait null when the refusal never stated one", () => {
+    const error = new ApiError(429, { code: "RATE_LIMIT_EXCEEDED", message: "slow down" });
+    expect(describeError(error).fix).toBe("wait:null");
+  });
+});
+
 describe("createErrorDescriber", () => {
   const describeError = createErrorDescriber({
     t,
     copyPrefix: "errors.",
+    formatWait: (secs) => humanizeWait(t, secs, "errors."),
     messageKeyPrefix: "serverErrors.",
     knownMessageKeys: { quotaDay: "", suspended: "" },
     codes: {
       QUOTA_EXCEEDED: ({ says, wait }) => ({
         cause: says ?? "errors.quota",
-        hint: wait ? `errors.retryIn(${wait})` : undefined,
+        fix: wait ? `errors.retryIn(${wait})` : undefined,
       }),
     },
   });
 
   it("reads a thrown non-response as the network, with a way forward", () => {
-    const { cause, hint } = describeError(new TypeError("Failed to fetch"));
+    const { cause, fix } = describeError(new TypeError("Failed to fetch"));
     expect(cause).toBe("errors.network");
-    // The hint is the point. A cause with no hint is the dead end this module exists to stop.
-    expect(hint).toBe("errors.networkHint");
+    // The fix is the point. A cause with no fix is the dead end this module exists to stop.
+    expect(fix).toBe("errors.networkHint");
   });
 
   it("resolves a messageKey this build carries, with its params", () => {
@@ -82,16 +125,16 @@ describe("createErrorDescriber", () => {
   it("offers a retry on a 5xx and withholds it on a 4xx", () => {
     // A 5xx genuinely clears on its own. A 4xx does not, and saying so would cost the reader
     // another attempt for nothing.
-    expect(describeError(new ApiError(503, null)).hint).toBe("errors.retrySoon");
-    expect(describeError(new ApiError(403, null)).hint).toBeUndefined();
+    expect(describeError(new ApiError(503, null)).fix).toBe("errors.retrySoon");
+    expect(describeError(new ApiError(403, null)).fix).toBeUndefined();
   });
 
   it("never puts the client's own log line on screen", () => {
     // A gateway answers with HTML, so there is no envelope and `message` is the client's
     // `Request failed (502)` — English, and written for a log.
-    const { cause, hint } = describeError(new ApiError(502, null));
+    const { cause, fix } = describeError(new ApiError(502, null));
     expect(cause).toBe("errors.unexpected");
-    expect(hint).toBe("errors.retrySoon");
+    expect(fix).toBe("errors.retrySoon");
   });
 });
 
@@ -107,6 +150,7 @@ describe("the recovery kind", () => {
     messageKeyPrefix: "serverErrors.",
     knownMessageKeys: { quotaDay: "" },
     durableLimitCodes: ["QUOTA_EXCEEDED"],
+    formatWait: (secs) => humanizeWait(t, secs, "errors."),
   });
 
   it("sends a 401 to sign-in and leaves a 403 alone", () => {
@@ -159,6 +203,7 @@ describe("the recovery kind", () => {
     const describe503 = createErrorDescriber({
       t,
       copyPrefix: "errors.",
+      formatWait: (secs) => humanizeWait(t, secs, "errors."),
       messageKeyPrefix: "serverErrors.",
       knownMessageKeys: {},
       codes: {
@@ -185,6 +230,7 @@ describe("createErrorDescriber, when the code names the sentence", () => {
   const describeError = createErrorDescriber({
     t,
     copyPrefix: "errors.",
+    formatWait: (secs) => humanizeWait(t, secs, "errors."),
     messageKeyPrefix: "errors.",
     knownMessageKeys: { FORECAST_NOT_FOUND: "", network: "" },
   });
