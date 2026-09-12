@@ -57,6 +57,17 @@ function exportsRenderer<Context>(mod: unknown): mod is { renderPage: PageRender
  * bundle, and a plugin running in `closeBundle` is inside the build that would have to have
  * produced it. So the entry is a path on disk, written by `vite build --ssr src/entry-server.tsx`,
  * and nothing in the source tree references it.
+ *
+ * **The calling script has to exit itself.** This import is where the renderer enters your
+ * process, and under bun `react-dom/static.browser` — which invariant 1 requires, so every app on
+ * this rig loads it — leaves that process alive after its last await. Measured by elimination with
+ * no app code at all: `react-dom/server` exits, `static.browser` does not, and
+ * `process.getActiveResourcesInfo()` reports nothing either way, so the handle is invisible to
+ * everything except the hang. Under node it exits. Nothing here can undo it — a library must not
+ * call `process.exit` on its host — so a prerender script ends with `process.exit(0)` once every
+ * file is written, and in CI the alternative is a job that does all its work and then runs to its
+ * timeout. Five adopters had already written that line against a DIFFERENT holder (an auth client
+ * whose token-refresh timer starts at module scope); none of them knew the renderer does it too.
  */
 export async function loadRenderer<Context = unknown>(
   entryFile: string,
