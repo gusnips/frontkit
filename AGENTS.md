@@ -712,6 +712,64 @@ still get wrong, that only this repo's shape reveals".
   nesting a `t()` inside a hint. **The gap was never the return type — it was a decision the type
   had no room for**, and a decision fits beside prose without replacing it.
 
+### Migration 5 (−55 lines, 4 commits)
+
+The first adopter whose migration turned up a bug that was **live on a public, indexed page**, and
+the first where two separate declines were each worth more than the adoption would have been.
+
+- **The same bug, in a second repo, in a file with the same path.** Its brand-variable substituter
+  declared six placeholder names and matched three of them in the regex beside it, so the legal
+  entity, its registration number and its address were substituted nowhere. The Terms and the
+  Privacy policy told readers, in all three languages, that the service is operated by
+  `{{legalEntity}}` (registration `{{legalEntityCnpj}}`). Measured on the deployed site before the
+  fix: 36 raw placeholders across six prerendered pages — the same count as the earlier repo with
+  the identical defect. What hides it in both is that `{{brand}}` on the neighbouring line resolves
+  correctly, so half the placeholders work and the page reads as fine everywhere anyone looks.
+  `applyBrandVars` derives its pattern from `Object.keys(vars)`, so adopting it fixes the class and
+  not the instance: **a var you supply is a var that gets filled.** The second occurrence is what
+  proves that derivation was the right fix rather than over-engineering — the first one only proved
+  somebody had made a typo.
+- **A decline can name the package's next gap more precisely than an adoption would.** `authSlice`
+  did not land here, and measuring why found the seam it is missing. `derive(user)` covers product
+  state COMPUTED FROM the user. This adopter holds an operator-impersonation token that is not
+  computed from the user — it comes from session storage and an admin action — yet sign-out must
+  still reset it AND remove its storage key, because that token is bound to the operator's own
+  session. `clear` is a fixed writer with no seam for that, and spreading an override after the
+  slice leaves a live `clear()` that does NOT end the impersonation sitting beside the app's own
+  `clearUser()` that does: a sign-out footgun worse than the duplication it would remove. That is
+  the **second** instance in the fleet — another repo's store carries a one-shot sign-out notice,
+  which is the same class of state. **It was deliberately not built**, and that is the other half:
+  unlike the gap `authSlice` itself closed, closing this one would produce no adoption today, so
+  designing the seam now would be designing ahead of the code.
+- **A measured decline needs a ratio, not a feeling.** `cn` is two byte-identical seven-line copies
+  in one repo and the package ships the same function. Adopting it saves six lines and touches 168
+  files — a worse ratio than an adoption already declined at ~25 lines for ~70 call sites. Nothing
+  in it can drift, either: no options, no config, no product decision, which is exactly why all ten
+  repos wrote it identically. And in a shared tree the purely mechanical rewrite is the change most
+  likely to collide with work you cannot see.
+- **The adopter's own test named the right home for a shared constant.** The list of refusals that
+  do not clear by waiting is taken twice — once to decide whether to retry, once to decide which
+  control to offer — so it has to be declared once. It went into the query client first, which put
+  shared DATA inside the module that constructs a side-effectful singleton. A store test that mocks
+  that module wholesale then read the constant as `undefined`. The failure was the altitude error
+  talking: it belongs beside the error-code union it describes, where the comment stating the rule
+  already lived, and where nothing has to be instantiated to read it.
+- **A net-POSITIVE slice can still be right, and saying so beats hiding it.** The describer returns
+  four things; this app rendered one, so the package was computing "what to do about it" and every
+  error surface dropped it — 53 of them, all fixed in one file, because all four come from the one
+  call that already yielded the cause. That slice is +29 lines. The net-negative rule is about a
+  migration, and its reason is duplication: an adopter that GROWS because the cut line was drawn
+  wrong. Rendering output the package already computes is not that, and the honest move is to state
+  the number and the reason rather than pad the diff elsewhere. The migration closed at −55.
+- **Check the vendor's own entry before adding a dependency — and resolve it the way the app
+  does.** Invariant 3 needs the auth library's retryable-error predicate, and the module doc
+  suggested an adapter. The first check, run with `node` from the repo root, reported the symbol
+  missing and looked like proof a new dependency was needed. It was not: the package is hoisted
+  into a store that node's resolver cannot walk from there, and the vendor's main entry re-exports
+  the auth package wholesale. Re-run through the app's OWN resolver, the answer flipped and the
+  dependency was already present. **A resolution check is only evidence when it resolves the way
+  the consumer will.**
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
