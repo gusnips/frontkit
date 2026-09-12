@@ -336,6 +336,33 @@ describe("createApiClient", () => {
     expect(thrown).toBe(seen[0]);
   });
 
+  /**
+   * A refusal's headers reach nobody otherwise: `request` throws before the `Response` escapes.
+   * One adopter's API reports what every call cost on the error path too — `x-request-cost: 0`
+   * on a page that was walled — which is the whole promise "a blocked page costs nothing" made
+   * checkable. Without the response here, adopting this client would have deleted that screen.
+   */
+  it("hands the failed response to onError, headers and all", async () => {
+    stubFetch(
+      () =>
+        new Response(JSON.stringify({ error: { code: "UPSTREAM_BLOCKED", message: "walled" } }), {
+          status: 422,
+          headers: { "x-request-cost": "0" },
+        }),
+    );
+    const seen: { code: string | undefined; cost: string | null }[] = [];
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session(),
+      onSessionDead: () => {},
+      onError: (error, response) =>
+        seen.push({ code: error.code, cost: response.headers.get("x-request-cost") }),
+    });
+
+    await api.get("/v1/scrape").catch(() => {});
+    expect(seen).toEqual([{ code: "UPSTREAM_BLOCKED", cost: "0" }]);
+  });
+
   it("does not let a broken listener replace the API failure", async () => {
     stubFetch(
       () =>

@@ -84,8 +84,20 @@ export interface ApiClientOptions {
    *
    * Observation only: the error is thrown either way, and throwing from here would replace a
    * real API failure with whatever the listener hit.
+   *
+   * **The response comes with it, because a refusal's headers are otherwise unreachable.**
+   * `request` throws before the `Response` escapes, so an adopter whose API states something on
+   * the error path had no way to read it at all — one reports what every call cost, refusals
+   * included, which is how "a blocked page costs nothing" becomes a thing a customer can check
+   * rather than a thing we assert. That is the distinction worth keeping: field-error flattening
+   * and a per-call meter callback both stayed in their products, because a product can write
+   * those itself. This one it cannot, at any price, and a capability the kit makes unreachable
+   * is a regression the kit has to undo.
+   *
+   * The BODY has already been read by the time this runs — the envelope was needed to build the
+   * error — so `response.json()` here throws. The headers are what is left, and what this is for.
    */
-  onError?: (error: ApiError) => void;
+  onError?: (error: ApiError, response: Response) => void;
   /**
    * Abort a request that has not answered. Default 30s.
    *
@@ -334,7 +346,7 @@ export function createApiClient({
       // the real news, and swallowing it for a bug in a side effect would send everyone
       // debugging the wrong thing.
       try {
-        onError?.(error);
+        onError?.(error, res);
       } catch {
         // ignored on purpose — see above
       }
