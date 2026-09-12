@@ -160,6 +160,16 @@ pin them; if one fails, a lesson is being un-learned.
    hoists in-tree `<title>`/`<meta>`/`<link>` to the FRONT of the server stream — which lands
    inside the body when you are filling one `<div>` rather than assembling a document. Strip
    them, and rethrow `onError` so a render failure fails the build.
+
+   One cost comes with it, and it belongs beside the rule rather than in a bug report: under bun,
+   importing that renderer holds the event loop open, so a prerender script that has written every
+   file and printed its summary **will not exit on its own**. It ends with `process.exit(0)`.
+   Measured by elimination, with no app code loaded: `react-dom/server` exits,
+   `react-dom/static.browser` does not, node exits either way, and
+   `process.getActiveResourcesInfo()` reports nothing — so the only symptom is a CI job that does
+   all of its work and then runs to its timeout. A library must not call `exit` on its host, which
+   is why this is written down in three places instead of fixed in one.
+
 2. **A prerendered file names its own route**, and the entry hydrates only on a match.
    "Does the root have children" is the wrong question and getting it wrong is silent: a static
    host answers every address it does not publish with the nearest `404.html`, which has the
@@ -769,6 +779,63 @@ the first where two separate declines were each worth more than the adoption wou
   the auth package wholesale. Re-run through the app's OWN resolver, the answer flipped and the
   dependency was already present. **A resolution check is only evidence when it resolves the way
   the consumer will.**
+
+### Migration 6 (−282 lines, 5 commits)
+
+The first adopter already running the package in three apps before the migration started, and the
+first whose migration caught the package **contradicting itself** — two halves of one contract,
+shipped in the same tarball, disagreeing about the name of a field.
+
+- **A line every adopter writes is a fact the package failed to record.** Six prerender scripts
+  across five adopters already ended with `process.exit(0)`, and every one of them was written
+  against a DIFFERENT holder: an auth client whose token-refresh timer starts at module scope.
+  None of them knew the renderer invariant 1 requires does it too, so the sixth adopter
+  rediscovered it from scratch — through three refuted hypotheses and two builds killed by hand.
+  This is migration 2's rule ("a guard every adopter writes is a bug in the package") arriving
+  from the other end: the package could not fix the cause, so what it owed was the sentence.
+- **A rename adapter in every adopter is an API we got wrong.** `ErrorStateProps` — the contract
+  this package ships for the component that renders a described error — has always called the
+  second half `fix`, while the describer returned `hint`. Every adopter wrote `fix={hint}` at
+  every error surface, and `states.ts` had been documenting a `fix` the describer never returned.
+  The tell that the rename was right rather than merely tidy: it made an existing doc comment
+  TRUE instead of forcing an edit. It also cleared a collision, because in an adopter a form
+  field's `hint` is the requirement text under the input.
+- **A default whose price is invisible is not a kindness.** The describer humanized a stated wait
+  itself, which put three ICU plural keys into the key union of every adopter's `t` whether or not
+  a wait was ever rendered. Measured for one adopter through `Intl.PluralRules`, that is **24
+  catalog entries** — three keys across one language's two plural categories and two languages'
+  three — to satisfy a compiler for copy it already formatted correctly with
+  `Intl.RelativeTimeFormat`. `formatWait` is required rather than defaulted, so the catalog you
+  need is the one you can see; `humanizeWait` is still exported and is now what you pass.
+- **The drift was real and ran the opposite way from the prediction.** The expectation was a "try
+  again" offered for a refusal the query layer refuses to retry. Measured, it was the reverse: two
+  503s that never clear on their own were shown as "write to us, no retry" while `shouldRetry`,
+  seeing only a 5xx, spent two more requests and about three seconds of spinner on each. Deriving
+  the button from the retry rule is what surfaced it, and the fix was one shared list rather than
+  either consumer changing its mind.
+- **A code that means two things is a contract gap, not a client decision.** A third 503 in that
+  same family has two raisers — "not configured on this deployment" (durable) and "did not answer
+  just now", which the server tags `severity: "transient"`. The envelope carries no severity, so
+  the client cannot separate them and would be wrong for half the cases whichever way it chose. It
+  stayed off the list, with the reason written beside the list. **Declining to guess is an
+  outcome; leaving the guess undocumented is not.**
+- **A bug class checked and found absent is a result worth the reading.** Migration 5's brand-var
+  substituter bug — names declared but not matched, so legal text shipped raw placeholders — was
+  checked here against the same file shape: four names declared, four matched. Clean. The check
+  cost minutes and the alternative was assuming.
+- **A byte-diff that changes files is a question, not a verdict.** 82 of 88 prerendered pages came
+  out identical, asset hashes unmoved. The six that differed were the 404 shells, which now keep
+  the brand `og:image` the template declares where the old rig stripped it — correct per invariant
+  12, but only because the advertised card is a real file, which was checked on disk rather than
+  assumed. Three sibling repos shipped that same tag pointing at a card that never existed.
+- **`scripts/` typechecked by nothing, for the second migration running.** Both apps ran
+  `typecheck` against their app tsconfig alone, so the `tsconfig.node.json` beside it — and with
+  it every script that writes a head, a canonical and a sitemap — never executed at all. Migration
+  4 found this in one repo and it was not a quirk of that repo.
+- **Piping a build through `tail` throws away its exit code.** The pipeline reports `tail`'s
+  status, so an `&&` chain advances past a failed build and a "completed, exit 0" notification
+  means nothing. Two of this migration's dead ends trace to that one habit, including a "hang"
+  that was a finished build waiting on the event loop above.
 
 ### How to migrate a repo — the check that is not optional
 
