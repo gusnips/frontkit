@@ -18,9 +18,40 @@ import { escapeAttr, escapeRegex } from "./escape.ts";
 /** The empty root a template must carry — `bakeHead` fills it, and refuses a filled one. */
 export const EMPTY_ROOT = '<div id="root"></div>';
 
-/** `[^>]*` on both sides tolerates the attributes being split across lines, as Vite emits them. */
-const metaRe = (selector: string): RegExp =>
-  new RegExp(`(<meta[^>]*${escapeRegex(selector)}[^>]*content=")[^"]*(")`);
+/**
+ * One tag, in BOTH attribute orders.
+ *
+ * `[^>]*` on either side already tolerates the attributes being split across lines, as Vite
+ * emits them. What it cannot tolerate is `content` coming FIRST — `<meta content="…"
+ * name="description">` is equally valid HTML, hand-written heads are full of it, and a regex
+ * anchored on "selector, then content" simply does not match. That matters more here than
+ * anywhere else in this file, because {@link setMeta} THROWS on no match: a template spelling
+ * one required tag the other way round is a red build with a misleading message, on a head that
+ * is perfectly correct. The fifth adopter's rig carried the reversed form as a second pattern;
+ * this is that, kept.
+ *
+ * The capture groups differ between the two, which is why they are separate patterns and not
+ * one alternation: forward captures `(…content=")value(")`, reversed captures
+ * `(<meta…content=")value("…selector)`. `$1`/`$2` mean the right thing in both.
+ */
+const metaResFor = (pattern: string): readonly RegExp[] => [
+  new RegExp(`(<meta[^>]*${pattern}[^>]*content=")[^"]*(")`),
+  new RegExp(`(<meta[^>]*content=")[^"]*("[^>]*${pattern})`),
+];
+
+/** …from a selector written literally, as every caller but {@link eitherRes} writes it. */
+const metaRes = (selector: string): readonly RegExp[] => metaResFor(escapeRegex(selector));
+
+/**
+ * Rewrite the value the first matching pattern captures between `$1` and `$2`, or null when the
+ * template carries no such tag. Tag-agnostic on purpose — the canonical `<link>` uses it too.
+ */
+function rewriteAttr(html: string, patterns: readonly RegExp[], value: string): string | null {
+  for (const re of patterns) {
+    if (re.test(html)) return html.replace(re, `$1${escapeAttr(value)}$2`);
+  }
+  return null;
+}
 
 /**
  * Replace the `content` of one `<meta …>`. Throws when the tag is missing, so an edit to
@@ -28,9 +59,9 @@ const metaRe = (selector: string): RegExp =>
  * every crawler.
  */
 function setMeta(html: string, selector: string, value: string): string {
-  const re = metaRe(selector);
-  if (!re.test(html)) throw new Error(`prerender: <meta ${selector}> not found in index.html`);
-  return html.replace(re, `$1${escapeAttr(value)}$2`);
+  const out = rewriteAttr(html, metaRes(selector), value);
+  if (out === null) throw new Error(`prerender: <meta ${selector}> not found in index.html`);
+  return out;
 }
 
 /**
@@ -48,8 +79,8 @@ function setMeta(html: string, selector: string, value: string): string {
  * That is the exact failure this file exists to prevent, arriving through the package rather
  * than despite it.
  */
-const eitherRe = (key: string): RegExp =>
-  new RegExp(`(<meta[^>]*(?:name|property)="${escapeRegex(key)}"[^>]*content=")[^"]*(")`);
+const eitherRes = (key: string): readonly RegExp[] =>
+  metaResFor(`(?:name|property)="${escapeRegex(key)}"`);
 
 /**
  * Replace the `content` of a tag a template is allowed not to carry.
@@ -61,10 +92,10 @@ const eitherRe = (key: string): RegExp =>
  * is why they are written rather than ignored. Everything a crawler actually depends on goes
  * through `setMeta`.
  *
- * Takes the regex rather than the selector, so each caller picks how strict the spelling is.
+ * Takes the patterns rather than the selector, so each caller picks how strict the spelling is.
  */
-function setMetaIfPresent(html: string, re: RegExp, value: string): string {
-  return re.test(html) ? html.replace(re, `$1${escapeAttr(value)}$2`) : html;
+function setMetaIfPresent(html: string, patterns: readonly RegExp[], value: string): string {
+  return rewriteAttr(html, patterns, value) ?? html;
 }
 
 /** One `<link rel="alternate" hreflang>` — this page's address in another language. */
@@ -161,17 +192,17 @@ export function bakeHead(template: string, tags: HeadTags): string {
   html = setMeta(html, 'name="description"', tags.description);
   html = setMeta(html, 'property="og:title"', shareTitle);
   html = setMeta(html, 'property="og:description"', shareDescription);
-  html = setMetaIfPresent(html, metaRe('name="title"'), tags.title);
-  html = setMetaIfPresent(html, eitherRe("twitter:title"), shareTitle);
-  html = setMetaIfPresent(html, eitherRe("twitter:description"), shareDescription);
+  html = setMetaIfPresent(html, metaRes('name="title"'), tags.title);
+  html = setMetaIfPresent(html, eitherRes("twitter:title"), shareTitle);
+  html = setMetaIfPresent(html, eitherRes("twitter:description"), shareDescription);
 
   if (tags.image !== undefined) {
     html = setMeta(html, 'property="og:image"', tags.image);
-    html = setMetaIfPresent(html, eitherRe("twitter:image"), tags.image);
+    html = setMetaIfPresent(html, eitherRes("twitter:image"), tags.image);
     // A card's description goes with the card. Left alone, every page's own card was described
     // with the front page's title — the stale value this function exists to prevent, on the one
     // tag written for somebody who cannot see the picture.
-    html = setMetaIfPresent(html, eitherRe("og:image:alt"), shareTitle);
+    html = setMetaIfPresent(html, eitherRes("og:image:alt"), shareTitle);
   }
 
   if (tags.canonical === null) {
@@ -179,18 +210,27 @@ export function bakeHead(template: string, tags: HeadTags): string {
     // share card pointing at the origin root. The image is left alone — it is a picture, not a
     // claim about this address, and a dead link that still unfurls the brand card is fine.
     html = html
-      .replace(/\s*<link rel="canonical"[^>]*>/, "")
+      .replace(/\s*<link[^>]*rel="canonical"[^>]*>/, "")
       .replace(/\s*<meta[^>]*(?:name|property)="(?:og|twitter):url"[^>]*>/g, "");
   } else {
     html = setMeta(html, 'property="og:url"', tags.canonical);
-    html = setMetaIfPresent(html, eitherRe("twitter:url"), tags.canonical);
+    html = setMetaIfPresent(html, eitherRes("twitter:url"), tags.canonical);
     // Demanded, like every meta tag a crawler depends on. `String.replace` with no match is a
     // silent no-op, so a template that never had a canonical would get one on no page at all
     // and say nothing about it — the exact failure `setMeta` exists to turn into a red build.
-    const canonicalRe = /(<link rel="canonical" href=")[^"]*(")/;
-    if (!canonicalRe.test(html))
+    // Both attribute orders, for the reason `metaResFor` gives — and this is the branch where
+    // getting it wrong REFUSES a correct head rather than skipping it.
+    const written = rewriteAttr(
+      html,
+      [
+        /(<link[^>]*rel="canonical"[^>]*href=")[^"]*(")/,
+        /(<link[^>]*href=")[^"]*("[^>]*rel="canonical")/,
+      ],
+      tags.canonical,
+    );
+    if (written === null)
       throw new Error('prerender: <link rel="canonical"> not found in index.html');
-    html = html.replace(canonicalRe, `$1${escapeAttr(tags.canonical)}$2`);
+    html = written;
   }
 
   if (tags.alternates?.length) {
@@ -208,7 +248,11 @@ export function bakeHead(template: string, tags: HeadTags): string {
     // APPENDED rather than set, because a Vite template carries no such tag — but one that
     // does would end up with two, and a crawler reading the first would get the template's
     // language on every page. So drop whatever is there before writing this page's own.
-    html = html.replace(/\s*<meta property="og:locale(?::alternate)?"[^>]*>/g, "");
+    // `[^>]*` before the attribute as well as after it: a template that writes `content` first
+    // would survive the strip and keep its own tag beside the appended one, and a crawler
+    // reading the first of two gets the template's language on every page — which is the exact
+    // outcome the strip is here to prevent.
+    html = html.replace(/\s*<meta[^>]*property="og:locale(?::alternate)?"[^>]*>/g, "");
     const alternates = (tags.alternates ?? [])
       .filter((alt) => alt.hreflang !== "x-default" && alt.hreflang !== tags.lang)
       .map(
@@ -227,10 +271,9 @@ export function bakeHead(template: string, tags: HeadTags): string {
   // carrying both leaves a contradiction to each crawler's own tie-break rule, and one adopter's
   // 404 shipped exactly that.
   if (tags.noindex) {
-    const robots = metaRe('name="robots"');
-    html = robots.test(html)
-      ? html.replace(robots, "$1noindex$2")
-      : html.replace("</head>", `    <meta name="robots" content="noindex" />\n  </head>`);
+    html =
+      rewriteAttr(html, metaRes('name="robots"'), "noindex") ??
+      html.replace("</head>", `    <meta name="robots" content="noindex" />\n  </head>`);
   }
   if (tags.headExtra) html = html.replace("</head>", `    ${tags.headExtra}\n  </head>`);
 

@@ -56,6 +56,22 @@ const LEAN_TEMPLATE = `<!doctype html>
  */
 const NAME_TWITTER_TEMPLATE = TEMPLATE.replace(/property="twitter:/g, 'name="twitter:');
 
+/**
+ * The same head with `content` written FIRST, on every tag including the canonical.
+ *
+ * Equally valid HTML, ordinary in a hand-written template, and the fifth adopter's own rig
+ * carried a second pattern for exactly this. Here it is worse than the spelling above: the
+ * narrow regex did not merely skip these tags, it made `setMeta` THROW — so a correct head
+ * failed the build saying the tag was "not found in index.html".
+ */
+const CONTENT_FIRST_TEMPLATE = TEMPLATE.replace(
+  /<meta ((?:name|property)="[^"]*") (content="[^"]*")/g,
+  "<meta $2 $1",
+).replace(
+  '<link rel="canonical" href="https://acme.com/" />',
+  '<link href="https://acme.com/" rel="canonical" />',
+);
+
 const BASE = { title: "T", description: "D", canonical: "https://acme.com/pricing" };
 
 describe("bakeHead", () => {
@@ -112,6 +128,35 @@ describe("bakeHead", () => {
     const html = bakeHead(NAME_TWITTER_TEMPLATE, { ...BASE, ogTitle: "share" });
     expect(html).toContain('<meta name="twitter:title" content="share" />');
     expect(html).toContain('<meta name="twitter:description" content="D" />');
+  });
+
+  // The other half of the same class, and the louder one: a required tag written the other way
+  // round was a red build on a head that is perfectly correct.
+  it("writes a head that spells the content attribute first", () => {
+    const html = bakeHead(CONTENT_FIRST_TEMPLATE, { ...BASE, ogTitle: "share" });
+    expect(html).toContain('<meta content="D" name="description" />');
+    expect(html).toContain('<meta content="share" property="og:title" />');
+    expect(html).toContain('<meta content="share" property="twitter:title" />');
+    expect(html).toContain('<link href="https://acme.com/pricing" rel="canonical" />');
+  });
+
+  it("strips a reversed canonical and share URL from a shell", () => {
+    const html = bakeHead(CONTENT_FIRST_TEMPLATE, { ...BASE, canonical: null });
+    expect(html).not.toContain('rel="canonical"');
+    expect(html).not.toContain("og:url");
+    expect(html).not.toContain('content=""');
+  });
+
+  // Strip-then-append, so a strip that misses leaves two tags — and a crawler reads the first,
+  // which is the template's language rather than this page's.
+  it("replaces a reversed og:locale instead of writing a second one", () => {
+    const withLocale = CONTENT_FIRST_TEMPLATE.replace(
+      "</head>",
+      '  <meta content="en_US" property="og:locale" />\n  </head>',
+    );
+    const html = bakeHead(withLocale, { ...BASE, lang: "pt-BR" });
+    expect(html.match(/property="og:locale"/g)).toHaveLength(1);
+    expect(html).toContain('content="pt_BR"');
   });
 
   it("strips a share URL spelled with either attribute", () => {
