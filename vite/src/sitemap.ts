@@ -15,7 +15,16 @@ import type { Alternate } from "./head.ts";
  * FLAT (`pricing.html`), not directory-style (`pricing/index.html`). Cloudflare Pages serves
  * the directory form at `/pricing/` and answers `/pricing` with a 308 to it — so every address
  * the app advertises in its canonical and its sitemap would be a redirect rather than a page.
- * A flat file is served at `/pricing` AND `/pricing/`, 200 either way.
+ * A flat file answers `/pricing` — the address the canonical and the sitemap name — with a 200,
+ * and normalizes `/pricing/` to it with a 308.
+ *
+ * This said "200 either way" until somebody measured it. On a live Pages deployment `/precos/`
+ * answers `308` with `location: /precos`, which then answers 200. The rule is untouched by that
+ * — the ADVERTISED form is the one that must be a page, and it is — but the parenthetical was
+ * inherited from a donor comment and repeated into an adopter's commit message as a live bug
+ * before anyone checked. It also has a consequence worth knowing: on a host that normalizes,
+ * `hydrateOrMount`'s slash tolerance can never fire, because the browser is redirected before it
+ * runs. That tolerance earns its place on hosts that serve both forms, not on this one.
  *
  * That is Cloudflare Pages, not every host. Firebase Hosting serves the directory form at
  * `/pricing` itself with `trailingSlash: false`, and an adopter there names its own files. What

@@ -103,7 +103,13 @@ their folders — `/guides/errors` → `guides/errors.html`.
 
 Every address your app puts in a canonical or a sitemap has to answer 200 rather than redirect. On
 Cloudflare Pages that means flat files: it serves `pricing/index.html` at `/pricing/` and answers
-`/pricing` with a 308. A flat file answers both.
+`/pricing` with a 308. A flat file answers `/pricing` with a 200 and normalizes `/pricing/` to it
+with a 308 — so the form you advertise is the form that is a page, which is the whole point.
+
+This page said "a flat file answers both" until somebody ran the `curl -I` the next paragraph asks
+for: `/precos/` came back `308`, `location: /precos`. Nothing about the rule changed, but the
+detail matters when you are deciding whether a slash-tolerant hydration check is fixing anything —
+on a host that normalizes, the browser is redirected before your bundle runs, so it never can.
 
 Hosts differ, though. Firebase Hosting redirects `/pricing` to `/pricing/` by default, and serves
 `pricing/index.html` at `/pricing` itself once `trailingSlash` is `false`. On a host like that,
