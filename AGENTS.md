@@ -988,6 +988,88 @@ reason to open.
   through that pipeline silently skipped the one new test, and the gate failed on it. A "changed
   files" pipeline that feeds a formatter needs the untracked ones too.
 
+### Migration 9 (−81 lines, 3 commits)
+
+The last of the nine, the smallest, and the first where the package had to correct **itself** —
+twice, once for a comment it had inherited and once for a claim this migration put into an
+adopter's history before measuring it.
+
+- **A grep proxy is not a measurement, and it was wrong three times in one sitting.** The sweep
+  asked "does this entry-server call `renderTree`" and reported 17 of 19 as still on
+  `renderToString` — an alarm that would have opened pull requests against a dozen healthy repos.
+  Re-asked as "what does this file actually import", the answer was **zero**: seven go through the
+  package, twelve reach `react-dom/static` directly, pre-kit. The follow-up query repeated the
+  error one level down, matching the word `renderToString` inside comments explaining why the file
+  does not use it; a third pass counted `lazy(` in a comment saying no route is lazy. What settled
+  it was the built output — grep every `dist/` for React's own error sentence — after the detector
+  was first run against a file known to contain it. **A search that returns nothing proves nothing
+  until you have watched it find something.**
+- **A guard's reach is the caret, not the publish.** The `renderToString` check shipped in
+  `@gusnips/vite@0.8.1` and was written specifically for adopters who have not migrated. They sit
+  at `^0.4.3`, `^0.4.6`, `^0.5.2`, `^0.5.4`, `^0.6.0` and `^0.6.2`, and a caret on a 0.x does not
+  cross a minor — so **not one of them can receive it**, and the only repo that can is the one that
+  no longer needs it. Migration 4 learned to check the range before paying for compatibility; this
+  is the same fact from the other side. A guard reaches nobody until each repo deliberately bumps,
+  which makes the bump the deliverable, not the guard.
+- **The comment that was wrong, and the six lines it cost.** This rig carried a second meta setter
+  because a comment said the first one's pattern "cannot see" a tag whose attributes span three
+  lines. `[^>]*` is a negated character class; it matches newlines. Run against the real template,
+  both patterns match every multi-line tag in it, and the second one's is strictly the narrower.
+  Two call sites and six lines for a problem that never existed — and the test beside them asserted
+  the behaviour while crediting it to the wrong function.
+- **And the one this migration got wrong itself.** `pageFile`'s comment said a flat file is served
+  at `/pricing` AND `/pricing/`, "200 either way". That sentence was repeated into an adopter's
+  commit message as a live hydration bug. `curl -I` on the deployment: the slashed form answers
+  **308** with `location:` the unslashed one, which then answers 200. The host normalizes before
+  the bundle runs, so the slash-tolerant compare **cannot fire there at all**. The rule survives —
+  the advertised form is the one that must be a page, and it is — but the parenthetical was a donor
+  comment nobody had checked, and the README's own next paragraph says to run that `curl -I`.
+  Adopting the shared compare is still right; claiming it fixed something live was not.
+- **The sibling finding, inside a single file tree.** One screen refuses to navigate on an
+  unconfirmed session and writes down why: "navigating anyway would bounce the just-authenticated
+  user back to login with no explanation." The gate next door read _every_ `/me` failure as "signed
+  out" — a 401, a dropped connection and a 502 mid-deploy all landing on one `setMe(null)` — and
+  redirected to the login form. So a signed-in person on a flaky connection was sent to sign in
+  again, to fix a session that was never broken. Invariant 3, reached a fourth way, in a context
+  provider rather than a transport, with the fix already written one file away.
+- **A verification script is code, and it can be wrong in the direction that flatters you.** The
+  bundle-hash normaliser behind the byte diff excluded `-` from its hash class, and Vite's
+  base64url hashes contain one. It reported 11 changed files where there were 3 — and it had passed
+  the earlier run only because that build's hashes happened to have no internal hyphen. Migration
+  4's "a guard that has never fired is not evidence that it works", applied to the tooling doing
+  the checking.
+- **Four measured declines, one of them a first.** The token package: this brand's vocabulary is
+  entirely its own and shares **zero** of the 19 semantic names, so there is nothing to override —
+  and with no `--color-input` at all, the contrast floor three earlier migrations failed has no
+  instance here. The vite preset: a 7-line config, no placeholders, and **0** imports through the
+  `@` alias it would add. The auth store: a React context, with no zustand in the catalog. The
+  error describer: it needs a `t` and a catalog of known keys, and this app has no i18n at all —
+  one language, written in place. And `cn`, which has **0 call sites**: the first adopter where the
+  answer is not a ratio but an absence.
+- **What the donor knew that the package did not take.** Its prerender reads the site's origin out
+  of the canonical the template declares, rather than from an env var the script would have to
+  resolve — one file is the answer for the head Vite ships and for every file written after it, and
+  there is no second place for a domain to drift to. Kept as-is. Its `process.exit(0)` comment also
+  documents the bun idle-hang independently, from the symptom end, where the package documents it
+  from the cause end.
+- **Adopting a generator can be proved by the bytes it replaces.** `robotsTxt` took over a static
+  file that had the origin typed into it a second time, and the generated output was
+  **byte-identical**. That is the whole argument: no behaviour changed, and one place a domain
+  could drift is gone.
+- **The rig swap was −256; the migration closed at −81.** Two slices added capability the app did
+  not have — an error state that states its cause instead of bouncing, and a crash screen instead
+  of a white page — and they are stated rather than trimmed to. Migration 5 settled that this is
+  not the duplication the net-negative rule exists to catch. Verified the same way migration 8 was:
+  normalise the bundle hashes, then assert no changed line is anything but the two deliberate ones
+  — 9 of 12 files byte-identical, 3 changed, 0 unexplained.
+- **A boundary belongs outside the router, and out of the prerender.** Outside the router because
+  the session provider every screen renders under throws before any route does; out of
+  `entry-server.tsx` because a boundary inside a prerendered tree can bake its own crash screen into
+  the file as that page's indexable body. Both checked against the written output, not reasoned
+  about: no prerendered file contains a crash string. The placement has a consequence the fallback
+  has to respect — with no router context, every link in it is a plain `<a>`, or it throws inside
+  the screen that exists to handle a throw.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
