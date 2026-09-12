@@ -16,6 +16,11 @@
  * sitemap all install exactly what they use.
  */
 export { resolveKey } from "./catalog.ts";
+// `headExtra` takes raw markup, so the moment an adopter builds a tag out of its own copy it
+// needs the same escaping every tag this package writes already gets. Exported rather than
+// re-invented per app: an adopter's hand-rolled copy is one that can drift from ours, and the
+// first one to need it was building a `<link title="…">` out of a translated page title.
+export { escapeAttr } from "./escape.ts";
 export {
   assertRendered,
   bakeHead,
