@@ -921,6 +921,73 @@ superset — the case three earlier migrations each declined for the opposite re
   **143**, which is not a failing gate and must not be read as one, and zsh does not word-split, so
   a watchdog stashed in a variable is looked up as a command with a space in its name.
 
+### Migration 8 (−185 lines, 6 commits)
+
+The first adopter whose own rigs were good enough that the migration looked, going in, like pure
+deduplication. It produced the strongest finding in the project so far, out of a file nobody had a
+reason to open.
+
+- **`renderToString` does not only render the fallback. It renders its own ERROR, into the page.**
+  Invariant 1 had the gentle half. What this adopter shipped on a live, indexed reference page was
+  React's "The server used renderToString which does not support Suspense" message, a stack trace,
+  and five copies of an absolute path from the machine that ran the build. Nothing in a browser
+  shows it — the bundle replaces the body on load — so the only readers who ever saw it are the
+  ones who run no JavaScript, which is every crawler the prerender exists to serve. **It was in one
+  of the page's two languages**, and that is the half nobody would guess: the first render suspends
+  and bails, but it also resolves the `lazy()` promise, so the next locale in the same loop rendered
+  the real component and looked perfect. One loop, two versions of one address, one a stack trace.
+  Every cheap check passes it because the error text makes the file BIGGER — a size floor reads it
+  as a full page, and the splash check is gated on a small file for the reason that gate exists.
+  `assertRendered` refuses the signature now (0.8.1); it can only fire for an entry still on
+  `renderToString`, which is the point, because those are the repos that have not read this.
+- **A blocker dissolved by two commands that the audit had reasoned about for a paragraph.** The
+  plan said adopting `renderTree` could hang the docs build, because the reference route fetches a
+  live document and `react-dom/static` resolves Suspense where `renderToString` does not. Measured:
+  the renderer imports fine with no DOM, and the hook behind it is an ordinary effect-driven state
+  machine, so a build renders its loading branch and never touches the network. The guess cost a
+  paragraph; checking it cost two commands. **Measure the blocker before you design around it.**
+- **A slice order drawn from an audit can be wrong about a dependency the audit never had to
+  execute.** The plan put the retry rule first and the transport second. Impossible: the kit's
+  `shouldRetry` narrows on the kit's `ApiError` and the app still threw its own, so the drift could
+  not be fixed until the transport landed. Reordered on contact with the code.
+- **The green gate caught neither regression the manual read caught.** Swapping the transport made
+  `String(error.code)` print the literal word "undefined" beside a request id (the old class always
+  had a code; the kit's leaves it absent when there is no envelope), and made the transport's own
+  `Request failed (502)` the sentence shown as the problem. Both shipped past a full green suite.
+  This is the rule at the end of this file, earning itself again.
+- **The third repo with the split-origin language bug — and the fix was already in the package.**
+  `queryKey` was written for one donor with a storefront and an app on separate origins. This
+  adopter has the same layout and the same hole: `localStorage` is per-origin, so one key NAME with
+  three stores behind it, and a reader who picked a language on the storefront landed in English
+  across ten links. Its own comment had concluded a cookie was what that would take. The whole
+  point is the third repo, again.
+- **An adopter AHEAD of the package, recorded rather than built.** `resolveKey` returns the KEY on a
+  miss; this adopter's equivalent throws. At a call site feeding `<title>` and `description`,
+  returning the key ships a raw catalog key to a crawler on a live page. The adopter is right and
+  the package is weaker — but it can do this itself in fifteen lines, so it stays a note. One
+  adopter's stricter policy is not yet the package's gap.
+- **Invariant 15, reached from the adopter's side.** `pageSlug` and `ogImagePath` are byte-
+  equivalent to the package's and were still declined: the adopter's page registry is import-free
+  ON PURPOSE so the browser bundle can read it, and those helpers sit in the barrel whose node
+  module imports `node:fs`. Taking them would pull Node into a browser bundle. **The rule cuts both
+  ways — sometimes the adopter is the one who must not import.**
+- **A note in your own roadmap ages like any other comment.** The constraint was written down as
+  "81 non-frontend importers". Re-measured while checking it: 150 importers, 44 in the frontends,
+  so 106. The constraint was stronger than its own record. Re-read before quoting yourself.
+- **When a migration changes every file, assert the SHAPE of the change.** Adopting the shared rig
+  moved `og:locale` from replaced-in-place to stripped-and-appended, so all 38 prerendered pages
+  differed and a file-by-file read would have been theatre. The check that meant something was
+  mechanical: normalise the bundle hashes, then assert that **no changed line was anything but a
+  console href** — 38 changed, 0 unexpected. A diff too big to read is not a diff you skip; it is
+  one you write a predicate for.
+- **Two slices were net POSITIVE on purpose, and saying so is the point.** A crash screen and a
+  language that survives a subdomain hop are capabilities the repo did not have at all; a blank
+  page costs zero lines. Migration 5 settled that this is not the duplication the net-negative rule
+  exists to catch. The migration closed at −185 without anything being trimmed to get there.
+- **`git diff --name-only` cannot see a file git has never seen.** Formatting the changed files
+  through that pipeline silently skipped the one new test, and the gate failed on it. A "changed
+  files" pipeline that feeds a formatter needs the untracked ones too.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
