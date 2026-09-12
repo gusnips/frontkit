@@ -599,6 +599,106 @@ whose CI runs no tests. Each of those moved a lesson somewhere it had not been b
   superset still does not adopt, and that is the honest result: a 235-line store of sign-in
   methods under `persist` is product code that happens to hold a session, not plumbing.
 
+### Migration 4 (−233 lines, 3 commits)
+
+The first adopter that was **ahead of the package**, and that changes what a migration produces:
+three separate fixes landed in the package FIRST, because adopting it unpatched would have been a
+regression. A migration is not only "what does this repo lack" — it is also "what does the package
+still get wrong, that only this repo's shape reveals".
+
+- **Two guards for one regression, and neither could fire.** `assertRendered` refuses a page whose
+  body is a loading screen. This adopter's looked for a spinner class its splash does not use. The
+  package's was anchored at the root's FIRST tag and would have missed it too, because this splash
+  centres its live region inside a `<main>`. Two independent checks against one failure, both
+  written carefully, both dead. **A guard that has never fired is not evidence that it works** —
+  and the only way to find out is to feed it the thing it is supposed to catch. Fixed in the
+  package first (0.4.7).
+- **A tag the package wrote in one spelling only.** `bakeHead` matched the `twitter:` tags by
+  `property=`; this adopter's template spells them `name=`. `String.replace` with no match
+  succeeds, so adopting it unpatched would have frozen all 48 prerendered files at the front door's
+  card, in three languages, with nothing in a browser to show it. It now writes whichever attribute
+  the template carries (0.4.7). Same class as the canonical bug in migration 1: a silent no-op is
+  worse than a missing feature.
+- **A guard can be worth adopting where it finds nothing.** `assertOgImages` reads every advertised
+  card against the disk. This adopter passes it today, because it advertises one brand card
+  everywhere — so it is not a fix here. It is what stops a per-page card quietly reintroducing the
+  bug three sibling repos shipped. **"Already correct" is a reason to take the guard, not to skip
+  it**, because what it pins is the thing a future change would break.
+- **The file that decides every published page was typechecked by nothing.** `scripts/` was in no
+  tsconfig's `include`, so neither `tsc -b` nor CI ever read the rig that writes every head, every
+  canonical and the sitemap. It is in `tsconfig.node.json` now, which extends the React config
+  because a prerender is a Node process that typechecks browser code. Read what your tsconfig
+  actually covers; an `include` that misses a directory fails by saying nothing at all.
+- **One predicament, three detectors, and the guard belongs to the tab.** A deploy landing under an
+  open tab breaks it two ways and only one looks like a missing file: the next navigation asks for
+  a chunk whose hash is gone, or the old bundle reads a field the API has renamed and throws a bare
+  `TypeError`. Message matching is blind to the second by construction, so the server probe two
+  adopters had written independently came up as `isStaleBuild`. It asks for the **page**, never the
+  asset — a CDN serves assets with a long `s-maxage`, so a bundle retired an hour ago still answers
+  200 from the edge and would report "current" during exactly the window when skew is likeliest.
+  The two donors disagreed on the comparison, and the tiebreak was the failure DIRECTION: the
+  anchored `src="…"` match is more precise and breaks if anything rewrites the markup on the way
+  out, where a minifier changing quote style is enough — and breaking there reports a healthy tab
+  as stale, a reload nobody can refuse.
+
+  The rename is the half the adoption uncovered. Three detectors for one predicament, each with its
+  own once-a-minute key, hands a broken deploy three reloads a minute to take turns with — which is
+  exactly what this adopter would have got, its own probe on one key and the package's on another,
+  each resetting the other's clock. `reloadOnceForChunkError` → `reloadOnce`, one key
+  (`frontkit:reload-at`), exported because the one caller that cannot import it is an inline
+  `<script>`. Breaking, so 0.5.0 — and a caret on a 0.x does not cross a minor, so the adopters on
+  `^0.4.x` were untouched until they bump deliberately. **Check the range before paying for
+  compatibility you do not owe.**
+
+- **The deepest fix was in host config, which no package can ship.** A static host answers a missing
+  `/assets/x.js` with the SPA fallback — `index.html`, 200, `text/html` — and that IS the browser's
+  "MIME type text/html" module refusal. Hosts then match cache rules against the REQUEST PATH
+  rather than the outcome, so an `immutable, max-age=31536000` rule written for hashed assets lands
+  on that HTML body and poisons one asset URL for a year. This adopter removed the cause at the
+  edge, with middleware turning a guarded miss into a real, uncacheable 404; a sibling repo built
+  three layers of recovery around a cause it never removed. The package cannot ship either one, so
+  the module doc and the README name it. **A package that cannot fix a cause can still refuse to
+  let it go unwritten.**
+- **`tsc` never removes output it did not just write.** `@gusnips/react@0.5.0` reached the registry
+  carrying both `deploy-recovery.js` and the `chunk-reload.js` it replaced, because every package
+  built with a bare `tsc` and `files: ["dist"]` ships whatever is sitting there. The dead copy was
+  unreachable through the exports map — which is what made it worth fixing rather than shrugging
+  at, because it still declared the old key that very release existed to remove, in a published
+  artifact for somebody to grep a year from now and believe. Builds clean `dist/` first, and
+  `release:check` now reads the packed tarball for `dist` files with no `src` behind them: a clean
+  script is a claim about a command, the tarball is what the registry receives. **Verified by
+  watching the new check fail before fixing what it caught** — against the dirty tree it named
+  `dist/chunk-reload.*` and nothing else, with no false positive on the nested `react/src/ui/*` nor
+  on `tokens`, which emits no `dist` at all.
+- **The package shipped a bug this adopter had already avoided.** `i18nInitOptions` hardcoded
+  `caches: ["localStorage"]`, so the detector wrote the stored locale back on every
+  `changeLanguage`. That is right until an app offers "follow the browser": reaching that state
+  means clearing the key and detecting again, and a caching detector writes the language it just
+  detected straight into the key it was told to clear, so the choice re-pins itself and the option
+  becomes unreachable. Three repos on this stack answer this three ways — the detector writes, the
+  app writes, or both do — and the third is harmless only where there is no "follow the browser"
+  state to break, which is how one hardcoded answer survived this long. `storageWriter: "app"`
+  turns the write off and leaves the read alone (0.5.2). One writer per key, the same rule the
+  reload guard arrived at from the other end.
+- **A measurement that came out against the hypothesis, and that is the result.** The expectation
+  was that this adopter's optional `detail` would challenge `EmptyStateProps.description` being
+  required. Every one of its twelve empty-state call sites passes it, so the required field is
+  confirmed rather than contradicted. The contract still did not get adopted — this adopter's prop
+  names differ (`detail`, `children`, `footer`), so taking the type means renaming across twelve
+  files for no behaviour change. Two honest outcomes from one reading, and neither is a commit.
+- **A describer worth more than ours, recorded before it is decided.** This adopter routes failures
+  to catalog KEYS and resolves them at the render edge, where `createErrorDescriber` returns
+  resolved prose. Three differences are measurable: a `Failure` can be stored and re-resolved after
+  a language switch; it carries a machine-readable recovery kind (`retry` / `signin` / `wait` /
+  `none`), which is what lets a UI render a disabled countdown rather than re-deriving retryability
+  from its own switch; and it carries the raw provider string, which is what `ErrorStateProps`
+  already reserves a `reference` slot for and the describer produces nothing to fill. One honest
+  correction to the adopter's own reasoning: it argues that keys keep the check pure, and the
+  package's tests already assert key identity through an echoing `t`, so that third argument is
+  weaker against us than it reads. Not adopted in either direction yet, and deliberately so — it is
+  a breaking change to a published API, and the price is at its lowest while every repo that calls
+  it is still on `^0.4.x`.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
