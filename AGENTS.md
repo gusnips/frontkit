@@ -686,18 +686,31 @@ still get wrong, that only this repo's shape reveals".
   confirmed rather than contradicted. The contract still did not get adopted — this adopter's prop
   names differ (`detail`, `children`, `footer`), so taking the type means renaming across twelve
   files for no behaviour change. Two honest outcomes from one reading, and neither is a commit.
-- **A describer worth more than ours, recorded before it is decided.** This adopter routes failures
-  to catalog KEYS and resolves them at the render edge, where `createErrorDescriber` returns
-  resolved prose. Three differences are measurable: a `Failure` can be stored and re-resolved after
-  a language switch; it carries a machine-readable recovery kind (`retry` / `signin` / `wait` /
-  `none`), which is what lets a UI render a disabled countdown rather than re-deriving retryability
-  from its own switch; and it carries the raw provider string, which is what `ErrorStateProps`
-  already reserves a `reference` slot for and the describer produces nothing to fill. One honest
-  correction to the adopter's own reasoning: it argues that keys keep the check pure, and the
-  package's tests already assert key identity through an echoing `t`, so that third argument is
-  weaker against us than it reads. Not adopted in either direction yet, and deliberately so — it is
-  a breaking change to a published API, and the price is at its lowest while every repo that calls
-  it is still on `^0.4.x`.
+- **A describer worth more than ours, and the answer was neither donor's design.** This adopter
+  routes failures to catalog KEYS, carries a machine-readable recovery kind, and keeps the raw
+  provider string; `createErrorDescriber` returned two resolved strings. Three differences,
+  measured — and only two were worth anything, which is why this landed additive (0.5.3) rather
+  than as the breaking rewrite it first looked like.
+
+  **`recover` is the one that mattered, and copying the adopter would have been the wrong fix.**
+  Both donors hardcode a recovery per error code, beside a `shouldRetry` already answering the
+  same question for react-query. Two answers to one question drift, and this drift is visible: a
+  screen offering "try again" for a refusal the query layer has already refused to retry, so the
+  button does nothing and the reader presses it twice. So it is DERIVED from `shouldRetry` —
+  one rule, two consumers, invariant 8 owning both. An arm can still narrow it, which is exactly
+  what a spent quota needs: a 429 the rule would otherwise call `"wait"`.
+
+  `reference` is the second, and it was free. `ErrorStateProps` has reserved a slot for a request
+  id since the contract was written and nothing ever produced one to put in it. The same pass
+  finally reads `expected` — the flag on the 401 the CLIENT raises during sign-out — so an error
+  surface stops offering a retry for something nobody broke.
+
+  The third, keys instead of prose, was **declined**, and that is the honest half. The package's
+  `t` re-resolves at the render edge, which migration 2 had already made a rule; its tests assert
+  key identity through an echoing `t`, so the adopter's purity argument is weaker against us than
+  it reads; and converting the arms in the two repos that call it is a real rewrite, one of them
+  nesting a `t()` inside a hint. **The gap was never the return type — it was a decision the type
+  had no room for**, and a decision fits beside prose without replacing it.
 
 ### How to migrate a repo — the check that is not optional
 

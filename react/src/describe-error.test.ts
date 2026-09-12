@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api-error.ts";
 import { createErrorDescriber, humanizeWait } from "./describe-error.ts";
+import { shouldRetry } from "./query.ts";
 
 /** A translator that echoes the key, so a test can see exactly which one was asked for. */
 const t = (key: string, params?: Record<string, unknown>) =>
@@ -91,6 +92,86 @@ describe("createErrorDescriber", () => {
     const { cause, hint } = describeError(new ApiError(502, null));
     expect(cause).toBe("errors.unexpected");
     expect(hint).toBe("errors.retrySoon");
+  });
+});
+
+/**
+ * The control to offer beside the words. The fourth adopter had this and the package did not, so
+ * every adopter re-derived "can a second attempt fix this" from its own switch — beside a
+ * `shouldRetry` already answering exactly that for react-query.
+ */
+describe("the recovery kind", () => {
+  const describeError = createErrorDescriber({
+    t,
+    copyPrefix: "errors.",
+    messageKeyPrefix: "serverErrors.",
+    knownMessageKeys: { quotaDay: "" },
+    durableLimitCodes: ["QUOTA_EXCEEDED"],
+  });
+
+  it("sends a 401 to sign-in and leaves a 403 alone", () => {
+    expect(describeError(new ApiError(401, null)).recover).toBe("signin");
+    // 403 is not a dead session: the session is fine and a different account is the fix, so
+    // signing someone out would be the wrong cause AND the wrong remedy.
+    expect(describeError(new ApiError(403, null)).recover).toBe("none");
+  });
+
+  it("offers a retry for a request that never landed", () => {
+    expect(describeError(new TypeError("Failed to fetch")).recover).toBe("retry");
+  });
+
+  it("counts down when the refusal stated its own expiry", () => {
+    const error = new ApiError(
+      429,
+      { code: "RATE_LIMIT_EXCEEDED", message: "slow down" },
+      { retryAfterSecs: 30 },
+    );
+    expect(describeError(error).recover).toBe("wait");
+  });
+
+  it("offers no control for a limit that buying clears rather than waiting", () => {
+    // The same 429 as above. Only the CODE separates a burst limit from a spent quota, which is
+    // why the caller names them — from the same list it hands `queryDefaults`.
+    const spent = new ApiError(429, { code: "QUOTA_EXCEEDED", message: "spent" });
+    expect(describeError(spent).recover).toBe("none");
+  });
+
+  it("never asks anyone to retry the 401 the client raised itself", () => {
+    // `expected` is the sign-out path: nothing is broken and the person is already on their way
+    // to the door. A retry button here is the surface contradicting what it reports.
+    expect(describeError(new ApiError(401, null, { expected: true })).recover).toBe("none");
+  });
+
+  it("agrees with the retry rule instead of deciding the same thing twice", () => {
+    // The whole reason this derives rather than switches: if the two ever disagree, a reader
+    // presses a button the query layer has already refused to honour.
+    const error = new ApiError(503, null);
+    expect(shouldRetry(error)).toBe(true);
+    expect(describeError(error).recover).toBe("retry");
+  });
+
+  it("carries the request id the error contract reserves a slot for", () => {
+    const error = new ApiError(500, null, { requestId: "req_123" });
+    expect(describeError(error).reference).toBe("req_123");
+  });
+
+  it("lets an arm narrow the derived kind without restating it", () => {
+    const describe503 = createErrorDescriber({
+      t,
+      copyPrefix: "errors.",
+      messageKeyPrefix: "serverErrors.",
+      knownMessageKeys: {},
+      codes: {
+        MAINTENANCE: (ctx) => {
+          // The arm reads what the rule decided, so an arm that agrees can stay silent.
+          expect(ctx.recover).toBe("retry");
+          return { cause: "errors.maintenance", recover: "none" };
+        },
+      },
+    });
+    const out = describe503(new ApiError(503, { code: "MAINTENANCE", message: "back soon" }));
+    expect(out.recover).toBe("none");
+    expect(out.cause).toBe("errors.maintenance");
   });
 });
 

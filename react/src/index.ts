@@ -53,7 +53,9 @@ export {
   type DescribedError,
   type ErrorArm,
   type ErrorContext,
+  type ErrorCopy,
   type ErrorDescriberOptions,
+  type RecoveryKind,
   type Translate,
 } from "./describe-error.ts";
 

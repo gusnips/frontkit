@@ -1,4 +1,5 @@
 import { ApiError, retryAfterSecs } from "./api-error.ts";
+import { shouldRetry } from "./query.ts";
 
 /**
  * Turning anything thrown into copy a person can act on.
@@ -19,11 +20,42 @@ import { ApiError, retryAfterSecs } from "./api-error.ts";
  * which is the part that was written twice and got subtly different both times.
  */
 
-export interface DescribedError {
+/**
+ * Which control to offer beside the words.
+ *
+ * The fourth adopter had this and the package did not, which left every adopter re-deriving
+ * "can a second attempt fix this" from its own switch — beside a `shouldRetry` already deciding
+ * exactly that for react-query. Two answers to one question drift, and the drift is visible: a
+ * screen offering "try again" for a refusal the query layer refuses to retry, so the button does
+ * nothing and the reader presses it twice.
+ *
+ * So this is DERIVED from `shouldRetry`, not switched on separately. One rule, two consumers.
+ */
+export type RecoveryKind =
+  /** A second attempt can work. Offer the button. */
+  | "retry"
+  /** Auth said no. Offer a way back to sign-in, never a retry. */
+  | "signin"
+  /** It stated its own expiry. Offer the button, disabled, with the countdown. */
+  | "wait"
+  /** Waiting cannot fix it and neither can pressing anything. Offer no control. */
+  | "none";
+
+/** The copy an arm writes. Everything it leaves out, {@link createErrorDescriber} fills in. */
+export interface ErrorCopy {
   /** What happened, in the reader's words. */
   cause: string;
   /** What to do about it. Its absence should be a decision, not an oversight. */
   hint?: string;
+  /** Override the derived kind — a 429 whose code means a spent quota is `"none"`, not `"wait"`. */
+  recover?: RecoveryKind;
+  /** Override the request id. Rarely wanted; the envelope's is used by default. */
+  reference?: string;
+}
+
+export interface DescribedError extends ErrorCopy {
+  /** Always present on the way out, whether an arm set it or the rule derived it. */
+  recover: RecoveryKind;
 }
 
 /**
@@ -100,6 +132,13 @@ export interface ErrorContext {
   /** Seconds until it clears, already humanized. Null when the envelope did not say. */
   wait: string | null;
   waitSecs: number | null;
+  /**
+   * What the rule decided before this arm ran. Read it to agree, return your own to override.
+   *
+   * Exposed so an arm can narrow rather than restate: a quota arm that already knows the limit is
+   * durable returns `"none"`, and every other arm can leave it alone and stay right by default.
+   */
+  recover: RecoveryKind;
 }
 
 export interface ErrorDescriberOptions<
@@ -142,9 +181,17 @@ export interface ErrorDescriberOptions<
    * code that does not exist is a compile error at the arm rather than a branch that never runs.
    */
   codes?: Partial<Record<string, ErrorArm>>;
+  /**
+   * The codes that mean "this limit does not clear by waiting" — **the same list you hand
+   * `queryDefaults`**, because it answers the same question and a second copy is a second
+   * chance to disagree with the retry rule. Declare it once in the app and pass it twice.
+   */
+  durableLimitCodes?: readonly string[];
+  /** Longest stated wait still worth a retry rather than a countdown. Matches `queryDefaults`. */
+  maxRetryWaitSecs?: number;
 }
 
-export type ErrorArm = (ctx: ErrorContext) => DescribedError;
+export type ErrorArm = (ctx: ErrorContext) => ErrorCopy;
 
 /** Build the describer. */
 export function createErrorDescriber<
@@ -157,6 +204,8 @@ export function createErrorDescriber<
   messageKeyPrefix,
   knownMessageKeys,
   codes = {},
+  durableLimitCodes = [],
+  maxRetryWaitSecs,
 }: ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>): (error: unknown) => DescribedError {
   const known = new Set<string>(Object.keys(knownMessageKeys));
 
@@ -180,11 +229,35 @@ export function createErrorDescriber<
     );
   }
 
+  /**
+   * Which control to offer, decided once and never switched on separately.
+   *
+   * Everything below the last line defers to `shouldRetry` — the rule invariant 8 already owns —
+   * so the button a reader sees and the retry react-query performs cannot disagree.
+   */
+  function recoveryFor(error: ApiError, waitSecs: number | null): RecoveryKind {
+    // The client raised this one itself, to stop a caller while a dead session was already being
+    // handled. Nothing is broken and the person is already on their way to sign-in, so asking
+    // them to try again would be the surface contradicting the thing it is reporting.
+    if (error.expected) return "none";
+    // 401 is "we do not know who you are", which no number of attempts answers. 403 is NOT this:
+    // the session is fine and it is a different account that would help, so it falls through.
+    if (error.status === 401) return "signin";
+    // It named its own expiry, so there is a real number to count down beside a disabled button.
+    if (waitSecs !== null) return "wait";
+    return shouldRetry(error, durableLimitCodes, maxRetryWaitSecs) ? "retry" : "none";
+  }
+
   return function describeError(error: unknown): DescribedError {
     if (!(error instanceof ApiError)) {
       // Not a response at all — the request never landed. Almost always the network, and almost
-      // never worth showing a stack trace for.
-      return { cause: t(`${copyPrefix}network`), hint: t(`${copyPrefix}networkHint`) };
+      // never worth showing a stack trace for. `shouldRetry` answers a non-response the same way,
+      // so these two agree here without either being told about the other.
+      return {
+        cause: t(`${copyPrefix}network`),
+        hint: t(`${copyPrefix}networkHint`),
+        recover: "retry",
+      };
     }
 
     const waitSecs = retryAfterSecs(error);
@@ -193,10 +266,8 @@ export function createErrorDescriber<
       says: serverSentence(error),
       wait: waitSecs === null ? null : humanizeWait(t, waitSecs, copyPrefix),
       waitSecs,
+      recover: recoveryFor(error, waitSecs),
     };
-
-    const arm = error.code === undefined ? undefined : codes[error.code];
-    if (arm) return arm(ctx);
 
     // Anything unmapped: the server's own sentence is still the most specific thing we have,
     // and support can act on it. A 5xx additionally gets "try again shortly", because that one
@@ -207,10 +278,24 @@ export function createErrorDescriber<
     // own `Request failed (502)`, written for a log. A gateway answering with HTML while the API
     // restarts is exactly when that happens, so it reached screens — until the second migration,
     // whose three apps each guarded against that one string by hand.
-    const serverWords = error.code === undefined ? "" : error.message;
+    const arm = error.code === undefined ? undefined : codes[error.code];
+    const copy: ErrorCopy = arm
+      ? arm(ctx)
+      : {
+          cause:
+            ctx.says ??
+            ((error.code === undefined ? "" : error.message) || t(`${copyPrefix}unexpected`)),
+          hint: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
+        };
+
+    // The arm wins where it spoke, the rule fills the rest. `requestId` is the one thing every
+    // error surface asks for and nothing was producing — `ErrorStateProps` has reserved a
+    // `reference` slot for it since the contract was written.
+    const reference = copy.reference ?? error.requestId;
     return {
-      cause: ctx.says ?? (serverWords || t(`${copyPrefix}unexpected`)),
-      hint: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
+      ...copy,
+      recover: copy.recover ?? ctx.recover,
+      ...(reference !== undefined && { reference }),
     };
   };
 }

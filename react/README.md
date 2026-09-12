@@ -152,7 +152,18 @@ the prop shape _is_ the rule: `problem`, `cause`, `fix`, and `action`. **`fix` a
 required.** A required prop is the only version of "always offer a way out" that a caller in a
 hurry cannot skip.
 
-`createErrorDescriber` turns a thrown `ApiError` into the `cause` and `fix` to put in it.
+`createErrorDescriber` turns a thrown `ApiError` into the `cause` and `fix` to put in it — plus
+which control to offer, and the request id to print under it:
+
+```ts
+const { cause, hint, recover, reference } = describeError(error);
+// recover: "retry" | "signin" | "wait" | "none"
+```
+
+`recover` is derived from `shouldRetry` — the same rule react-query retries on — so the button a
+reader sees and the retry that actually happens cannot disagree. Give it the same
+`durableLimitCodes` list you give `queryDefaults`, and a spent quota offers no button instead of
+one that cannot work.
 
 ## Also here
 
