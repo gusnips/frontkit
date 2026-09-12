@@ -837,6 +837,78 @@ shipped in the same tarball, disagreeing about the name of a field.
   means nothing. Two of this migration's dead ends trace to that one habit, including a "hang"
   that was a finished build waiting on the event loop above.
 
+### Migration 7 (14 commits: −169 source across the adoptions, +125 over the range)
+
+The first migration whose total came out **positive**, which made the accounting itself the
+finding. Also the first adopter whose auth store was a clean SUBSET of the kit's rather than a
+superset — the case three earlier migrations each declined for the opposite reason.
+
+- **"Net-negative" has to name WHAT is counted and WHICH commits.** This range is +125 lines, and
+  every part of that is fine once it is split. The seven commits that actually swap the adopter's
+  code for this package are **−169 lines of source**. Tests are **+102, in two files** — a
+  rewritten describer test and a guard test for behaviour nobody in the fleet had pinned. The
+  remaining +178 is not an adoption at all: three live bug fixes, one prep refactor, and a
+  cross-origin capability that did not exist before. Reaching a negative total would have meant
+  deleting tests or leaving bugs alone. Measure the adoption commits, in source, and state the
+  rest out loud.
+- **The same dead-looking code meant the opposite thing here, and the SERVER is what said so.**
+  Migration 2 found a reconnect loop with backoff and a retry ceiling that had never run once,
+  because both callers disabled it. This adopter's stream client has that same shape and it is
+  load-bearing in a way no caller reveals: the server ends any stream older than its ceiling
+  **with no terminal frame, on purpose** — "a clean close mid-run reads as a dropped socket, which
+  is exactly what we want", because an error frame would end the client's watching. The reconnect
+  IS the continuation path for a long run, resuming from `Last-Event-ID`. Reading the callers
+  answered migration 2; reading the producer answered this one. When a shape is ambiguous, the
+  other end of the wire is the authority, and it often already has the comment.
+- **Read the serializer, not the emitters.** The blocking question was whether that wire ever
+  carries a frame with no `data:` line, which this package's parser drops by design. Grepping the
+  code that emits frames was the wrong move and cost two passes: every frame there funnels through
+  ONE `write` that always sends `data: JSON.stringify(...)`. One file answered for all of them,
+  and handed over the rest of the slice's facts on the way — a 15-second heartbeat, and an `id`
+  only where the producer numbers frames.
+- **Two package bugs, found by the function-by-function read, neither visible in a green suite.**
+  The describer gated known message keys on `Object.keys`, and i18next stores a plural as
+  `name_one`/`name_other` while a server names the BASE — so **2 of that API's 112 thrown keys**,
+  both plan limits, would have fallen back to the server's English at exactly the moment the
+  specific sentence is the whole value. And the unmapped-code arm hands the reader `error.message`,
+  which is right for the API of migration 2 (where the code names the copy) and exactly wrong for
+  an adopter whose own docs call `message` the English line for the log: every coded 4xx with no
+  key would have put developer English on screen in a three-language product. Both fixed in the
+  package first (`fallback` takes an arm; the gate admits plural bases). **The old file's tests all
+  passed against the old file** — which is the blind spot that rule exists for.
+- **A language crosses in the URL or it does not cross.** A storefront and the app it sells are
+  different origins, so they share no `localStorage` however identically the key is spelled — and
+  a reader who picks a language on one and clicks through gets the browser's guess on the other,
+  turning a choice they just made into a guess. `queryKey` exists for this. The half that is easy
+  to miss: **a GET form REPLACES its action URL's query with its own field set**, so a language
+  carried in the action is discarded the moment the form submits — on precisely the no-JavaScript
+  path that is the reason the form is a real form. It rides as a hidden input or it does not ride.
+- **React 19's static render writes the PROP name, not the attribute name.** `hrefLang="es"`
+  reaches the HTML in camelCase. Browsers parse attribute names case-insensitively so the page is
+  correct, and every grep written for the real spelling reports zero — which is how a verifier came
+  back saying a build had no language links when it had all of them. Grep the built output for what
+  React EMITS, not for what the spec calls it.
+- **The first auth store that was a subset, and it still closed a gap.** The factory went in
+  outright with zero call-site changes, because the adopter's guards were already taking that store
+  as `SessionState`. What it fixed on the way is the thing the factory's own doc predicts: the
+  package's `setUser` ends the loading state in the same write, where this store left `isLoading`
+  alone and relied on a separate call. Here that call covered the boot lookup and **nothing covered
+  the other path** — a session arriving through the auth channel while the lookup was still in
+  flight set the user and left every guard on its loading screen. Three declines made the factory
+  look like the wrong shape; the first subset showed the shape was right and the adopters were
+  supersets.
+- **A dead export survives a green gate when the tool calls it a hint.** A deleted module left its
+  subpath behind in a package's export map. Nothing imported it, so nothing broke, and the dead-code
+  check reported it as a configuration hint rather than an error — which is exactly how an entry
+  like that outlives the person who remembers what it was for. An export map is a claim about what
+  a package offers; this one advertised a module whose removal was the point of the commit.
+- **`%CPU` is a lifetime average, and the evidence dies with the process.** A gate hung for
+  12m40s and `ps` reported the stuck process at 99.9% CPU, which reads as an infinite loop. It was
+  not: macOS averages `%CPU` over a process's whole life, and a `sample` showed every thread parked
+  — blocked, not spinning. Sample before you kill. Two more from the same hour: a killed gate exits
+  **143**, which is not a failing gate and must not be read as one, and zsh does not word-split, so
+  a watchdog stashed in a variable is looked up as a command with a space in its name.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
@@ -846,8 +918,15 @@ does. So for every file being deleted: list what it does, and find each one here
 missing comes UP into the package before the delete lands — that is the whole point, and it is
 how the other eleven repos get it.
 
-**Every migration must be net-negative in lines.** If an adopting repo grows, the cut line was
-drawn in the wrong place and the fix belongs here, not in the adopter.
+**Every migration must be net-negative in lines — measured on the ADOPTION commits, in source.**
+If the code that swaps an adopter's copy for this package grows, the cut line was drawn in the
+wrong place and the fix belongs here, not in the adopter. But a migration also fixes the bugs it
+finds and sometimes builds what it discovers is missing, and those commits can carry the whole
+range positive with nothing wrong; tests that pin behaviour nobody had pinned do the same. So
+split the number and say which part is which. What is never allowed is padding the diff to reach
+a negative total — deleting tests, or leaving a bug alone, to make an arithmetic look right.
+Migration 7 is the worked example: +125 over the range, −169 of source across its seven adoptions,
++102 of it tests in two files.
 
 The tree is shared. Other agents work the same branch concurrently with uncommitted work you
 cannot see — providerkit's fourth migration was started and backed out for exactly that. Commit
