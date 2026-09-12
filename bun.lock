@@ -76,7 +76,7 @@
     },
     "vite": {
       "name": "@gusnips/vite",
-      "version": "0.5.3",
+      "version": "0.5.4",
       "dependencies": {
         "@gusnips/react": "workspace:*",
       },
