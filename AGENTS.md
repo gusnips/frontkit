@@ -547,7 +547,7 @@ whose CI runs no tests. Each of those moved a lesson somewhere it had not been b
 - **The package already had the fix; adopting it is what found the bug.** The shared error
   boundary reloaded after any chunk failure with no memory of having done it, so a chunk that was
   really gone reloaded the page every three seconds, forever, with the person inside.
-  `reloadOnceForChunkError` has guarded that since the audit. The same class's matcher missed
+  `reloadOnce` has guarded that since the audit. The same class's matcher missed
   Firefox's wording, the second hand-written matcher to do so after migration 2's sibling app,
   and it never cleared, so a crash on one screen was still there after the back button.
 - **An error screen's words are a claim, and this one was false.** The crash page said the

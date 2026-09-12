@@ -61,8 +61,10 @@ export {
   installPreloadErrorHandler,
   isChunkLoadError,
   isPreloadHintFailure,
-  reloadOnceForChunkError,
-} from "./chunk-reload.ts";
+  isStaleBuild,
+  RELOAD_GUARD_KEY,
+  reloadOnce,
+} from "./deploy-recovery.ts";
 
 // The two constants, but NOT `hydrateOrMount` — that one is at `@gusnips/react/hydrate`, because
 // it is the package's only `react-dom` import. These come from the contract module, which imports

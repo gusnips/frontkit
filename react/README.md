@@ -67,9 +67,47 @@ those codes and they are never retried.
 
 An app with `lazy()` routes serves chunks by hashed filename. Deploy while someone has a tab
 open, and their next click asks for a file that no longer exists — a white screen on a button
-that worked a minute ago.
+that worked a minute ago. The same deploy breaks a second way that looks nothing like the first:
+the old bundle reads a field your API just renamed, and throws a plain `TypeError` with nothing
+in it about a deploy.
 
-Two halves. In your browser entry:
+**Fix the cause in your host config first.** This package cannot do it for you and it is worth
+more than everything below. A static host answers a missing `/assets/x.js` with your SPA
+fallback — `index.html`, at a 200, as `text/html` — and that is what the browser's "MIME type
+text/html" module-script refusal actually is. Hosts then match cache rules against the _request
+path_ rather than the outcome, so the `immutable, max-age=31536000` rule you wrote for hashed
+assets lands on that HTML body: one poisoned asset URL, at the edge and in every browser that
+touched it, for a year. Keep the fallback off `/assets/`, and answer a miss there with a real,
+uncacheable 404.
+
+Then two detectors, for the two failures:
+
+```ts
+if (await isStaleBuild()) reloadOnce();
+```
+
+`isStaleBuild` asks the server instead of reading the error — it compares the entry script this
+document loaded against the one the live page names. That is the only thing that catches the
+renamed-field crash, where the message carries no signal at all. It asks for the page, not for
+the asset: a CDN serves assets with a long `s-maxage`, so a bundle retired an hour ago still
+answers 200 from the edge and would report "current" during exactly the window when skew is most
+likely. Anything ambiguous — offline, a non-200, a timeout — answers `false`, because dressing a
+real bug up as an update hides it from you too.
+
+```ts
+if (isChunkLoadError(error) && reloadOnce()) return null;
+```
+
+`isChunkLoadError` matches the message, which is all you have for a failure that never reaches a
+boundary — an `unhandledrejection`, or a listener. Every browser's phrasing is in there.
+
+`reloadOnce` reloads at most once a minute, and there is **one** stamp for every reason to
+reload. A tab can reload because a chunk 404'd, because the server says it is behind, or from a
+guard inlined in `index.html` that runs before any module does. Three detectors, one predicament
+— give each its own key and a broken deploy gets three reloads a minute to take turns with. That
+inline guard cannot import anything, so the key it has to copy is exported as `RELOAD_GUARD_KEY`.
+
+And in your browser entry:
 
 ```ts
 import { installPreloadErrorHandler } from "@gusnips/react";
@@ -77,21 +115,11 @@ import { installPreloadErrorHandler } from "@gusnips/react";
 installPreloadErrorHandler();
 ```
 
-And in your error boundary:
-
-```ts
-if (isChunkLoadError(error) && reloadOnceForChunkError()) return null;
-```
-
-`reloadOnceForChunkError` reloads at most once a minute, because reloading on a chunk error the
-reload does not fix is an infinite loop with a person inside it. Past that, a genuinely missing
-chunk degrades to your error screen, which can at least say something.
-
-The handler is the other half, and it is narrower than it looks: it swallows Vite's CSS _preload
-hint_ failure and nothing else. A hint that fails is harmless — the import runs straight after
-and usually works. Taking Vite's `preventDefault()` for every preload error instead resolves the
-dynamic import with `undefined`, `React.lazy` reads `.default` off nothing, and you get a crash
-screen plus a TypeError with only React frames in it, naming no chunk.
+It is narrower than it looks: it swallows Vite's CSS _preload hint_ failure and nothing else. A
+hint that fails is harmless — the import runs straight after and usually works. Taking Vite's
+`preventDefault()` for every preload error instead resolves the dynamic import with `undefined`,
+`React.lazy` reads `.default` off nothing, and you get a crash screen plus a TypeError with only
+React frames in it, naming no chunk.
 
 ## Guards that can tell "no" from "I don't know"
 
