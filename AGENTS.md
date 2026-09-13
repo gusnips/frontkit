@@ -188,6 +188,17 @@ pin them; if one fails, a lesson is being un-learned.
    not-found page rendered INTO it. Hydrating that is React reconciling two different pages — it
    recovers by throwing the tree away and logging, which is a page that works and a bug nobody
    sees.
+
+   **And nothing random or clock-dependent may initialize prerendered state.** That is the same
+   failure arriving from inside the tree instead of from the address. A front page whose hero did
+   `useState(pickRandomIndex)` ran that initializer twice — once in the build, baking one variant
+   into the file a crawler reads, and once in the browser, drawing another. One render, two
+   independent draws, and React settles it by discarding the prerendered tree and redrawing: it
+   looks perfect, and it costs the whole point of prerendering on the page that gets the most
+   traffic. The tell is the only visible symptom and it is worth knowing on its own — **every build
+   emits a different file**, so no byte-diff can separate a real change from a coin flip, and the
+   verification a migration depends on quietly stops working. Two repos shipped it. Pick a
+   constant, seed it, or move the draw into an effect that runs after mount.
 3. **A failed refresh is not a dead session.** Only auth actually answering "no" signs anyone
    out; a network failure falls through and the request is retried. Collapsing the two means a
    Wi-Fi blip logs the user out mid-load. And a sign-out needs a fail-safe timer: awaiting
@@ -1099,14 +1110,17 @@ was supposed to buy, obtained through the package instead of through a repo merg
   differently, which it did not. That one surfaced only because the file was being rewritten anyway.
   A wrong idea spreads in paraphrase, and no exact-match search will ever find that copy.
 - **A build that changes every run is not a failed migration — it is a measurement problem, with a
-  real bug under it.** Two of the three bake a RANDOMLY CHOSEN demo conversation into the front
+  real bug under it.** Two of the three baked a RANDOMLY CHOSEN demo conversation into the front
   page, via `useState(pickRandomIndex)`. Two builds of byte-identical source produced two different
   names, so the byte-diff that proves a migration lost nothing could not run on `index.html` at all.
-  What proves it instead is rebuilding until the same variant comes up and comparing then —
+  What proved it instead was rebuilding until the same variant came up and comparing then —
   byte-identical on the fourth try in one repo and the fifth in the other. The bug underneath is
   worse than the noise it makes: a random value used as SSR state cannot agree with the client's
   first render, so the front page hydrates against markup that is not a render of its own state.
-  Invariant 2's family, arrived at from a direction no route check can see.
+  Both are fixed, and the fix carries its own check: two consecutive builds of one source now emit
+  a byte-identical `index.html`, which is worth running against any prerendered page. The rule went
+  into invariant 2, because that is what it is — invariant 2 reached from a direction no route
+  check can see.
 - **Strip before you measure, not after.** The old rigs removed the FAQ JSON-LD from the BAKED page
   while `assertRendered` compared that page against the UNstripped template — so the growth floor
   measured two different documents, short by ~3 KB on one side only. A small page could have failed
