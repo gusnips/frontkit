@@ -1070,6 +1070,64 @@ adopter's history before measuring it.
   has to respect — with no router context, every link in it is a plain `<a>`, or it throws inside
   the screen that exists to handle a throw.
 
+### Migrations 10–12 (three sibling repos, −196 source each, one reading)
+
+Three repos that are one product under three brands, and the first time ONE migration's reading
+served three adoptions. Their prerender rigs differed by a 404 title and two comment lines, so the
+slice that landed in the first applied to the other two verbatim. That is what collapsing the fork
+was supposed to buy, obtained through the package instead of through a repo merge.
+
+- **The roadmap's own numbers had aged, and re-measuring changed the track.** It recorded 558
+  byte-identical files, a `packages/ui` identical file-for-file, and ~3,050 lines of plumbing each,
+  and concluded the three should be merged into one repo. Measured: **429** source files identical
+  across all three of ~1,750 shared paths — a quarter, not a fork — with 45 of ~74 `packages/ui`
+  files identical, 1,213 shared paths differing between just two of them, and **two of the three
+  sharing no git history with the third at all**. The collapse is a multi-week merge; the adoption
+  was an afternoon. Migration 8's rule about quoting yourself applies to a plan, not just a comment.
+- **Invariant 12, occurrences four, five and six — and this time the code said why.** All three
+  advertised `/og/__not-found__.png` on their 404, a file each card generator has never rendered
+  because it only renders pages in the registry. The mechanism was one line: the image was computed
+  BEFORE the branch that decides a page is a shell, so the shell stripped the canonical and both
+  share URLs and kept the card. Six repos now, and the fix is the absence of an argument.
+- **Migration 3's double-robots bug, also in all three.** The old rig APPENDED
+  `<meta name="robots" content="noindex">` beside the template's `index, follow`, so every 404
+  shipped two contradictory tags and left the tie-break to each crawler's own rule. Written down in
+  0.4.5, and found in three more repos the first time anyone read the bytes rather than the diff.
+- **Grep the sentence — but a paraphrase survives the grep.** The house rule says correcting a
+  comment means grepping for its sentence. The flat-file sentence corrected one release earlier had
+  three more verbatim copies, which the grep found, and a FOURTH in a test comment phrased
+  differently, which it did not. That one surfaced only because the file was being rewritten anyway.
+  A wrong idea spreads in paraphrase, and no exact-match search will ever find that copy.
+- **A build that changes every run is not a failed migration — it is a measurement problem, with a
+  real bug under it.** Two of the three bake a RANDOMLY CHOSEN demo conversation into the front
+  page, via `useState(pickRandomIndex)`. Two builds of byte-identical source produced two different
+  names, so the byte-diff that proves a migration lost nothing could not run on `index.html` at all.
+  What proves it instead is rebuilding until the same variant comes up and comparing then —
+  byte-identical on the fourth try in one repo and the fifth in the other. The bug underneath is
+  worse than the noise it makes: a random value used as SSR state cannot agree with the client's
+  first render, so the front page hydrates against markup that is not a render of its own state.
+  Invariant 2's family, arrived at from a direction no route check can see.
+- **Strip before you measure, not after.** The old rigs removed the FAQ JSON-LD from the BAKED page
+  while `assertRendered` compared that page against the UNstripped template — so the growth floor
+  measured two different documents, short by ~3 KB on one side only. A small page could have failed
+  "nothing rendered" while rendering perfectly. Stripping the template first makes the two
+  comparable. Nobody had hit it; the rig had carried it latent for as long as it had existed.
+- **The optional-peer split paid, and the receipt is a version.** These repos run vite 7 and
+  plugin-react 5, where the preset declares vite 8 and plugin-react 6. The install was clean and the
+  rig unaffected, because the barrel imports neither and the preset sits behind its own subpath.
+  That is invariant 15's payoff stated as something an adopter simply does not have — and it is why
+  `webPreset` was declined here, with the version named rather than a shrug.
+- **A clean negative on the hole three migrations found.** `scripts/` typechecked by nothing was
+  migration 4's finding, then migration 6's, then migration 9's. All three of these repos include
+  `**/*`, so their scripts were covered before anyone asked. The check cost one command, and
+  assuming would have cost a wrong bullet in this file.
+- **The shared tree bit twice, two different ways, and a guard is what made pushing safe.** One repo
+  went from clean to nine foreign dirty files in the minutes between the audit and the install;
+  another had two unpushed commits belonging to somebody else, so its slice is committed and
+  deliberately NOT pushed. Pushing "your own completed unit" in a shared tree means asserting it:
+  refuse unless the commits ahead of the remote are exactly yours. The rule about never staging
+  foreign FILES has a twin about never shipping foreign COMMITS.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
