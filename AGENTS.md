@@ -199,6 +199,7 @@ pin them; if one fails, a lesson is being un-learned.
    emits a different file**, so no byte-diff can separate a real change from a coin flip, and the
    verification a migration depends on quietly stops working. Two repos shipped it. Pick a
    constant, seed it, or move the draw into an effect that runs after mount.
+
 3. **A failed refresh is not a dead session.** Only auth actually answering "no" signs anyone
    out; a network failure falls through and the request is retried. Collapsing the two means a
    Wi-Fi blip logs the user out mid-load. And a sign-out needs a fail-safe timer: awaiting
