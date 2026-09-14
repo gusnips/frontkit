@@ -197,8 +197,11 @@ pin them; if one fails, a lesson is being un-learned.
    looks perfect, and it costs the whole point of prerendering on the page that gets the most
    traffic. The tell is the only visible symptom and it is worth knowing on its own — **every build
    emits a different file**, so no byte-diff can separate a real change from a coin flip, and the
-   verification a migration depends on quietly stops working. Two repos shipped it. Pick a
-   constant, seed it, or move the draw into an effect that runs after mount.
+   verification a migration depends on quietly stops working. Three repos shipped it, and the
+   third is the shape a search for `useState(` misses: suggestion chips sampled inside a `useMemo`,
+   so search for the draw itself (`Math.random`), not for where it lands. Pick a constant, seed it,
+   or move the draw into an effect that runs after mount — and for anything a reader aims at, take
+   the constant, because the effect's swap lands just as the control becomes clickable.
 
 3. **A failed refresh is not a dead session.** Only auth actually answering "no" signs anyone
    out; a network failure falls through and the request is retried. Collapsing the two means a
