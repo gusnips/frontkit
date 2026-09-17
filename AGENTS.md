@@ -230,9 +230,15 @@ pin them; if one fails, a lesson is being un-learned.
    them burns another request against the limiter and says the same thing three times. Retry 408,
    a transient 429, 5xx, and no-response-at-all — nothing else.
 
-   **Measured on the server side, where these are raised: 13 raises of a 402 across five backends,
-   and not one states a wait.** Unanimous, no exception — so this is not a client-side policy, it
-   is what every server already does. The number came out of building the same rule for the server
+   **Measured on the server side, where these are raised: of 13 raises of a 402 across five
+   backends, none states a wait.** So the rule is not only a client-side policy — it is what every
+   raiser in the fleet does today. Written that way on purpose: "no 402 in the fleet states a wait,
+   in 13 raises" stays true forever, where "a 402 never states a wait" is a claim nobody measured
+   and a card retry window or a transfer clearing overnight would contradict. The day an exception
+   turns up it should read as a finding, not as this file being wrong — and the code already allows
+   it, because the wait is available at every status.
+
+   The number came out of building the same rule for the server
    kit, by counting raises rather than by arguing; and the count is worth more than its answer,
    because the same method answered three statuses three different ways. A 429 was the opposite
    (**34 of 40 raises already state a wait**, which is why a required argument was cheap there),
