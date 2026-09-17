@@ -1212,3 +1212,16 @@ your own slice per file, by pathspec, and never touch a foreign dirty file.
   Base UI production error arrives as "the bare number 31", the fix landed in `menu.tsx`, and the
   same sentence sat uncorrected in "What the migrations taught" — the document people read
   BEFORE the code.
+
+  **And the copy a grep cannot reach is the one already sent to somebody.** A sentence in a
+  reviewer's inbox, in a message to another agent, in a report someone is reading right now — no
+  search finds it, only remembering you said it. That is not a completeness rule, it is an
+  ORDERING one, and the ordering is what changes what you do first: **the in-flight copy is the
+  only one with a deadline.** The code comment will still be wrong in ten minutes and still be
+  fixable; the sentence somebody already has may already have been acted on. So the correction
+  goes out before your own tree is clean, not after — which cuts against the instinct to wait
+  until you have the fix in hand, because sending twice feels like admitting the mistake twice.
+  Learned twice in one afternoon (2026-09-17), both times on our own text rather than a donor's:
+  an overclaimed measurement was corrected in a code comment and a report, and the copy that
+  mattered was the one inside a merge already in flight — it reached `main` and had to be
+  cherry-picked out.
