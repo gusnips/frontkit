@@ -228,8 +228,30 @@ pin them; if one fails, a lesson is being un-learned.
 8. **Never retry what waiting cannot fix, and when it says how long, believe it.** 402 and a
    durable 429 (`QUOTA_EXCEEDED`, `PAYMENT_REQUIRED`) clear by buying, not by waiting; retrying
    them burns another request against the limiter and says the same thing three times. Retry 408,
-   a transient 429, 5xx, and no-response-at-all — nothing else. The second half arrived with the
-   second migration: a refusal that states its own expiry has already answered the question, so a
+   a transient 429, 5xx, and no-response-at-all — nothing else.
+
+   **Measured on the server side, where these are raised: 13 raises of a 402 across five backends,
+   and not one states a wait.** Unanimous, no exception — so this is not a client-side policy, it
+   is what every server already does. The number came out of building the same rule for the server
+   kit, by counting raises rather than by arguing; and the count is worth more than its answer,
+   because the same method answered three statuses three different ways. A 429 was the opposite
+   (**34 of 40 raises already state a wait**, which is why a required argument was cheap there),
+   and a 5xx was a third thing again (**16 of 94** — most of them "the database is unreachable",
+   with no wait to state, so the wait stayed a capability and never became an obligation). One
+   method, three answers, is what makes it evidence rather than a prior with a number stapled to
+   it. Do not read the 429's 34-of-40 as agreeing with this rule: it counts a different thing,
+   and quoting it here would suggest a 429 usually knows its wait, which is true, and that waiting
+   therefore fixes it, which is the mistake the rule exists to stop.
+
+   **And one axis this rule has never had: idempotency governs retry, not only transience.** A POST
+   that failed with no answer may have succeeded, so retrying it duplicates; a GET cannot. One
+   backend in the fleet writes it as `attempts: init.method === "POST" ? 1 : 3` and is the only
+   copy anywhere that does. Everything above reasons about whether WAITING can help, which is the
+   wrong question for a write: a transient 5xx on a charge is exactly the case this rule currently
+   tells you to retry, and exactly the case where a retry can bill someone twice. Unless a request
+   carries an idempotency key the server honours, a non-idempotent method gets one attempt.
+
+   The second half arrived with the second migration: a refusal that states its own expiry has already answered the question, so a
    short wait is WAITED OUT (`retryDelay` takes the stated seconds over the backoff) and a long
    one is an answer (`shouldRetry` refuses past `maxRetryWaitSecs`, default 10s). Without it a
    per-minute limiter answering `Retry-After: 60` got retried at 1s and 2s — two more requests
@@ -237,6 +259,7 @@ pin them; if one fails, a lesson is being un-learned.
    the screen said anything. **Read the wait from the HEADER first**: it is where HTTP puts it,
    and the package looked only in `details.retryAfterSecs` — one donor's body convention — so for
    every API that follows the spec, the one refusal that states its expiry read as silent.
+
 9. **A wrapper forwards its rest props.** A closed prop list removes `name`, `required`, `form`
    and `data-*` from a form control. Four wrappers in the donor repo did exactly this: they did
    not add form integration, they removed it.
