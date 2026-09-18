@@ -67,6 +67,10 @@ export interface ApiClientOptions {
    * `location.replace()` does not stop the current frame, so a caller's own `onError` must
    * still run or a half-finished screen keeps rendering against data that will never arrive.
    * The error it throws carries `expected: true`.
+   *
+   * Ending the session IN PLACE is equally supported — routing to the sign-in screen without a
+   * reload — and it is the case that keeps this client alive across the next sign-in. The
+   * sign-out latch is keyed on the refused token for exactly that reason; see `refusedToken`.
    */
   onSessionDead: () => void;
   /**
@@ -265,11 +269,23 @@ export function createApiClient({
     return refreshing;
   }
 
-  /** Latches, so whichever request gets here first owns the sign-out and the rest are no-ops. */
-  let signingOut = false;
-  function sessionDead(): never {
-    if (!signingOut) {
-      signingOut = true;
+  /**
+   * Latches, so whichever request gets here first owns the sign-out and the rest are no-ops.
+   *
+   * Keyed on the token that was REFUSED rather than on a boolean, because the latch is about one
+   * session and not about the client. An adopter that ends a dead session in place — routing to
+   * the sign-in screen instead of reloading — keeps this client across the next sign-in, and a
+   * flag that never clears means the second dead session in that tab only throws: nothing calls
+   * `onSessionDead`, so every request 401s with nothing left to redirect it. That is the state
+   * `signOutTimeoutMs` exists to prevent, reached from the other side, and an adopter hit it.
+   *
+   * `undefined` means no session has been refused. `null` is a real value here — a request with
+   * no token at all can be the one auth answers "no" to.
+   */
+  let refusedToken: string | null | undefined;
+  function sessionDead(token: string | null): never {
+    if (refusedToken === undefined) {
+      refusedToken = token;
       let done = false;
       const go = (): void => {
         if (done) return;
@@ -318,22 +334,33 @@ export function createApiClient({
   }
 
   async function request(path: string, options: RequestOptions = {}): Promise<Response> {
-    let res = await send(path, await session.getToken(), options);
+    const token = await session.getToken();
+    // A token that is not the one already refused is a new session, and signing back in inside
+    // the same tab is the only thing that produces one. That releases the latch.
+    if (refusedToken !== undefined && token !== null && token !== refusedToken)
+      refusedToken = undefined;
+    let res = await send(path, token, options);
 
     if (res.status === 401) {
       // Only a refresh that actually REACHED auth proves the session is gone. Anything else is
       // a network problem, and the 401 falls through as an ordinary error — the next request
       // refreshes cleanly once the connection is back. Invariant 3.
       let answered = false;
+      // The NEWEST token that was refused, which is what the latch is keyed on. Latching the one
+      // the request started with would be wrong: a refresh that yields a token auth then also
+      // refuses leaves `getToken` answering that newer one, so the very next request would read
+      // it as a fresh session and sign the same dead one out twice.
+      let refused = token;
       for (let attempt = 0; attempt < maxRefreshAttempts; attempt++) {
         if (attempt > 0) await sleep(refreshRetryDelayMs);
         const result = await refresh();
         answered = result.reachedAuth;
         if (!result.token) continue;
+        refused = result.token;
         res = await send(path, result.token, options);
         if (res.status !== 401) break;
       }
-      if (res.status === 401 && answered) sessionDead();
+      if (res.status === 401 && answered) sessionDead(refused);
     }
 
     if (!res.ok) {

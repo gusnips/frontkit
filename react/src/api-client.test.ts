@@ -186,6 +186,72 @@ describe("createApiClient", () => {
   });
 
   /**
+   * The latch is about one SESSION, not about the client.
+   *
+   * An adopter that ends a dead session IN PLACE — routing to the sign-in screen rather than
+   * reloading — keeps this client across the next sign-in. A latch that never clears means the
+   * SECOND dead session in that tab only throws: nothing calls `onSessionDead`, so every
+   * request 401s with nothing left to redirect it. That is the same end state the sign-out
+   * fail-safe timer exists to prevent, reached from the other side.
+   */
+  it("signs out again after the tab signs back in", async () => {
+    stubFetch(() => unauthorized());
+    const onSessionDead = vi.fn();
+    let token = "first-session";
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session({
+        getToken: async () => token,
+        refresh: async () => ({ token: null, reachedAuth: true }),
+      }),
+      onSessionDead,
+      refreshRetryDelayMs: 0,
+    });
+
+    await api.get("/a").catch(() => {});
+    expect(onSessionDead).toHaveBeenCalledTimes(1);
+
+    // The person signs back in without reloading: same client, a different token.
+    token = "second-session";
+    await api.get("/b").catch(() => {});
+    expect(onSessionDead).toHaveBeenCalledTimes(2);
+
+    // …and the second session latches on its own, exactly as the first one did.
+    await api.get("/c").catch(() => {});
+    expect(onSessionDead).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * …and the latch holds the NEWEST refused token, not the one the request started with.
+   *
+   * A refresh can hand back a rotated token that auth then also refuses. The adapter stores it,
+   * so `getToken` answers with it from then on — and a latch keyed on the token the request
+   * began with would read that as a fresh session and sign the same dead one out twice.
+   */
+  it("does not sign out twice when the refused token was itself a refresh", async () => {
+    stubFetch(() => unauthorized());
+    const onSessionDead = vi.fn();
+    let token = "old-token";
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session({
+        getToken: async () => token,
+        refresh: async () => {
+          // What a rotating auth server does: a new token the API still refuses.
+          token = "rotated-token";
+          return { token, reachedAuth: true };
+        },
+      }),
+      onSessionDead,
+      refreshRetryDelayMs: 0,
+    });
+
+    await api.get("/a").catch(() => {});
+    await api.get("/b").catch(() => {});
+    expect(onSessionDead).toHaveBeenCalledTimes(1);
+  });
+
+  /**
    * providerkit's invariant 2, on the web side: a caller's Stop and our deadline must stay
    * distinguishable. The deadline aborts with a **TimeoutError**, not an AbortError, so
    * `isAbortError` stays false for it — which is what lets a timeout be retried and reported
