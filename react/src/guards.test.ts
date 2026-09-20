@@ -13,7 +13,7 @@ import {
 // lets the redirect cases assert a destination without rendering anything.
 const router = vi.hoisted(() => ({
   Navigate: vi.fn(),
-  useLocation: vi.fn(() => ({ pathname: "/posts", search: "?page=2" })),
+  useLocation: vi.fn(() => ({ pathname: "/posts", search: "?page=2", hash: "#comments" })),
 }));
 vi.mock("react-router-dom", () => router);
 
@@ -96,13 +96,12 @@ describe("createRequireAuth", () => {
     expect(branch(render(guard(false, true)))).toBe("LOADING");
   });
 
-  // The redirect carries where they were headed, query string included: an adopter's sign-in screen
-  // reads `location.state.from` to land them on the page they actually wanted rather than the home
-  // screen. One donor hardcoded this in four places, which is what made it a factory.
-  it("remembers the address it turned away", () => {
+  // The URL carries the whole destination because router state is lost on reload, OAuth and email
+  // links. The sign-in screen reads `next`, validates it, and replaces this history entry.
+  it("remembers the whole address it turned away", () => {
     expect(branch(render(guard(false)))).toEqual({
-      to: "/login",
-      state: { from: "/posts?page=2" },
+      to: "/login?next=%2Fposts%3Fpage%3D2%23comments",
+      state: undefined,
     });
   });
 
@@ -120,6 +119,27 @@ describe("createRequireAnonymous", () => {
   });
 
   it("sends a signed-in visitor home", () => {
+    expect(branch(render(guard(true)))).toEqual({ to: "/", state: undefined });
+  });
+
+  it("resumes a carried internal route", () => {
+    router.useLocation.mockReturnValueOnce({
+      pathname: "/login",
+      search: "?next=%2Fposts%3Fpage%3D2%23comments",
+      hash: "",
+    });
+    expect(branch(render(guard(true)))).toEqual({
+      to: "/posts?page=2#comments",
+      state: undefined,
+    });
+  });
+
+  it("falls home instead of following an external target", () => {
+    router.useLocation.mockReturnValueOnce({
+      pathname: "/login",
+      search: "?next=%2F%2Fevil.test",
+      hash: "",
+    });
     expect(branch(render(guard(true)))).toEqual({ to: "/", state: undefined });
   });
 

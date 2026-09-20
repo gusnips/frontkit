@@ -1,6 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { safeInternalPath } from "./internal-path.ts";
 
 /**
  * Route guards.
@@ -58,6 +59,14 @@ export interface GuardOptions {
   loading: ReactNode;
 }
 
+/** Query parameter carrying the route a sign-in interrupted. */
+export const AUTH_RETURN_PARAM = "next";
+
+function signInUrl(signInPath: string, returnTo: string): string {
+  const separator = signInPath.includes("?") ? "&" : "?";
+  return `${signInPath}${separator}${AUTH_RETURN_PARAM}=${encodeURIComponent(returnTo)}`;
+}
+
 /**
  * Signed in, or off to sign in — remembering where they were headed, so the redirect afterwards
  * lands on the page they actually wanted rather than the home screen.
@@ -71,10 +80,13 @@ export function createRequireAuth(
     const { isAuthenticated, isLoading } = useSession();
     const location = useLocation();
     if (isLoading) return <>{loading}</>;
-    if (!isAuthenticated)
-      return (
-        <Navigate to={signInPath} replace state={{ from: location.pathname + location.search }} />
-      );
+    if (!isAuthenticated) {
+      // Query state survives a reload, an OAuth round trip and an email-link round trip. Router
+      // state survives none of them, so it only looked like a remembered destination on the
+      // password path. The hash belongs too: tabs and anchored settings are real destinations.
+      const returnTo = location.pathname + location.search + location.hash;
+      return <Navigate to={signInUrl(signInPath, returnTo)} replace />;
+    }
     return <>{children}</>;
   };
 }
@@ -87,8 +99,12 @@ export function createRequireAnonymous(
 ) {
   return function RequireAnonymous({ children }: { children: ReactNode }) {
     const { isAuthenticated, isLoading } = useSession();
+    const location = useLocation();
     if (isLoading) return <>{loading}</>;
-    if (isAuthenticated) return <Navigate to={homePath} replace />;
+    if (isAuthenticated) {
+      const carried = new URLSearchParams(location.search).get(AUTH_RETURN_PARAM);
+      return <Navigate to={safeInternalPath(carried) ?? homePath} replace />;
+    }
     return <>{children}</>;
   };
 }
