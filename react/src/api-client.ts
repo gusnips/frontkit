@@ -354,7 +354,9 @@ export function createApiClient({
       for (let attempt = 0; attempt < maxRefreshAttempts; attempt++) {
         if (attempt > 0) await sleep(refreshRetryDelayMs);
         const result = await refresh();
-        answered = result.reachedAuth;
+        // A later network miss cannot erase an earlier answer from auth. The attempts are one
+        // investigation of this session, and one definitive "no" settles it.
+        answered ||= result.reachedAuth;
         if (!result.token) continue;
         refused = result.token;
         res = await send(path, result.token, options);

@@ -26,7 +26,10 @@ function session(overrides: Partial<SessionAdapter> = {}): SessionAdapter {
   };
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("createApiClient", () => {
   it("unwraps the success envelope", async () => {
@@ -162,6 +165,49 @@ describe("createApiClient", () => {
     // It surfaces as an ordinary 401 the caller can report, not as an expected sign-out.
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).expected).toBe(false);
+  });
+
+  it("remembers an auth answer across later failed refresh attempts", async () => {
+    stubFetch(() => unauthorized());
+    const onSessionDead = vi.fn();
+    let refreshes = 0;
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session({
+        refresh: async () =>
+          ++refreshes === 1
+            ? { token: null, reachedAuth: true }
+            : { token: null, reachedAuth: false },
+      }),
+      onSessionDead,
+      refreshRetryDelayMs: 0,
+    });
+
+    const error = await api.get("/me").catch((e: unknown) => e);
+    expect(refreshes).toBe(2);
+    expect(onSessionDead).toHaveBeenCalledTimes(1);
+    expect((error as ApiError).expected).toBe(true);
+  });
+
+  it("uses the fail-safe when sign-out never settles", async () => {
+    vi.useFakeTimers();
+    stubFetch(() => unauthorized());
+    const onSessionDead = vi.fn();
+    const api = createApiClient({
+      baseUrl: "https://api.test",
+      session: session({
+        refresh: async () => ({ token: null, reachedAuth: true }),
+        signOut: () => new Promise(() => {}),
+      }),
+      onSessionDead,
+      maxRefreshAttempts: 1,
+      signOutTimeoutMs: 3_000,
+    });
+
+    await api.get("/me").catch(() => {});
+    expect(onSessionDead).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(onSessionDead).toHaveBeenCalledTimes(1);
   });
 
   it("signs out once when auth actually says no", async () => {
