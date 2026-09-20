@@ -126,16 +126,29 @@ Per package: `cd react && bun run test`, etc.
 - **And the adopter's half of that pin: the two carets move together, or the install grows a second
   copy of `react`.** That exact pin inside `vite` is reachable through the ADOPTER's `vite` caret,
   so a repo whose `react` caret sits a minor behind gets both. Measured by really installing
-  `{"@gusnips/react": "^0.8.0", "@gusnips/vite": "^0.8.2"}` — one repo's actual catalog — which
-  resolves to `@gusnips/react@0.8.1` hoisted **and** `@gusnips/vite/node_modules/@gusnips/react@0.9.2`
-  nested, because `^0.8.2` floats vite to 0.8.6 whose pin is `0.9.2` and a caret on a 0.x does not
-  cross a minor. `{"^0.9.0", "^0.8.4"}` — what six other repos carry — installs one copy, also
-  measured. Nothing warns: `bun install` is silent, `release:check` reads what the REGISTRY gets and
-  not what an adopter assembles, and the two `PRERENDERED_ROUTE_ATTR`s happened to be the same
-  string, so even the failure invariant 2 describes stays quiet. The check an adopter can run is one
-  line — `find node_modules -path '*@gusnips/react/package.json'` prints ONE line — and the rule is
-  simply that the pair is one decision: bump `react` and `vite` in the same commit, in the adopter
-  too, never only the one whose changelog you were reading.
+  `{"@gusnips/react": "^0.8.0", "@gusnips/vite": "^0.8.2"}` — two repos carry exactly that — which
+  resolves `@gusnips/react` to **0.8.1 and 0.9.2 at once**, because `^0.8.2` floats vite to 0.8.6
+  whose pin is `0.9.2` and a caret on a 0.x does not cross a minor. `{"^0.9.0", "^0.8.4"}` installs
+  one copy, also measured. Nothing warns: `bun install` is silent, `release:check` reads what the
+  REGISTRY gets and not what an adopter assembles, and the two `PRERENDERED_ROUTE_ATTR`s happened to
+  be the same string, so even the failure invariant 2 describes stays quiet. The rule is that the
+  pair is one decision: bump `react` and `vite` in the same commit, in the adopter too, never only
+  the one whose changelog you were reading.
+
+  **Two things about MEASURING it, both learned by getting them wrong an hour apart.** This bullet
+  first said one repo, and the count was wrong because the scan read each repo's ROOT manifest only —
+  which answers for the repos that keep a dependency catalog and silently skips every repo that
+  declares the same dependency inside its workspaces. Three of twelve did, and one of those three was
+  the second offender. A fleet-wide dependency question is asked of **every** `package.json`, never
+  the root one.
+
+  And this bullet first offered `find node_modules -path '*@gusnips/react/package.json'` as the
+  one-line check. Under bun's isolated linker that is wrong in the direction that invents a problem:
+  it walks `node_modules/.bun`, the content store, which keeps every version ever installed in that
+  tree — so a range you have already corrected still reports two copies. Ask the resolver instead:
+  `bun why @gusnips/react` prints one heading per RESOLVED version, and one heading is the whole
+  test. Watched misfiring on a real tree before the replacement was believed, which is the only
+  evidence a check ever has.
 
 ## What must NOT be shared
 
