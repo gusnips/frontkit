@@ -36,7 +36,7 @@ export interface ApiSuccess<T, M = PaginationMeta> {
 }
 
 /**
- * Error envelope — byte-compatible with a server's `AppError.toJSON()`.
+ * Error envelope — the wire shape a server returns for a failed request.
  *
  * The four fields are not decoration, and every donor arrived at the same four:
  *
