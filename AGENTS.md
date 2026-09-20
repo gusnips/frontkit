@@ -1192,6 +1192,48 @@ was supposed to buy, obtained through the package instead of through a repo merg
   refuse unless the commits ahead of the remote are exactly yours. The rule about never staging
   foreign FILES has a twin about never shipping foreign COMMITS.
 
+### Migration 13 (an audit of an already-migrated adopter)
+
+The first pass over a repo that had **already** adopted the package, looking only at whether the
+adoption was right. It found the package shipping the hazard rather than the adopter, which is the
+strongest argument yet for auditing after a migration instead of closing the ticket at green.
+
+- **A return target is written into a QUERY STRING, so it must not carry what a fragment carries.**
+  `createRequireAuth` built it as `pathname + search + hash`, and that guard renders exactly when
+  there is no session yet — which is the state an implicit-flow callback is in while its client
+  reads the fragment. Point an OAuth `redirectTo` at a guarded route and the bounce is
+  `/login?next=/app%23access_token%3D…%26refresh_token%3D…`: a refresh token in `Referer`, in
+  access logs, and in history. `returnPathFromLocation` keeps the page and drops only a fragment
+  carrying a credential, because the page is the part worth returning to and the anchor is the part
+  that is dangerous.
+- **The default nobody passes was the one that mattered, and it is the opposite of the guess.**
+  supabase-js declares no `flowType` of its own, so GoTrueClient's fallback stands and it is
+  **implicit**, not PKCE — the callback comes back in the fragment. Across the fleet **10 of 12
+  frontends set no `flowType` at all**; two ask for PKCE. Measured through an app's own resolver
+  rather than by reading a changelog, because migration 5 already learned that a resolution check
+  is only evidence when it resolves the way the consumer will: run from the wrong directory, the
+  same question answers differently.
+- **A rule stated in a README is not a rule the code keeps.** The README said the guard carries
+  "path, query and hash", and it did, literally. The sentence was right about intent and the
+  concatenation under it was the bug — which is why correcting it meant grepping the sentence and
+  rewriting the claim, not patching the line.
+- **The adopter's remaining hole was the one this project has closed five times.** An invite link's
+  `?next=` used `startsWith("/")` under a comment promising it would "never follow an external
+  URL". It would: a parser folds `//evil.test` and `/\evil.test` into another origin and strips a
+  tab before deciding. The comment was the tell — a claim the code one line below does not deliver.
+- **A guard reaches nobody until the caret lets it.** The two repos that call `createRequireAuth`
+  sit at `^0.9.0` and `^0.8.0`. The first takes 0.9.2 on its next lockfile update; the second
+  **cannot receive it at all**, because a caret on a 0.x does not cross a minor — and it is the one
+  whose `redirectTo` points at a guarded route, so it holds the live instance. Migration 9 learned
+  this from the guard's side; this is the same fact from the bug's side, and it makes the bump the
+  deliverable rather than the release.
+- **Two plan items did not survive contact with the branch, in opposite directions.** A note to
+  check a GoTrue nonce variable before removing it was stale — the repo had already deleted it, and
+  the local checkout was 58 commits behind, which is the only reason the note looked live. The
+  adapter the plan proposed adopting was already adopted. Re-read before you write the finding
+  down, and re-read the REMOTE, because a stale checkout makes every version claim about the fleet
+  wrong in the same direction.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
