@@ -123,6 +123,19 @@ Per package: `cd react && bun run test`, etc.
   bug above is a caught error rather than a broken tarball.
 - **Publish in dependency order** — `tokens`, `http`, `react`, `vite` — and bump `vite` whenever
   `react` ships, because the pin inside it changed even when none of its own code did.
+- **And the adopter's half of that pin: the two carets move together, or the install grows a second
+  copy of `react`.** That exact pin inside `vite` is reachable through the ADOPTER's `vite` caret,
+  so a repo whose `react` caret sits a minor behind gets both. Measured by really installing
+  `{"@gusnips/react": "^0.8.0", "@gusnips/vite": "^0.8.2"}` — one repo's actual catalog — which
+  resolves to `@gusnips/react@0.8.1` hoisted **and** `@gusnips/vite/node_modules/@gusnips/react@0.9.2`
+  nested, because `^0.8.2` floats vite to 0.8.6 whose pin is `0.9.2` and a caret on a 0.x does not
+  cross a minor. `{"^0.9.0", "^0.8.4"}` — what six other repos carry — installs one copy, also
+  measured. Nothing warns: `bun install` is silent, `release:check` reads what the REGISTRY gets and
+  not what an adopter assembles, and the two `PRERENDERED_ROUTE_ATTR`s happened to be the same
+  string, so even the failure invariant 2 describes stays quiet. The check an adopter can run is one
+  line — `find node_modules -path '*@gusnips/react/package.json'` prints ONE line — and the rule is
+  simply that the pair is one decision: bump `react` and `vite` in the same commit, in the adopter
+  too, never only the one whose changelog you were reading.
 
 ## What must NOT be shared
 
