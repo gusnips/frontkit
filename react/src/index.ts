@@ -29,7 +29,7 @@
 // identical in source.
 
 export { cn } from "./cn.ts";
-export { safeInternalPath } from "./internal-path.ts";
+export { returnPathFromLocation, safeInternalPath, type PathParts } from "./internal-path.ts";
 
 export { ApiError, isAbortError, retryAfterSecs } from "./api-error.ts";
 export {

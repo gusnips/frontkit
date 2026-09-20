@@ -105,6 +105,21 @@ describe("createRequireAuth", () => {
     });
   });
 
+  // Point an OAuth `redirectTo` at a guarded route and this is the first render after the provider
+  // returns: no session yet, and the implicit flow's tokens still sitting in the address bar. The
+  // page is worth remembering; the fragment would be a refresh token written into a query string.
+  it("refuses to carry a callback's tokens into the sign-in URL", () => {
+    router.useLocation.mockReturnValueOnce({
+      pathname: "/dashboard",
+      search: "?tab=usage",
+      hash: "#access_token=eyJhbG.p.s&refresh_token=v1_abc&token_type=bearer",
+    });
+    expect(branch(render(guard(false)))).toEqual({
+      to: "/login?next=%2Fdashboard%3Ftab%3Dusage",
+      state: undefined,
+    });
+  });
+
   it("lets a signed-in visitor through", () => {
     expect(branch(render(guard(true)))).toBe("CONTENT");
   });

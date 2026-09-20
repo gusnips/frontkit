@@ -183,6 +183,24 @@ const next = safeInternalPath(new URLSearchParams(location.search).get("next")) 
 
 `createRequireAnonymous` already performs that check and falls back to the home path you gave it.
 
+Writing a return target down is the other direction, and it has its own hazard. A Supabase client
+with no `flowType` is on the **implicit** flow — the default — so a callback comes back as
+`#access_token=…&refresh_token=…`. A guard renders exactly when there is no session yet, which is
+that callback's own state while the client parses the fragment: point an OAuth `redirectTo` at a
+guarded route and a concatenated `pathname + search + hash` puts a refresh token into a query
+string, where it rides in `Referer`, lands in access logs and stays in history.
+
+```ts
+import { returnPathFromLocation } from "@gusnips/react";
+
+// Takes anything shaped like the current page: `window.location`, or `useLocation()`.
+const returnTo = returnPathFromLocation(window.location);
+```
+
+It keeps the page and drops only a fragment carrying a credential, because the page is the part
+worth returning to. `createRequireAuth` uses it; use it anywhere else you record where someone was
+— a dead-session redirect is the common one.
+
 ## Never dead-end anyone
 
 ```ts

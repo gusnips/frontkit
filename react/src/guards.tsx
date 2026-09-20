@@ -1,7 +1,7 @@
 import type { UseQueryResult } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { safeInternalPath } from "./internal-path.ts";
+import { returnPathFromLocation, safeInternalPath } from "./internal-path.ts";
 
 /**
  * Route guards.
@@ -83,8 +83,12 @@ export function createRequireAuth(
     if (!isAuthenticated) {
       // Query state survives a reload, an OAuth round trip and an email-link round trip. Router
       // state survives none of them, so it only looked like a remembered destination on the
-      // password path. The hash belongs too: tabs and anchored settings are real destinations.
-      const returnTo = location.pathname + location.search + location.hash;
+      // password path. The hash belongs too: tabs and anchored settings are real destinations —
+      // but not when it is the round trip itself, which is why this is not a concatenation. This
+      // guard renders exactly when there is no session yet, and that is the state an implicit-flow
+      // callback is in while its client parses the fragment: point an OAuth `redirectTo` at a
+      // guarded route and the raw hash is a refresh token, on its way into a query string.
+      const returnTo = returnPathFromLocation(location);
       return <Navigate to={signInUrl(signInPath, returnTo)} replace />;
     }
     return <>{children}</>;
