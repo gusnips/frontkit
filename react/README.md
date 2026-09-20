@@ -87,6 +87,13 @@ limit both arrive as 429, but one clears by waiting and the other clears by buyi
 second burns another request against the limiter to hear the same thing three times, so you name
 those codes and they are never retried.
 
+You only need that list where your API stays quiet. If it answers `Retry-After: 2`, the wait is
+sat out; past `maxRetryWaitSecs` (10 seconds by default) the wait is the answer and the screen
+says so instead of holding a spinner. And if it sends `details.retryAfterSecs: null`, it is
+saying waiting will never fix this — a cap that frees only when somebody deletes something, a
+slot that frees when another job ends. That `null` is read as the claim it is, not as a field
+somebody forgot, so the code never reaches your list.
+
 ## Survives your deploys
 
 An app with `lazy()` routes serves chunks by hashed filename. Deploy while someone has a tab

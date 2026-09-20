@@ -9,6 +9,14 @@ const refusal = (status: number, code?: string) =>
 const waited = (status: number, secs: number) =>
   new ApiError(status, null, { retryAfterSecs: secs });
 
+/** A refusal whose body says, in so many words, that waiting will never clear it. */
+const never = (status: number) =>
+  new ApiError(status, { code: "LIMIT_REACHED", message: "", details: { retryAfterSecs: null } });
+
+/** The same body with no such key: details, but no claim either way. */
+const silent = (status: number) =>
+  new ApiError(status, { code: "LIMIT_REACHED", message: "", details: { scope: "account" } });
+
 // Invariant 8, and the reason this module exists: three donors wrote three retry rules and
 // each was right about something the other two got wrong. Every case below is one of those.
 describe("shouldRetry", () => {
@@ -54,6 +62,38 @@ describe("shouldRetry", () => {
   // waiting, its status code is not the more specific claim.
   it("lets a durable code override the status", () => {
     expect(shouldRetry(refusal(503, "QUOTA_EXCEEDED"), ["QUOTA_EXCEEDED"])).toBe(false);
+  });
+
+  // The same judgement with the server doing the naming. The server half of this fleet sends
+  // `details.retryAfterSecs: null` on a refusal no amount of time clears — a cap that frees only
+  // when somebody deletes something, a slot that frees when another job ends. Read as "nothing
+  // said how long", which is how every version before this one read it, that 429 gets retried
+  // against a limit that cannot move, and the app has to keep a `durableLimitCodes` entry for a
+  // claim the answer already carries.
+  it("does not retry a refusal whose body says waiting never helps", () => {
+    expect(shouldRetry(never(429))).toBe(false);
+    // And it outranks the status, exactly as a durable code does.
+    expect(shouldRetry(never(503))).toBe(false);
+  });
+
+  // The distinction the rule above rests on: an absent key is silence, not a claim, and silence
+  // has always meant "retry a transient failure". Only a key that is present and `null` is the
+  // claim — which is why this reads `=== null` and not `in`.
+  it("still retries when the body carries details but no stated wait", () => {
+    expect(shouldRetry(silent(500))).toBe(true);
+    expect(shouldRetry(silent(429))).toBe(true);
+  });
+
+  // A header wait and a body `null` contradict each other. The `null` is written by whoever
+  // raised this particular refusal; the number can come from a limiter that attaches one to
+  // every 429 it emits, so the hand-written claim is the more specific one.
+  it("takes an explicit never over a stated wait", () => {
+    const both = new ApiError(
+      429,
+      { code: "LIMIT_REACHED", message: "", details: { retryAfterSecs: null } },
+      { retryAfterSecs: 2 },
+    );
+    expect(shouldRetry(both)).toBe(false);
   });
 
   // The second migration's rule. Its limiter answers `Retry-After: 60` on a per-minute window,

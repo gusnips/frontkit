@@ -1,5 +1,5 @@
 import type { DefaultOptions } from "@tanstack/react-query";
-import { ApiError, retryAfterSecs } from "./api-error.ts";
+import { ApiError, retryAfterSecs, waitingNeverHelps } from "./api-error.ts";
 
 /**
  * react-query defaults — the merge of three repos that each got part of this right.
@@ -21,6 +21,11 @@ import { ApiError, retryAfterSecs } from "./api-error.ts";
  * same limiter, and three seconds added before the screen says anything. So a stated wait is
  * waited out when it is short, and is an ANSWER when it is not.
  *
+ * The fifth rule came from the server half of this fleet rather than from a donor: a refusal can
+ * state that waiting will never fix it at all, by sending `details.retryAfterSecs: null`. Read as
+ * "did not say how long" — which is what every version before this one did — that 429 is retried
+ * against a limit no amount of time moves.
+ *
  * This is invariant 8.
  */
 
@@ -34,6 +39,10 @@ export interface QueryDefaultsOptions {
    * Error codes that mean "this limit does not clear by waiting" — a spent monthly quota, a
    * balance that needs topping up. They usually arrive as 402 or 429; the status alone cannot
    * tell them apart from a burst limit, which is why the caller names them.
+   *
+   * Only needed where the server does not say so itself. One that sends
+   * `details.retryAfterSecs: null` has already made the claim and `shouldRetry` reads it, which
+   * is one entry fewer to keep in step with a backend this app does not own.
    */
   durableLimitCodes?: readonly string[];
   /** How many times to retry a transient failure. Two donors used 2, one used 1. */
@@ -73,6 +82,13 @@ export function shouldRetry(
   if (!(error instanceof ApiError)) return true;
 
   if (error.code !== undefined && durableLimitCodes.includes(error.code)) return false;
+
+  // The same judgement, made by the server instead of by a list the app maintains: an explicit
+  // `details.retryAfterSecs: null` means waiting will never fix this. Checked before the stated
+  // wait because the two can contradict each other, and the `null` is written by whoever raised
+  // this particular refusal where a number can come from a limiter that attaches one to every
+  // 429 it emits.
+  if (waitingNeverHelps(error)) return false;
 
   // It told us when it clears. A wait we are not willing to hold is a refusal, not a hiccup —
   // and it is the same judgement `durableLimitCodes` makes, except the server did the naming.

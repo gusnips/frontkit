@@ -266,6 +266,23 @@ pin them; if one fails, a lesson is being un-learned.
    and the package looked only in `details.retryAfterSecs` — one donor's body convention — so for
    every API that follows the spec, the one refusal that states its expiry read as silent.
 
+   **And a reading that came from the other end of the fleet rather than from a donor: a refusal
+   can state that waiting never helps AT ALL.** For a limit no amount of time clears — a
+   concurrency slot that frees when somebody else's job ends, a cap on live objects that clears
+   by archiving one — the server kit answers with an explicit body `retryAfterSecs` of `null`,
+   and deliberately no header, because a `Retry-After` stating no time is worse than none. Its own words for why
+   that is a value and not an omission: **"an omission is invisible in a diff; a `null` is a
+   claim somebody has to read."** This package could not read it. `retryAfterSecs` answered
+   `null` for "said nothing" and for "said never" alike, so `shouldRetry` fell through to the
+   status and retried a 429 — and a durable 503 — that the server had explicitly said would never
+   clear, while an adopter kept a `durableLimitCodes` entry for that one refusal, which is the
+   hand-maintained list the server's `null` exists to delete. **Two halves of one fleet shipped
+   one value with two readings, and each half is right about its own question.** So the fix is a
+   second, narrow predicate rather than a wider return type: the countdown UIs reading
+   `retryAfterSecs` want `null` for both cases and are correct to. Read the two halves of a fleet
+   against each other the way two donors get read — a client that normalizes an explicit value
+   into an absent one is where a server's deliberate claim disappears.
+
 9. **A wrapper forwards its rest props.** A closed prop list removes `name`, `required`, `form`
    and `data-*` from a form control. Four wrappers in the donor repo did exactly this: they did
    not add form integration, they removed it.

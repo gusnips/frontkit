@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, parseRetryAfter, retryAfterSecs } from "./api-error.ts";
+import { ApiError, parseRetryAfter, retryAfterSecs, waitingNeverHelps } from "./api-error.ts";
 
 /**
  * Two APIs, two places for the same fact: one states the wait in the `Retry-After` header (the
@@ -37,6 +37,51 @@ describe("retryAfterSecs", () => {
     ).toBeNull();
     expect(retryAfterSecs(new ApiError(429, { code: "X", message: "", details: null }))).toBeNull();
     expect(retryAfterSecs(new ApiError(429, null))).toBeNull();
+  });
+
+  // And it keeps answering `null` for a stated never, which is what its callers want: there is
+  // no countdown to show. The claim is a separate question, asked separately.
+  it("answers null for a stated never, same as for silence", () => {
+    const stated = new ApiError(429, {
+      code: "X",
+      message: "",
+      details: { retryAfterSecs: null },
+    });
+    expect(retryAfterSecs(stated)).toBeNull();
+    expect(retryAfterSecs(new ApiError(429, null))).toBeNull();
+  });
+});
+
+/**
+ * The claim `retryAfterSecs` cannot carry: an explicit `null` in the body, meaning waiting will
+ * never fix this. It has to be told apart from an absent key, which is silence.
+ */
+describe("waitingNeverHelps", () => {
+  const withDetails = (details: unknown) => new ApiError(429, { code: "X", message: "", details });
+
+  it("reads a present null as the claim", () => {
+    expect(waitingNeverHelps(withDetails({ retryAfterSecs: null }))).toBe(true);
+  });
+
+  it("reads silence as no claim", () => {
+    expect(waitingNeverHelps(withDetails({ scope: "account" }))).toBe(false);
+    expect(waitingNeverHelps(withDetails({}))).toBe(false);
+    expect(waitingNeverHelps(new ApiError(429, null))).toBe(false);
+  });
+
+  it("reads a stated wait as no claim", () => {
+    expect(waitingNeverHelps(withDetails({ retryAfterSecs: 30 }))).toBe(false);
+    // The header is not a channel for this — there is no `Retry-After` that says "never".
+    expect(waitingNeverHelps(new ApiError(429, null, { retryAfterSecs: 30 }))).toBe(false);
+  });
+
+  // `details` is whatever the server put there, so the shape is a trust boundary. A JSON `null`
+  // is the one that bites: `typeof null` is `"object"`, so a missing guard reads a property off
+  // it and throws inside a retry rule.
+  it("survives a details that is not an object", () => {
+    expect(waitingNeverHelps(withDetails(null))).toBe(false);
+    expect(waitingNeverHelps(withDetails("nope"))).toBe(false);
+    expect(waitingNeverHelps(withDetails(7))).toBe(false);
   });
 });
 

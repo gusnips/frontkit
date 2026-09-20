@@ -70,6 +70,11 @@ export class ApiError extends Error {
  * The header first, because it is the standard one and it is what a limiter emits without being
  * asked; then `details.retryAfterSecs`, which one donor's API sends in the body instead. A
  * caller asking "how long" should not have to know which server it is talking to.
+ *
+ * It deliberately does not answer whether waiting helps at all. `null` here means "no countdown
+ * to show", which is the right answer both for a refusal that said nothing and for one that said
+ * waiting will never fix it — and the adopters' countdown UIs read it for exactly that. Telling
+ * those two apart is {@link waitingNeverHelps}.
  */
 export function retryAfterSecs(error: ApiError): number | null {
   if (error.retryAfterSecs !== undefined) return error.retryAfterSecs;
@@ -77,6 +82,32 @@ export function retryAfterSecs(error: ApiError): number | null {
   if (typeof details !== "object" || details === null) return null;
   const value = (details as { retryAfterSecs?: unknown }).retryAfterSecs;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Did the answer say, in so many words, that waiting will never fix this?
+ *
+ * The server half of this fleet sends `details.retryAfterSecs: null` on a refusal no amount of
+ * time clears — a cap that frees only when somebody deletes something, a concurrency slot that
+ * frees when another job ends. An explicit `null` is a claim somebody has to read; an omitted key
+ * is invisible. That is the whole reason the two must not collapse into one answer: this is the
+ * server naming what `durableLimitCodes` otherwise makes every app name by hand, one code at a
+ * time, and keep in step with a backend it does not own.
+ *
+ * Present-and-`null` is the entire test. An absent key reads as `undefined`, so `=== null`
+ * already separates the claim from the silence and an `in` check would only widen it to every
+ * stated wait. Body-only by design: `Retry-After` has no spelling for "never".
+ *
+ * Not exported from the package, and that is the point: it is not "is this refusal durable?". It
+ * says nothing about a durable CODE or a wait too long to hold, so an error surface branching on
+ * it would answer differently from the retry rule for every limit the app names itself. The one
+ * question worth asking out loud is `shouldRetry`, and `describeError` already derives the
+ * control it offers from exactly that — invariant 8, one rule and two consumers.
+ */
+export function waitingNeverHelps(error: ApiError): boolean {
+  const details = error.details;
+  if (typeof details !== "object" || details === null) return false;
+  return (details as { retryAfterSecs?: unknown }).retryAfterSecs === null;
 }
 
 /**
