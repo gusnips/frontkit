@@ -42,6 +42,30 @@ refusal signs anyone out. Before that split, a Wi-Fi blip logged people out mid-
 not a hang — and a hang leaves someone signed out in name only: every request 401ing, nothing
 left that could redirect it.
 
+### Supabase sessions
+
+```ts
+import { createSupabaseSessionAdapter } from "@gusnips/react/supabase";
+
+const session = createSupabaseSessionAdapter(supabase.auth);
+```
+
+Pass `session` to `createApiClient`. The adapter reads the current token, refreshes it and signs
+out. More importantly, it keeps a network failure separate from GoTrue refusing the refresh token,
+so losing Wi-Fi does not become a logout. It lives behind a subpath because it imports
+`@supabase/supabase-js`; the main entry does not.
+
+Supabase email links have two complete patterns. Keep either one, never half of each:
+
+- A link carrying `token_hash` needs one explicit `verifyOtp` call. Guard it against React
+  StrictMode because the hash is single-use.
+- A link carrying `ConfirmationURL` needs `detectSessionInUrl` enabled. That reader consumes an
+  implicit `#access_token` or a PKCE `?code`; it does not consume `token_hash`.
+
+Recovery and invite links continue to the new-password screen after the session opens. A callback
+must also tell a used or expired link apart from a request that never reached GoTrue: the first
+needs a new link, while the second can retry the same one.
+
 There is also a deadline on every request, which none of the codebases this came from had. A
 request with no timeout is a spinner with no end.
 
@@ -139,6 +163,18 @@ const RequireStaff = requireProfile(
 operator arriving while `/auth/me` is down gets told the page does not exist: the wrong cause, no
 retry, and no request id to quote. A guard has three answers — wait, fail, refuse — and only a
 real `false` reaches the refusal.
+
+`createRequireAuth` sends an anonymous visitor to `?next=`, carrying path, query and hash. The URL
+survives reloads, OAuth and email links; router state does not. Read it through the main entry's
+validator before navigating yourself:
+
+```ts
+import { safeInternalPath } from "@gusnips/react";
+
+const next = safeInternalPath(new URLSearchParams(location.search).get("next")) ?? "/";
+```
+
+`createRequireAnonymous` already performs that check and falls back to the home path you gave it.
 
 ## Never dead-end anyone
 
@@ -254,16 +290,18 @@ something.
 
 ## Subpaths, and what each one costs you
 
-`@gusnips/react` itself needs `react`, `react-dom` and nothing else. Anything that needs more
+`@gusnips/react` itself needs `react` and nothing else. Anything that needs another runtime peer
 lives behind a subpath, so you install a dependency only if you import the thing that uses it:
 
-| Import from               | What is in it                  | What you must have |
-| ------------------------- | ------------------------------ | ------------------ |
-| `@gusnips/react`          | the client and rest            | react, react-dom   |
-| `@gusnips/react/store`    | `createAuthStore`, `authSlice` | zustand            |
-| `@gusnips/react/guards`   | the route guards               | react-router-dom   |
-| `@gusnips/react/ui`       | the seven wrappers             | @base-ui/react     |
-| `@gusnips/react/contract` | two prerender names            | nothing            |
+| Import from               | What is in it                  | What you must have    |
+| ------------------------- | ------------------------------ | --------------------- |
+| `@gusnips/react`          | the client and rest            | react                 |
+| `@gusnips/react/store`    | `createAuthStore`, `authSlice` | zustand               |
+| `@gusnips/react/guards`   | the route guards               | react-router-dom      |
+| `@gusnips/react/hydrate`  | `hydrateOrMount`               | react-dom             |
+| `@gusnips/react/supabase` | the session adapter            | @supabase/supabase-js |
+| `@gusnips/react/ui`       | the seven wrappers             | @base-ui/react        |
+| `@gusnips/react/contract` | two prerender names            | nothing               |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
 point.** An optional peer the barrel imports anyway is not optional — it is a required one whose

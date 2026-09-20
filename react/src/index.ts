@@ -8,10 +8,11 @@
 // with the error moved from install time to the adopter's first build, which is the worse of the
 // two places to find out.
 //
-//   @gusnips/react/ui       the Base UI wrappers   → @base-ui/react
-//   @gusnips/react/store    createAuthStore        → zustand
-//   @gusnips/react/guards   the route guards       → react-router-dom
-//   @gusnips/react/hydrate  hydrateOrMount         → react-dom
+//   @gusnips/react/ui        the Base UI wrappers   → @base-ui/react
+//   @gusnips/react/store     createAuthStore        → zustand
+//   @gusnips/react/guards    the route guards       → react-router-dom
+//   @gusnips/react/hydrate   hydrateOrMount         → react-dom
+//   @gusnips/react/supabase  the session adapter    → @supabase/supabase-js
 //
 // `react-dom` is the one the second migration added, and it is the sharpest case yet: that
 // adopter ships a REACT NATIVE app beside its two web apps, and React Native has no react-dom to
