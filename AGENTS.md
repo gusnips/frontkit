@@ -139,7 +139,10 @@ Per package: `cd react && bun run test`, etc.
 - **And the adopter's half of that pin: the two carets move together, or the install grows a second
   copy of `react`.** That exact pin inside `vite` is reachable through the ADOPTER's `vite` caret,
   so a repo whose `react` caret sits a minor behind gets both. Measured by really installing
-  `{"@gusnips/react": "^0.8.0", "@gusnips/vite": "^0.8.2"}` — two repos carry exactly that — which
+  `{"@gusnips/react": "^0.8.0", "@gusnips/vite": "^0.8.2"}` — two repos carried exactly that when
+  this was written, and **no repo does as of 2026-09-21**; every adopter is on `{^0.9.x, ^0.8.x}`
+  now, in three matched pairs. The install below is still the evidence, and the pairs are what a
+  reader must re-measure rather than take from here — which
   resolves `@gusnips/react` to **0.8.1 and 0.9.2 at once**, because `^0.8.2` floats vite to 0.8.6
   whose pin is `0.9.2` and a caret on a 0.x does not cross a minor. `{"^0.9.0", "^0.8.4"}` installs
   one copy, also measured. Nothing warns: `bun install` is silent, `release:check` reads what the
@@ -1199,6 +1202,20 @@ adopter's history before measuring it.
   no longer needs it. Migration 4 learned to check the range before paying for compatibility; this
   is the same fact from the other side. A guard reaches nobody until each repo deliberately bumps,
   which makes the bump the deliverable, not the guard.
+
+  **Those six numbers are a reading, not a standing fact, and one got quoted as a standing fact
+  six weeks later.** Re-measured 2026-09-21 across every `package.json` on `origin/main`: all
+  thirteen adopters now sit at `^0.9.x` / `^0.8.x`, so a release into 0.9 reaches every one of
+  them without a bump. An agent building the server-side twin was told the opposite — "the
+  deliverable is the bump in each repo" — straight out of this bullet, and would have designed
+  around a problem that no longer exists. The lesson above is unchanged and the list under it
+  expired; what makes it safe to keep is the date beside it. **A version list in this file is
+  evidence for the sentence it appears under, never an answer to ask it for.** The current answer
+  comes from the resolver: install the range into an empty directory and read what lands, which
+  also shows whether two copies come with it.
+
+  And the blocker that replaced it is one this file already names from the other end: atendime
+  declares `^0.9.0` and resolves **0.8.0**, because bumping a version does not update the lock.
 - **The comment that was wrong, and the six lines it cost.** This rig carried a second meta setter
   because a comment said the first one's pattern "cannot see" a tag whose attributes span three
   lines. `[^>]*` is a negated character class; it matches newlines. Run against the real template,
@@ -1364,6 +1381,17 @@ strongest argument yet for auditing after a migration instead of closing the tic
   actually costs there is a destination that still dies on a reload and on an OAuth round trip,
   and a hand-written validator weaker than `safeInternalPath`. The sentence as written would have
   sent somebody to close an exposure that cannot exist, and left the real gap unnamed.
+
+  **Closed 2026-09-21: the third repo is no longer on `^0.8.0`.** It went to `^0.9.4` in the auth
+  pass, which is the bullet's own prescription carried out — the bump was the deliverable, and
+  what it delivered is the missing feature this bullet named rather than a fix to a bug. Its
+  destination now survives a reload and an OAuth round trip, and its hand-written `startsWith("/")`
+  validator is gone; `/\evil.test` walked through that one, since a parser folds the backslash
+  before deciding where the host ends. All three callers of `createRequireAuth` are on 0.9 now.
+
+  **Which makes the numbers in this bullet a dated reading, like the six in migration 9's.** They
+  were re-quoted as current six weeks on and sent another agent to solve a problem that had
+  dissolved. Keep the sentence, date the list, and get the current answer from the resolver.
 
 - **Two plan items did not survive contact with the branch, in opposite directions.** A note to
   check a GoTrue nonce variable before removing it was stale — the repo had already deleted it, and
