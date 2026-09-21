@@ -38,6 +38,26 @@ describe("the address shape", () => {
     expect(EN.splitLocalePath("/terms")).toEqual({ locale: "en", path: "/terms" });
   });
 
+  it("reads a localized root with or without a trailing slash as /", () => {
+    // The prerender's filenames, the router's basename and the hydration marker all lean on
+    // this: a host that normalizes one form to the other must not change which page it is.
+    expect(EN.splitLocalePath("/pt")).toEqual({ locale: "pt-BR", path: "/" });
+    expect(EN.splitLocalePath("/pt/")).toEqual({ locale: "pt-BR", path: "/" });
+  });
+
+  it("does not answer to a region-coded segment", () => {
+    // One donor moved from `/pt-br` to `/pt` and 301s the old form at the edge. The app must
+    // NOT resolve it as a second spelling — two live addresses for one page is the duplicate a
+    // canonical exists to prevent.
+    expect(EN.splitLocalePath("/pt-br/terms").locale).toBe("en");
+  });
+
+  it("never emits a capital in a segment, for any locale in the list", () => {
+    for (const locale of ["en", "pt-BR", "es"] as const) {
+      expect(EN.localeSegment(locale)).toBe(EN.localeSegment(locale).toLowerCase());
+    }
+  });
+
   it("matches the segment, not the tag", () => {
     // Comparing a pathname to the locale list by string equality is how `/pt` fails to match
     // `pt-BR`. The regionless segment is what is in the address.
