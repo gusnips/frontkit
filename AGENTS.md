@@ -258,6 +258,16 @@ pin them; if one fails, a lesson is being un-learned.
    versions — and 2.106, the one line where the status clause is the only thing catching
    GoTrue's own 500, is what four of them resolve today.
 
+   **The copy of this rule most likely to be wrong is a comment naming a version.** Writing the
+   number down is what makes the clause's reason checkable, and it is also what makes it rot. Of
+   the fleet's ten comments carrying an auth-js version, nine measure true and one said "the
+   installed 2.106" in a repo resolving **2.108.2** — the number carried from the four repos on
+   2.106 without being re-read, in a comment written the same day as this rule, stating a reason
+   ("a plain 500 is on no list") that was false where it sat. The code was right and its
+   justification was the part a future reader would have acted on. So: name a version only where
+   it is load-bearing, say how to check it (`bun why`, which prints one heading per RESOLVED
+   version), and measure it in the tree the comment is going into — not the one you measured last.
+
    What it costs when the clause is missing: four backends in the fleet answered **401 to their
    own auth provider's 500**, and every client reads a 401 as a dead session, so one bad minute
    at auth signed out everybody signed in.
