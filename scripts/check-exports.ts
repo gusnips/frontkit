@@ -31,7 +31,7 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
-const PACKAGES = ["tokens", "http", "react", "vite"];
+const PACKAGES = ["tokens", "http", "locale", "react", "vite"];
 
 interface PackageJson {
   name: string;

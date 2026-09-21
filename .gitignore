@@ -12,6 +12,7 @@ tokens/.compile-check
 # shows and a reader landing on @gusnips/tokens needs a CSS import, not `bun add @gusnips/react`.
 tokens/LICENSE
 http/LICENSE
+locale/LICENSE
 react/LICENSE
 vite/LICENSE
 

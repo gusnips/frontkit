@@ -49,6 +49,7 @@ const BROWSER_RULE: Rule = {
 /** Which rules apply where. A package missing from this map is not checked. */
 const PACKAGES: Record<string, Rule[]> = {
   http: [NODE_RULE, BROWSER_RULE],
+  locale: [NODE_RULE, BROWSER_RULE],
   react: [NODE_RULE],
   // vite/ is deliberately absent — it is the package that gets to touch the filesystem.
 };

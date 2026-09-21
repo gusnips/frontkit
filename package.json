@@ -6,6 +6,7 @@
   "workspaces": [
     "tokens",
     "http",
+    "locale",
     "react",
     "vite"
   ],
@@ -13,7 +14,7 @@
     "build": "bun run --filter '*' build",
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",
-    "lint": "eslint tokens http react vite",
+    "lint": "eslint tokens http locale react vite",
     "purity": "bun run scripts/check-purity.ts",
     "exports": "bun run scripts/check-exports.ts",
     "release:check": "bun run scripts/check-release.ts",

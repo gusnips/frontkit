@@ -22,6 +22,14 @@
         "vitest": "^4.1.2",
       },
     },
+    "locale": {
+      "name": "@gusnips/locale",
+      "version": "0.1.0",
+      "devDependencies": {
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.2",
+      },
+    },
     "react": {
       "name": "@gusnips/react",
       "version": "0.9.2",
@@ -177,6 +185,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
     "@gusnips/http": ["@gusnips/http@workspace:http"],
+
+    "@gusnips/locale": ["@gusnips/locale@workspace:locale"],
 
     "@gusnips/react": ["@gusnips/react@workspace:react"],
 
