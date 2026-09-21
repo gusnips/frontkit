@@ -276,6 +276,20 @@ pin them; if one fails, a lesson is being un-learned.
    call: Firebase Hosting redirects the other way by default and serves the directory form as
    itself with `trailingSlash: false`. A redirect costs twice, once for the crawler and once in the
    entry, where the address bar stops matching the route the file names (invariant 2).
+
+   **And an app advertises addresses in its own LINKS, not only in its head.** One adopter's
+   canonicals and both its sitemaps were already right on this rule, and every page still carried
+   a hand-written link to the bare `/docs` — 16 of them, written that way because it reads tidier
+   than `/docs/`, on the likeliest first click into a reference that lives under a path prefix.
+   The host answers it with a 308. A sitemap is walked once by a crawler; a link in the body is
+   what a reader presses, so the rule covers both and the check is `curl -I` on the link, not a
+   re-read of the canonical. This is also why `localeUrl` returns `origin + "/"` for the default
+   locale's root rather than the bare origin: the caller passed `"/"` as the path, so dropping it
+   is the helper discarding an argument to look tidier — the same instinct, one layer down. The
+   planned finding here was a decline, on the reasoning that the helper would break a deliberate
+   bare form; the host said the bare form had always been a redirect. **Measure the blocker
+   before you design around it.**
+
 6. **`og:locale` is not optional on a non-English page.** Absent, the Open Graph spec does not
    default it to "unknown" — it defaults to `en_US`, so a Portuguese page with a Portuguese
    `og:title` tells every share crawler the card is English.
