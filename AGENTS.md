@@ -140,8 +140,14 @@ Per package: `cd react && bun run test`, etc.
   copy of `react`.** That exact pin inside `vite` is reachable through the ADOPTER's `vite` caret,
   so a repo whose `react` caret sits a minor behind gets both. Measured by really installing
   `{"@gusnips/react": "^0.8.0", "@gusnips/vite": "^0.8.2"}` — two repos carried exactly that when
-  this was written, and **no repo does as of 2026-09-21**; every adopter is on `{^0.9.x, ^0.8.x}`
-  now, in three matched pairs. The install below is still the evidence, and the pairs are what a
+  this was written. **This sentence then said no repo did any more, and that was false.**
+  Re-measured 2026-09-21 against every `package.json` in the fleet: **six still declared
+  `@gusnips/react` at `^0.8.0`**, so none of them could receive anything released into 0.9 at all.
+  The correction that replaced it was written the same afternoon as the claim it corrected, and
+  was wrong in the opposite direction — first the carets were read as older than they were, then
+  as newer. **Both readings came from quoting a list instead of installing one.** All thirteen
+  were bumped in one pass that day; twelve now sit on `{^0.9.5, ^0.8.9}` and the thirteenth has no
+  `vite`. The install below is still the evidence, and the pairs are what a
   reader must re-measure rather than take from here — which
   resolves `@gusnips/react` to **0.8.1 and 0.9.2 at once**, because `^0.8.2` floats vite to 0.8.6
   whose pin is `0.9.2` and a caret on a 0.x does not cross a minor. `{"^0.9.0", "^0.8.4"}` installs
@@ -311,6 +317,23 @@ pin them; if one fails, a lesson is being un-learned.
    third time. Only the client half: several of the copies live in an `apps/api` or a
    `packages/server`, and a server must not depend on a package named react. That half belongs to
    the server kit, which already re-exports the vendor's predicate and needs the clause beside it.
+
+   **And exporting it moved the hazard: `isAuthOutage(null)` answered true.** Inside the package
+   that was never reachable — `reachedAuth` filters with `error === null ||` before it asks — so a
+   green suite kept it through the release. But `null` is the SUCCESS value of every supabase-js
+   auth call, and the whole point of exporting the test is that adopters write
+   `if (isAuthOutage(error))` around a `{ data, error }` result. That put "auth is down" on top of
+   every success. The tell was the same one that produced the export: an adopter had already
+   written the guard at its own call site (`!(error !== null && isAuthOutage(error))`), which is
+   migration 2's rule pointing at a function that exists because of migration 2's rule. Fixed in
+   0.9.5. **A predicate that is only ever fed a caught error has a different contract from one
+   anybody may call**, and publishing it is what changes which contract it is under.
+
+   The sibling reading is worth keeping beside it, because the two copies of this predicate in the
+   fleet answer the OPPOSITE way for the same input and both are right: in a browser, a throw that
+   is not an `AuthError` is a fetch `TypeError` or a CORS refusal — not auth answering, so `true`.
+   On a server the same `catch` wraps a database lookup, where a driver error is not an auth
+   outage, so `false`. One name, two call sites, two correct answers; do not "reconcile" them.
 
    **The same clause is wrong one step later, at the sentence.** "Check your connection" is true
    of a request that never landed and false of a 5xx, which is ours. auth-js marks "nothing came
@@ -1388,7 +1411,20 @@ strongest argument yet for auditing after a migration instead of closing the tic
   what it delivered is the missing feature this bullet named rather than a fix to a bug. Its
   destination now survives a reload and an OAuth round trip, and its hand-written `startsWith("/")`
   validator is gone; `/\evil.test` walked through that one, since a parser folds the backslash
-  before deciding where the host ends. All three callers of `createRequireAuth` are on 0.9 now.
+  before deciding where the host ends.
+
+  **And the sentence that closed this bullet — "all three callers of `createRequireAuth` are on
+  0.9 now" — was false the moment it was written.** It counted the repo that had just been bumped
+  and assumed that was the one the bullet had named at `^0.8.0`. It was not. The third caller sat
+  at `^0.8.0` until 2026-09-21, and by then it had already merged a reader that imports
+  `AUTH_RETURN_PARAM` from `@gusnips/react/guards` — a symbol that first shipped in **0.9.0**, so
+  that repo's typecheck could not pass and its sign-in destinations were being dropped: the guard
+  it had installed still wrote router state, and the login was reading a query parameter. Checked
+  against the published 0.8.0 tarball, whose `guards.d.ts` exports three factories and nothing
+  else, rather than against the changelog. Bumped the same day; all three callers are on 0.9.5 as
+  of 2026-09-21. **A repo that merges the reader and leaves the caret is the same bug as a repo
+  that ships the guard nobody can install** — both halves have to move, and only one of them is in
+  the diff you are reading.
 
   **Which makes the numbers in this bullet a dated reading, like the six in migration 9's.** They
   were re-quoted as current six weeks on and sent another agent to solve a problem that had
