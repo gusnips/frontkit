@@ -34,7 +34,7 @@ interface Rule {
 
 const NODE_RULE: Rule = {
   pattern:
-    /(?:from\s+['"]|import\s*\(\s*['"]|require\s*\(\s*['"])(?:node:)?(?:fs|path|os|child_process|crypto|net|http|https|stream|buffer|worker_threads|cluster|dns|tls|dgram|readline|vm|zlib|util|url|querystring|assert|events|process)(?:\/[^'"]*)?['"]|(?:^|[^.\w$])(?:process\.env|Buffer)\b/,
+    /(?:from\s+['"]|import\s*\(\s*['"]|import\s+['"]|require\s*\(\s*['"])(?:node:)?(?:fs|path|os|child_process|crypto|net|http|https|stream|buffer|worker_threads|cluster|dns|tls|dgram|readline|vm|zlib|util|url|querystring|assert|events|process)(?:\/[^'"]*)?['"]|(?:^|[^.\w$])(?:process\.env|Buffer)\b/,
   category: "node",
   description: "Node.js built-in or global",
 };
@@ -52,6 +52,9 @@ const PACKAGES: Record<string, Rule[]> = {
   locale: [NODE_RULE, BROWSER_RULE],
   react: [NODE_RULE],
   // vite/ is deliberately absent — it is the package that gets to touch the filesystem.
+  // tokens/ too, and for a different reason worth saying rather than leaving as a gap in a map:
+  // it ships no JavaScript at all, so its only `.ts` is the build-time Tailwind compile check,
+  // which is a script and reads files by design.
 };
 
 const TEST_FILE = /(?:^|\/)(?:__tests__\/|[^/]+\.test\.tsx?$)/;
