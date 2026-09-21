@@ -4,7 +4,11 @@ import {
   AuthRetryableFetchError,
 } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
-import { createSupabaseSessionAdapter, type SupabaseSessionAuth } from "./supabase-session.ts";
+import {
+  createSupabaseSessionAdapter,
+  isAuthOutage,
+  type SupabaseSessionAuth,
+} from "./supabase-session.ts";
 
 function auth(overrides: Partial<SupabaseSessionAuth> = {}): SupabaseSessionAuth {
   return {
@@ -101,5 +105,29 @@ describe("createSupabaseSessionAdapter", () => {
 
     await expect(adapter.signOut()).rejects.toBe(refusal);
     expect(signOut).toHaveBeenCalledOnce();
+  });
+});
+
+describe("isAuthOutage", () => {
+  it("lets a real refusal through as an answer", () => {
+    expect(
+      isAuthOutage(new AuthApiError("Invalid login credentials", 400, "invalid_credentials")),
+    ).toBe(false);
+    expect(
+      isAuthOutage(new AuthApiError("Token has expired or is invalid", 403, "otp_expired")),
+    ).toBe(false);
+  });
+
+  it("refuses to read a failure as an answer", () => {
+    // Nothing came back, and the two shapes that carries.
+    expect(isAuthOutage(new AuthRetryableFetchError("Failed to fetch", 0))).toBe(true);
+    expect(isAuthOutage(new TypeError("Load failed"))).toBe(true);
+    // A gateway between us and GoTrue, which auth-js wraps by name.
+    expect(isAuthOutage(new AuthRetryableFetchError("Bad Gateway", 502))).toBe(true);
+    // And the reason the status clause is not redundant: the statuses earning that name are a
+    // LIST, so it has holes at every version. 507 and 599 are on no version of it, and arrive
+    // as ordinary AuthApiErrors that `isAuthRetryableFetchError` answers false for.
+    expect(isAuthOutage(new AuthApiError("Insufficient Storage", 507, undefined))).toBe(true);
+    expect(isAuthOutage(new AuthApiError("Network Connect Timeout", 599, undefined))).toBe(true);
   });
 });

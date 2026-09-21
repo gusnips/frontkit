@@ -17,19 +17,43 @@ type _SupabaseAuthFitsAdapter = Satisfied<
   SupabaseClient["auth"] extends SupabaseSessionAuth ? true : false
 >;
 
+/**
+ * Auth FAILED rather than answered, so nothing is known about the credential it was handed:
+ * either the request never landed, or GoTrue failed on its own.
+ *
+ * This is the question every site that ends a session has to ask — a token refresh, an API
+ * door, and a callback choosing between "try again" and "that link is spent". Without it one
+ * bad minute at GoTrue signs out everybody whose token happened to need refreshing, and tells
+ * everybody clicking a recovery link that it has expired, which sends them to ask the service
+ * that is down for a replacement.
+ *
+ * Both clauses carry weight, and the second is why this is a function rather than one call.
+ * `isAuthRetryableFetchError` is a NAME check, and the statuses that earn that name are a list
+ * auth-js owns. The list has drifted — 502, 503 and 504 at 2.91; those plus the 52x family and
+ * still no 500 at 2.106; 500 through 530 at 2.108 — so code leaning on it alone is right at
+ * whichever version happens to be installed, which is not the same as being right, and a fleet
+ * installs several versions at once. It is also a LIST rather than a range, so it has holes at
+ * every version, drift or no drift: at 2.112 nothing covers 505 through 519 or 531 up, and a
+ * 507 or a 599 out of a proxy in front of GoTrue arrives as a plain `AuthApiError`. Pinning a
+ * recent SDK does not make the status clause redundant.
+ *
+ * Read the version a tree really serves with `bun why @supabase/auth-js`, which prints one
+ * heading per RESOLVED version; `node_modules` keeps copies the resolver does not serve.
+ *
+ * Anything that is not an auth error at all answers true: a failure from outside auth-js is not
+ * a verdict on the credential either.
+ */
+export function isAuthOutage(error: unknown): boolean {
+  if (!isAuthError(error)) return true;
+  return isAuthRetryableFetchError(error) || (error.status ?? 0) >= 500;
+}
+
 function reachedAuth(error: unknown): boolean {
-  if (!isAuthError(error) || isAuthRetryableFetchError(error)) return false;
-  // A 5xx is auth failing, not auth answering — and the vendor's predicate above cannot be
-  // relied on to say so, because it reads a list it owns and has already changed: at auth-js
-  // 2.91 it covered 502, 503 and 504, at 2.106 those plus the 52x family and still no 500, and
-  // at 2.108 it covers 500 through 530. Code leaning on it alone is right at whichever version
-  // happens to be installed, which is not the same as being right — and a fleet installs
-  // several versions at once, so "we are on a new one" is not the answer either.
-  //
-  // Without this clause one bad minute at GoTrue signs out everybody whose token happened to
-  // need refreshing. Measured across the fleet: four backends answered 401 to their own auth
-  // provider's 500 for exactly this reason.
-  if ((error.status ?? 0) >= 500) return false;
+  // Measured across the fleet: four backends answered 401 to their own auth provider's 500,
+  // and every client reads a 401 as a dead session, so one bad minute at auth signed out
+  // everybody who was signed in. `isAuthError` leads only for the narrowing below —
+  // `isAuthOutage` already answers true for anything that is not an auth error.
+  if (!isAuthError(error) || isAuthOutage(error)) return false;
   // Newer clients name a refresh that reached GoTrue but was deliberately discarded because the
   // local session changed mid-flight. That race is a no-op, not proof that either session died.
   return error.name !== "AuthRefreshDiscardedError";

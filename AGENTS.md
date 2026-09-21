@@ -258,6 +258,15 @@ pin them; if one fails, a lesson is being un-learned.
    versions — and 2.106, the one line where the status clause is the only thing catching
    GoTrue's own 500, is what four of them resolve today.
 
+   **And it is a LIST, not a range, so it has holes at every version — drift is not the only
+   argument.** At 2.112.4 it reads 500-504 and 520-530: nothing covers 505 through 519, nothing
+   covers 531 up. A 507 or a 599 out of a proxy in front of GoTrue arrives as a plain
+   `AuthApiError`, and the vendor's predicate answers false for it at every version ever shipped.
+   That matters because the drift argument invites exactly one reply — "then pin a recent SDK and
+   drop the redundant clause" — and this closes it. `isAuthRetryableFetchError` is a NAME check;
+   the statuses that earn the name are chosen where auth-js CONSTRUCTS the error, which is the
+   file to read when this needs measuring again, not the predicate.
+
    **The copy of this rule most likely to be wrong is a comment naming a version.** Writing the
    number down is what makes the clause's reason checkable, and it is also what makes it rot —
    and it does not rot alone, it gets COPIED, because such a sentence reads like a fact about the
@@ -277,6 +286,15 @@ pin them; if one fails, a lesson is being un-learned.
    predicate, list each version literal in it and print `bun why` beside it. A claim about the
    fleet is worth exactly the sweep that produced it.
 
+   **The third false one named no version at all, and that is the harder half.** An adopter's
+   test said a plain 500 "is on no version of the SDK's retryable list, so it arrives as an
+   ordinary AuthApiError" — false in its own tree, where 500 IS on the list and arrives as an
+   `AuthRetryableFetchError`. So the test was building the wrong shape to stand for the thing it
+   was about, and its assertion held for a reason the sentence beside it got wrong. **"No version"
+   is a version claim**, and it walks straight through the gate above, which looks for a version
+   LITERAL. The gate finds the claims that rot; it cannot find the ones that were never
+   measurable in the first place, and those are the ones stated most confidently.
+
    What it costs when the clause is missing: four backends in the fleet answered **401 to their
    own auth provider's 500**, and every client reads a 401 as a dead session, so one bad minute
    at auth signed out everybody signed in.
@@ -284,6 +302,12 @@ pin them; if one fails, a lesson is being un-learned.
    The shape is `isAuthRetryableFetchError(e) || (e.status ?? 0) >= 500`, and it belongs at
    every site that decides whether a session is over — the adapter's `reachedAuth`, the API
    door, and a callback that chooses between "retry" and "that link is spent".
+
+   **`@gusnips/react/supabase` exports it as `isAuthOutage`**, because five adopters had written
+   those same four tokens by hand and a sixth was about to — migration 2's rule, arriving for the
+   third time. Only the client half: several of the copies live in an `apps/api` or a
+   `packages/server`, and a server must not depend on a package named react. That half belongs to
+   the server kit, which already re-exports the vendor's predicate and needs the clause beside it.
 
    **The same clause is wrong one step later, at the sentence.** "Check your connection" is true
    of a request that never landed and false of a 5xx, which is ours. auth-js marks "nothing came

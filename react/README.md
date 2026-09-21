@@ -57,6 +57,24 @@ out. More importantly, it keeps a network failure separate from GoTrue refusing 
 so losing Wi-Fi does not become a logout. It lives behind a subpath because it imports
 `@supabase/supabase-js`; the main entry does not.
 
+The test it makes that decision with is exported, because a refresh is not the only place an app
+asks it:
+
+```ts
+import { isAuthOutage } from "@gusnips/react/supabase";
+
+// A callback that just failed to trade its one-use link.
+if (isAuthOutage(error))
+  showRetry(); // the link was never spent — the same one still works
+else showLinkSpent(); // auth said no: only a new link helps
+```
+
+`isAuthOutage` is true when auth FAILED rather than answered — a request that never landed, or a
+5xx. Only a real refusal is an answer, and only an answer may end a session or a link. Use it
+anywhere that decision is made; the sentence you show is a separate question, and a narrower one
+— "check your connection" is true of a request that never landed and false of a 502, which is
+ours. auth-js marks "nothing came back", and only that, with status 0.
+
 Supabase email links have two complete patterns. Keep either one, never half of each:
 
 - A link carrying `token_hash` needs one explicit `verifyOtp` call. Guard it against React
