@@ -1216,6 +1216,7 @@ adopter's history before measuring it.
 
   And the blocker that replaced it is one this file already names from the other end: atendime
   declares `^0.9.0` and resolves **0.8.0**, because bumping a version does not update the lock.
+
 - **The comment that was wrong, and the six lines it cost.** This rig carried a second meta setter
   because a comment said the first one's pattern "cannot see" a tag whose attributes span three
   lines. `[^>]*` is a negated character class; it matches newlines. Run against the real template,
