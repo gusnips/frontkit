@@ -21,11 +21,14 @@ function reachedAuth(error: unknown): boolean {
   if (!isAuthError(error) || isAuthRetryableFetchError(error)) return false;
   // A 5xx is auth failing, not auth answering — and the vendor's predicate above cannot be
   // relied on to say so, because it reads a list it owns and has already changed: at auth-js
-  // 2.91 it covered 502, 503 and 504, and at 2.108 it covers 500 through 530. Code leaning on
-  // it alone is right at whichever version happens to be installed, which is not the same as
-  // being right. Without this clause one bad minute at GoTrue signs out everybody whose token
-  // happened to need refreshing. Measured across the fleet: four backends answered 401 to
-  // their own auth provider's 500 for exactly this reason.
+  // 2.91 it covered 502, 503 and 504, at 2.106 those plus the 52x family and still no 500, and
+  // at 2.108 it covers 500 through 530. Code leaning on it alone is right at whichever version
+  // happens to be installed, which is not the same as being right — and a fleet installs
+  // several versions at once, so "we are on a new one" is not the answer either.
+  //
+  // Without this clause one bad minute at GoTrue signs out everybody whose token happened to
+  // need refreshing. Measured across the fleet: four backends answered 401 to their own auth
+  // provider's 500 for exactly this reason.
   if ((error.status ?? 0) >= 500) return false;
   // Newer clients name a refresh that reached GoTrue but was deliberately discarded because the
   // local session changed mid-flight. That race is a no-op, not proof that either session died.

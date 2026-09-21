@@ -250,20 +250,33 @@ pin them; if one fails, a lesson is being un-learned.
 
    **A 5xx is auth failing, not auth answering, and the vendor's own predicate must not be
    trusted to say so.** `isAuthRetryableFetchError` reads a list its library owns and has already
-   changed — 502, 503 and 504 at auth-js 2.91; 500 through 530 at 2.108 — so a copy leaning on it
-   alone is correct at whichever version happens to be installed, which is not the same as being
-   correct. Measured across the fleet: four backends answered **401 to their own auth provider's
-   500**, and every client in the fleet reads a 401 as a dead session, so one bad minute at auth
-   signed out everybody signed in. The shape is `isAuthRetryableFetchError(e) || (e.status ?? 0)
+   changed — 502, 503 and 504 at auth-js 2.91; those plus the 52x family and still **no 500** at
+   2.106; 500 through 530 at 2.108 — so a copy leaning on it alone is correct at whichever
+   version happens to be installed, which is not the same as being correct. Nor is "newer is
+   wider" a fact to lean on: a fleet installs several versions at once, so the version is read
+   off the tree the app builds against, per repo, and never off a changelog. Twelve repos, five
+   versions — and 2.106, the one line where the status clause is the only thing catching
+   GoTrue's own 500, is what four of them resolve today.
 
-   > = 500`, and it belongs at every site that decides whether a session is over — the adapter's
-`reachedAuth`, the API door, and a callback that chooses between "retry" and "that link is
-   > spent".
+   What it costs when the clause is missing: four backends in the fleet answered **401 to their
+   own auth provider's 500**, and every client reads a 401 as a dead session, so one bad minute
+   at auth signed out everybody signed in.
+
+   The shape is `isAuthRetryableFetchError(e) || (e.status ?? 0) >= 500`, and it belongs at
+   every site that decides whether a session is over — the adapter's `reachedAuth`, the API
+   door, and a callback that chooses between "retry" and "that link is spent".
 
    **The same clause is wrong one step later, at the sentence.** "Check your connection" is true
-   of a request that never landed and false of a 5xx, which is ours. Widen the decision, keep the
-   copy narrow, and let the 5xx fall to the generic line — four repos have both call sites in one
-   file, so the two are easy to conflate.
+   of a request that never landed and false of a 5xx, which is ours. auth-js marks "nothing came
+   back", and only that, with **status 0** — so the copy splits on the status and never on the
+   class, which is the one test that stays right as the vendor's list moves. Four repos have both
+   call sites in one file, so the two are easy to conflate.
+
+   And this said "let the 5xx fall to the generic line", which is the floor rather than the
+   answer: "something went wrong" tells a reader nothing to do next, and what a 5xx out of auth
+   needs is its own sentence — our side failed, wait a moment, the button beside this works.
+   Applying the rule across the fleet is what turned that up; the generic line is where a 5xx
+   must not stay, not where it belongs.
 
 4. **A failed query is not an answer.** `!me?.isStaff` reads a 500 as "not staff", so an
    operator arriving while `/auth/me` is down is told the page does not exist — the wrong cause,
