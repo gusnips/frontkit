@@ -67,6 +67,20 @@ describe("createSupabaseSessionAdapter", () => {
     await expect(thrown.refresh()).resolves.toEqual({ token: null, reachedAuth: true });
   });
 
+  it("keeps the session when auth answers with a failure of its own", async () => {
+    // `isAuthRetryableFetchError` says false for this one — it is an API error, not a fetch
+    // failure — so what holds the session is the status clause beside it. A 5xx is auth
+    // failing, never auth answering, and reading it as an answer signs the person out.
+    const outage = new AuthApiError("Internal Server Error", 500, undefined);
+    const adapter = createSupabaseSessionAdapter(
+      auth({
+        refreshSession: async () => ({ data: { session: null }, error: outage }),
+      }),
+    );
+
+    await expect(adapter.refresh()).resolves.toEqual({ token: null, reachedAuth: false });
+  });
+
   it("does not kill a session whose rotated refresh was discarded after a local race", async () => {
     const adapter = createSupabaseSessionAdapter(
       auth({

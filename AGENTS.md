@@ -247,6 +247,24 @@ pin them; if one fails, a lesson is being un-learned.
    Wi-Fi blip logs the user out mid-load. And a sign-out needs a fail-safe timer: awaiting
    `signOut()` before redirecting covers a rejection, not a hang, and a hang leaves someone
    signed out in name only — every request 401ing, nothing left that could redirect it.
+
+   **A 5xx is auth failing, not auth answering, and the vendor's own predicate must not be
+   trusted to say so.** `isAuthRetryableFetchError` reads a list its library owns and has already
+   changed — 502, 503 and 504 at auth-js 2.91; 500 through 530 at 2.108 — so a copy leaning on it
+   alone is correct at whichever version happens to be installed, which is not the same as being
+   correct. Measured across the fleet: four backends answered **401 to their own auth provider's
+   500**, and every client in the fleet reads a 401 as a dead session, so one bad minute at auth
+   signed out everybody signed in. The shape is `isAuthRetryableFetchError(e) || (e.status ?? 0)
+
+   > = 500`, and it belongs at every site that decides whether a session is over — the adapter's
+`reachedAuth`, the API door, and a callback that chooses between "retry" and "that link is
+   > spent".
+
+   **The same clause is wrong one step later, at the sentence.** "Check your connection" is true
+   of a request that never landed and false of a 5xx, which is ours. Widen the decision, keep the
+   copy narrow, and let the 5xx fall to the generic line — four repos have both call sites in one
+   file, so the two are easy to conflate.
+
 4. **A failed query is not an answer.** `!me?.isStaff` reads a 500 as "not staff", so an
    operator arriving while `/auth/me` is down is told the page does not exist — the wrong cause,
    no retry, no request id to quote. A guard decides between waiting, failing and answering; only

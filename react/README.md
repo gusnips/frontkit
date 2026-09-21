@@ -34,9 +34,11 @@ token when you use it, so the losers of that race each invalidate the winner —
 signed out in the middle of a load that was working. Three separate codebases arrived at
 single-flight refresh independently. This is that.
 
-**A refresh that never reached the server is not a "no".** Dropping a packet tells you nothing
-about whether a session is good. So `refresh()` answers `{ token, reachedAuth }`, and only a real
-refusal signs anyone out. Before that split, a Wi-Fi blip logged people out mid-load.
+**Only auth ANSWERING is a "no".** Dropping a packet tells you nothing about whether a session is
+good, and neither does a 500 — that is auth failing, not auth answering. So `refresh()` answers
+`{ token, reachedAuth }`, and only a real refusal signs anyone out. Before that split, a Wi-Fi
+blip logged people out mid-load; without the second half, one bad minute at the auth server signs
+out everybody whose token happened to need refreshing.
 
 **A sign-out has a fail-safe timer.** Awaiting `signOut()` before redirecting covers a rejection,
 not a hang — and a hang leaves someone signed out in name only: every request 401ing, nothing
@@ -63,8 +65,9 @@ Supabase email links have two complete patterns. Keep either one, never half of 
   implicit `#access_token` or a PKCE `?code`; it does not consume `token_hash`.
 
 Recovery and invite links continue to the new-password screen after the session opens. A callback
-must also tell a used or expired link apart from a request that never reached GoTrue: the first
-needs a new link, while the second can retry the same one.
+must also tell a used or expired link apart from a request that never landed — or one that landed
+and came back 5xx: the first needs a new link, and the other two can retry the same one, because
+the hash was never spent.
 
 There is also a deadline on every request, which none of the codebases this came from had. A
 request with no timeout is a spinner with no end.
