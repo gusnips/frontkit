@@ -1348,12 +1348,23 @@ strongest argument yet for auditing after a migration instead of closing the tic
   `?next=` used `startsWith("/")` under a comment promising it would "never follow an external
   URL". It would: a parser folds `//evil.test` and `/\evil.test` into another origin and strips a
   tab before deciding. The comment was the tell — a claim the code one line below does not deliver.
-- **A guard reaches nobody until the caret lets it.** The two repos that call `createRequireAuth`
-  sit at `^0.9.0` and `^0.8.0`. The first takes 0.9.2 on its next lockfile update; the second
-  **cannot receive it at all**, because a caret on a 0.x does not cross a minor — and it is the one
-  whose `redirectTo` points at a guarded route, so it holds the live instance. Migration 9 learned
-  this from the guard's side; this is the same fact from the bug's side, and it makes the bump the
-  deliverable rather than the release.
+- **A guard reaches nobody until the caret lets it.** Three repos call `createRequireAuth`, at
+  `^0.9.3`, `^0.9.2` and `^0.8.0`. The two on 0.9 take the fix on their next lockfile update; the
+  third **cannot receive it at all**, because a caret on a 0.x does not cross a minor. Migration 9
+  learned this from the guard's side; this is the same fact from the bug's side, and it makes the
+  bump the deliverable rather than the release.
+
+  **This bullet first said two repos, and said the one stuck at `^0.8.0` therefore held the live
+  instance. Both halves were wrong, and only re-measuring said so.** Three repos call the guard,
+  not two — the third adopted after the count was taken, which is what a count does. And the repo
+  that cannot receive the fix is the one that never received the BUG: at 0.8.x the guard wrote
+  `pathname + search` into ROUTER STATE, with no hash and no query string, so the leak arrived
+  with 0.9.0 and left with 0.9.2, and that caret spans neither. Its `redirectTo` points at an
+  unguarded route besides. **A stale caret is a missing FEATURE, not a retained bug** — what it
+  actually costs there is a destination that still dies on a reload and on an OAuth round trip,
+  and a hand-written validator weaker than `safeInternalPath`. The sentence as written would have
+  sent somebody to close an exposure that cannot exist, and left the real gap unnamed.
+
 - **Two plan items did not survive contact with the branch, in opposite directions.** A note to
   check a GoTrue nonce variable before removing it was stale — the repo had already deleted it, and
   the local checkout was 58 commits behind, which is the only reason the note looked live. The
