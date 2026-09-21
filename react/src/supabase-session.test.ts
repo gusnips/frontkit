@@ -2,6 +2,7 @@ import {
   AuthApiError,
   AuthRefreshDiscardedError,
   AuthRetryableFetchError,
+  AuthUnknownError,
 } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -129,5 +130,27 @@ describe("isAuthOutage", () => {
     // as ordinary AuthApiErrors that `isAuthRetryableFetchError` answers false for.
     expect(isAuthOutage(new AuthApiError("Insufficient Storage", 507, undefined))).toBe(true);
     expect(isAuthOutage(new AuthApiError("Network Connect Timeout", 599, undefined))).toBe(true);
+  });
+
+  it("reads nothing-went-wrong as nothing went wrong", () => {
+    // `null` is the SUCCESS value of every supabase-js auth call, and this function is
+    // exported, so the obvious `if (isAuthOutage(error))` around a `getUser()` result has to
+    // be safe. Before this, it answered true and put an outage on screen over every success.
+    // One adopter had already written the guard at its own call site, which is what a missing
+    // check in here looks like from the outside.
+    expect(isAuthOutage(null)).toBe(false);
+    expect(isAuthOutage(undefined)).toBe(false);
+  });
+
+  it("stays narrow for an error auth-js could not read", () => {
+    // AuthUnknownError is raised whenever the body does not parse as JSON, at ANY status, and
+    // it never fills one in — but `status` is still PRESENT, because the base class declares
+    // it, so `"status" in error` answers true and says nothing. That makes a 507 behind an
+    // HTML-answering proxy indistinguishable from a malformed 400, and the narrow answer is
+    // the right one: widening by class name would call the malformed 400 an outage too, and a
+    // dead session read as retryable is the same failure from the other side.
+    const unreadable = new AuthUnknownError("Unexpected token < in JSON", new Error("parse"));
+    expect(unreadable.status).toBeUndefined();
+    expect(isAuthOutage(unreadable)).toBe(false);
   });
 });

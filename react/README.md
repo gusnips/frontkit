@@ -75,6 +75,10 @@ anywhere that decision is made; the sentence you show is a separate question, an
 — "check your connection" is true of a request that never landed and false of a 502, which is
 ours. auth-js marks "nothing came back", and only that, with status 0.
 
+It is safe to hand it the `error` from a `{ data, error }` result without checking it first:
+`null` answers false. That is worth stating because `null` is the SUCCESS value of every
+supabase-js auth call, so the obvious `if (isAuthOutage(error))` is written against it constantly.
+
 Supabase email links have two complete patterns. Keep either one, never half of each:
 
 - A link carrying `token_hash` needs one explicit `verifyOtp` call. Guard it against React

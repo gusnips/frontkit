@@ -41,9 +41,16 @@ type _SupabaseAuthFitsAdapter = Satisfied<
  * heading per RESOLVED version; `node_modules` keeps copies the resolver does not serve.
  *
  * Anything that is not an auth error at all answers true: a failure from outside auth-js is not
- * a verdict on the credential either.
+ * a verdict on the credential either. Nothing at all answers false — `null` is what every
+ * supabase-js auth call returns on success, and success is not an outage.
  */
 export function isAuthOutage(error: unknown): boolean {
+  // Nothing thrown is not an outage, and this clause exists because the function is exported.
+  // `null` is the SUCCESS value of every supabase-js auth call, so the obvious
+  // `if (isAuthOutage(error))` around a `getUser()` result has to be safe; without this it read
+  // every success as auth being down. An adopter had already written that guard at its own call
+  // site, which is what a check missing from in here looks like from the outside.
+  if (error == null) return false;
   if (!isAuthError(error)) return true;
   return isAuthRetryableFetchError(error) || (error.status ?? 0) >= 500;
 }
