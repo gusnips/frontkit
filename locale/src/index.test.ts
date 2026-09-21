@@ -45,6 +45,16 @@ describe("the address shape", () => {
     expect(EN.splitLocalePath("/pt/")).toEqual({ locale: "pt-BR", path: "/" });
   });
 
+  it("does not read the default locale's own tag as a segment", () => {
+    // The default locale HAS no segment, so its own tag in a path is just a path: `/en/terms`
+    // under an English default is a 404 called `/en/terms`, never a second address for the page
+    // at `/terms`. Two live addresses for one page is the duplicate a canonical exists to
+    // prevent. It is the case below — match the segment, not the tag — reached from the
+    // default's side, and it is the half an adopter's test knew and the package's did not.
+    expect(EN.splitLocalePath("/en/terms")).toEqual({ locale: "en", path: "/en/terms" });
+    expect(PT.splitLocalePath("/pt-BR/termos")).toEqual({ locale: "pt-BR", path: "/pt-BR/termos" });
+  });
+
   it("does not answer to a region-coded segment", () => {
     // One donor moved from `/pt-br` to `/pt` and 301s the old form at the edge. The app must
     // NOT resolve it as a second spelling — two live addresses for one page is the duplicate a
