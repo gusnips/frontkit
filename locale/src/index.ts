@@ -143,14 +143,15 @@ export function createLocales<const L extends readonly string[]>(
    * Three repos shipped that bug and one of them had already written the fix down as "this would
    * take a cookie" — it does not; it takes putting the language in the link.
    *
-   * This form is for a destination that HAS per-locale addresses. The root keeps the bare origin
-   * rather than gaining a `/`: appending the default locale's `"/"` rewrites every link for
-   * nothing, and a byte-identical build is what proves a migration lost nothing.
+   * This form is for a destination that HAS per-locale addresses. The default locale's root comes
+   * out as `origin + "/"` rather than the bare origin, which was worth one argument with itself:
+   * the bare form looks tidier and the package first emitted it, but the caller passed `"/"` as
+   * the path, so dropping it is the helper quietly discarding an argument. The two forms are the
+   * same request to every browser and crawler, and `new URL(origin).href` normalizes to the
+   * slash — so the tiebreak went to the version with no special case in it.
    */
-  const localeUrl = (origin: string, locale: Locale, path = "/"): string => {
-    const route = localePath(locale, path);
-    return `${origin}${route === "/" ? "" : route}`;
-  };
+  const localeUrl = (origin: string, locale: Locale, path = "/"): string =>
+    `${origin}${localePath(locale, path)}`;
 
   /**
    * A route on an origin that has NO per-locale addresses — the language rides a query parameter.

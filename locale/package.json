@@ -1,6 +1,6 @@
 {
   "name": "@gusnips/locale",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Where a language lives in a URL, and how it crosses to another origin. Path prefixes, the inverse split, and the query parameter a separate origin needs. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",

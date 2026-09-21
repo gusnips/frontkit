@@ -65,10 +65,11 @@ describe("crossing to another origin", () => {
     );
   });
 
-  it("keeps the bare origin for the default locale's root", () => {
-    // Appending the default locale's "/" would rewrite every link in that language for nothing,
-    // and a byte-identical build is what proves a migration lost something or did not.
-    expect(EN.localeUrl(SITE, "en")).toBe("https://docs.example.com");
+  it("gives the default locale's root the path the caller passed", () => {
+    // `origin + "/"`, not the bare origin: the default path IS "/", and a helper that drops it
+    // is discarding an argument. Identical request either way; no special case is the tiebreak.
+    expect(EN.localeUrl(SITE, "en")).toBe("https://docs.example.com/");
+    expect(EN.localeUrl(SITE, "en", "/pricing")).toBe("https://docs.example.com/pricing");
   });
 
   it("puts the language in a query parameter for a destination that has none", () => {
