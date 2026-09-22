@@ -86,6 +86,32 @@ Supabase email links have two complete patterns. Keep either one, never half of 
 - A link carrying `ConfirmationURL` needs `detectSessionInUrl` enabled. That reader consumes an
   implicit `#access_token` or a PKCE `?code`; it does not consume `token_hash`.
 
+Either pattern can carry a destination — the `token_hash` one has to be asked. GoTrue hands every
+template a `{{ .RedirectTo }}`: the `redirectTo` the app passed, already checked against the
+allowlist, falling back to the Site URL when it was absent or not on it. A `{{ .ConfirmationURL }}`
+link carries it for you. A template that writes its own landing drops it unless it asks:
+
+```
+{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next={{ .RedirectTo }}
+```
+
+Leave that parameter off and `redirectTo` and `emailRedirectTo` do nothing on every e-mail flow,
+however carefully the app sets them — four of the codebases this came from pass one that the
+template throws away, so a person bounced off a protected page signs in and lands on the front
+door. Nothing reports it: the app's call is correct, the link works, and the destination was
+dropped in an HTML file hosted somewhere else.
+
+`{{ .RedirectTo }}` arrives as an absolute URL rather than a path, so the landing reads it as one:
+
+```ts
+const raw = new URLSearchParams(location.search).get("next");
+const url = raw ? new URL(raw, location.origin) : null;
+const next = url?.origin === location.origin ? safeInternalPath(url.pathname + url.search) : null;
+```
+
+Validate it on arrival even though GoTrue already did: that check is against a list of origins,
+so it says the link may come back here, not which page it may open.
+
 Recovery and invite links continue to the new-password screen after the session opens. A callback
 must also tell a used or expired link apart from a request that never landed — or one that landed
 and came back 5xx: the first needs a new link, and the other two can retry the same one, because
