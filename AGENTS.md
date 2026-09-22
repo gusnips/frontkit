@@ -172,6 +172,18 @@ Per package: `cd react && bun run test`, etc.
   test. Watched misfiring on a real tree before the replacement was believed, which is the only
   evidence a check ever has.
 
+  **And the split does not need two repos — one repo can do it to itself in a single commit.** An
+  adopter with no dependency catalog names the range in every workspace that uses it, and a bump that
+  moves some of them is a bump that CREATES the second copy rather than finding one. Measured
+  2026-09-21: four workspaces in one adopter declare `@gusnips/react`, the commit moved three, and
+  `bun why` then answered **0.9.5 and 0.9.1 at once** — a caret on a 0.x does not go backwards, so
+  the two ranges cannot meet. `bun install` said nothing. That is the same sentence above reaching
+  the case it did not name, and it also explains why the other adopters are safe: **a `catalog:`
+  entry is a pointer, not a range, so a catalog repo has exactly one range to get wrong.** Swept
+  across the fleet against `origin/main`, the catalog repos each declare one literal range; the one
+  without a catalog is the one that split. The immunity is the catalog, so a repo that does not keep
+  one gets the per-workspace check by hand.
+
 ## What must NOT be shared
 
 This rule is what keeps the package alive; violating it is how design systems die. Each of
