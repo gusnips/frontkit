@@ -145,10 +145,19 @@ Per package: `cd react && bun run test`, etc.
   `@gusnips/react` at `^0.8.0`**, so none of them could receive anything released into 0.9 at all.
   The correction that replaced it was written the same afternoon as the claim it corrected, and
   was wrong in the opposite direction — first the carets were read as older than they were, then
-  as newer. **Both readings came from quoting a list instead of installing one.** All thirteen
-  were bumped in one pass that day; twelve now sit on `{^0.9.5, ^0.8.9}` and the thirteenth has no
-  `vite`. The install below is still the evidence, and the pairs are what a
-  reader must re-measure rather than take from here — which
+  as newer. **Both readings came from quoting a list instead of installing one.**
+
+  **Then a THIRD count in this same sentence was false, two hours later, and it was the correction
+  itself.** It closed "twelve now sit on `{^0.9.5, ^0.8.9}` and the thirteenth has no `vite`".
+  Re-measured against a freshly fetched `origin/main`, per `package.json`, on the evening of
+  2026-09-21: **two adopters were on older matched pairs** — `{^0.9.2, ^0.8.6}` and
+  `{^0.9.3, ^0.8.7}` — both correct, both behind, and neither counted. Three wrong numbers in one
+  sentence in one afternoon is not three mistakes; it is one, and the mistake is **printing a
+  count here at all.** A number in this file is a reading with no timestamp attached to it, and
+  the fleet moves hourly. So the sentence no longer carries one: the pairs are a thing the reader
+  MEASURES — `git show origin/main:<path>` for every `package.json`, then `bun why`, per repo —
+  and this file's job is the rule and the method, never the tally. The install below is still the
+  evidence — which
   resolves `@gusnips/react` to **0.8.1 and 0.9.2 at once**, because `^0.8.2` floats vite to 0.8.6
   whose pin is `0.9.2` and a caret on a 0.x does not cross a minor. `{"^0.9.0", "^0.8.4"}` installs
   one copy, also measured. Nothing warns: `bun install` is silent, `release:check` reads what the
