@@ -55,6 +55,56 @@ browser cannot be indexed.** A crawler fetches an address once, and whatever lan
 is the only thing that address will ever mean, so the other two languages are unreachable however
 well they are written. One address per language is the whole fix.
 
+## Send a reader to their language before the page shows
+
+A bare address like `/pricing` is the only one that can be wrong for a reader. `/pt/pricing`
+names its language; `/pricing` just gets the default. So a Portuguese reader who lands on
+`/pricing` should end up on `/pt/pricing`.
+
+If your app's entry file does that redirect, it happens too late. The browser shows the English
+page while your JavaScript downloads, then jumps to Portuguese. That is a blink of about a
+second, on every first visit.
+
+`localeGateScript` decides before the page shows:
+
+```ts
+// vite.config.ts
+import { localeGateScript } from "@gusnips/locale";
+import { prePaintScript } from "@gusnips/vite";
+
+prePaintScript({
+  name: "locale",
+  source: localeGateScript({
+    locales: ["en", "pt-BR", "es"],
+    defaultLocale: "en",
+    storageKey: "app.locale",
+  }),
+  position: "head-prepend",
+});
+```
+
+It picks the language in this order:
+
+1. The language the reader chose before, which your language picker saved under `storageKey`.
+   Choosing the default counts: that reader stays on the bare address.
+2. The browser's languages, in the reader's own order. `pt-PT` and `pt` both find `pt-BR`.
+3. Nothing matched: the reader stays where they are.
+
+It never moves a reader off an address that already names a language, and it keeps the query and
+the `#fragment`. A crawler that runs no scripts stays on the default page.
+
+Three options, for sites that need them:
+
+- `base: "/docs"` when the pages live under a path.
+- `exclude: ["/login", "/app"]` for app screens served beside the site. They are never
+  redirected, and neither is anything under them.
+- `signedInKey: /^sb-.+-auth-token$/` leaves signed-in readers alone. Their language comes from
+  their account, not their browser.
+
+Serve it as a file, which is what `prePaintScript` does. A `script-src 'self'` policy blocks an
+inline script without any error, and the blink comes back. Then take the redirect out of your
+entry file: the entry just renders the language the address names.
+
 ## A language does not survive a jump to another origin
 
 This is the part that gets written last and is usually a bug first. If your site is on
@@ -94,8 +144,8 @@ reading.
 
 ## Two things it does not do
 
-**It does not pick the language.** Detection is `@gusnips/react`'s `i18nInitOptions`, and the
-choice of which language a bare address shows is yours.
+**It picks a language in one place only:** the redirect off a bare address, above. Inside an app,
+detection is `@gusnips/react`'s `i18nInitOptions`.
 
 **It does not write `og:locale`.** That tag needs a territory your list does not carry (`en` is
 not valid there; `en_US` is), and which territory to claim is a product decision.

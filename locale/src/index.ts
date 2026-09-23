@@ -13,6 +13,8 @@
  * in frontkit depends on this one, so it is a leaf: no version of it can pin a sibling.
  */
 
+import { runLocaleGate, type GateConfig } from "./gate.ts";
+
 /** The parameter that hands a language across an origin. One spelling, everywhere.
  *
  *  Pass it to `i18nInitOptions({ queryKey: LOCALE_QUERY_PARAM })` as well, and the reader and the
@@ -189,4 +191,79 @@ export function createLocales<const L extends readonly string[]>(
     localeUrl,
     localeQueryUrl,
   };
+}
+
+/** What {@link localeGateScript} needs to know about one product's pages. */
+export interface LocaleGateOptions<L extends readonly string[]> {
+  /** The same list and default {@link createLocales} gets. */
+  locales: L;
+  defaultLocale: L[number];
+  /** Where the reader's explicit choice is stored — the key the language picker writes. */
+  storageKey: string;
+  /** Where the pages are mounted when it is not the origin's root, e.g. `/docs`. */
+  base?: string;
+  /** Route paths (unprefixed, after `base`) that are never redirected, with everything under
+   *  them: an app's own screens served beside a public site, e.g. `["/login", "/w"]`. */
+  exclude?: readonly string[];
+  /** A storage key that means someone is signed in, e.g. `/^sb-.+-auth-token$/`. Their language
+   *  comes from their account, so the gate leaves them alone — and also leaves alone an address
+   *  that carries a sign-in (`access_token=` in the fragment, `code=` in the query). */
+  signedInKey?: RegExp;
+}
+
+/**
+ * The one redirect off an unprefixed address, as a script that runs before first paint.
+ *
+ * The default locale is unprefixed, so `/pricing` is the only address that can be wrong for a
+ * reader: every other one names its language. Every repo on this stack sent that reader to
+ * `/pt/pricing` from `main.tsx`, "before the first render" — and still showed the English page
+ * for about a second, because the render is not the paint. The prerendered file IS the English
+ * page, the browser paints it while the bundle downloads, and only then does the entry run.
+ * Deciding in a classic `<head>` script is what gets ahead of the paint: it runs before the body
+ * is parsed, and the page it leaves is hidden, so nothing of it shows.
+ *
+ * The decision is the one those entries made, merged from all of them: a stored choice wins
+ * (and a stored choice of the default stays put), then the browser's languages in the reader's
+ * own order, exact tag before base subtag. Blocked storage falls through to the browser rather
+ * than failing, which one copy did not do. A crawler still gets the unprefixed page: it has no
+ * stored choice, and its browser asks for English or runs no script at all.
+ *
+ * Serve it as a FILE, never inline — `@gusnips/vite`'s `prePaintScript` does that — because a
+ * `script-src 'self'` policy silently blocks an inline script, and the blink comes back:
+ *
+ * ```ts
+ * // vite.config.ts
+ * prePaintScript({
+ *   name: "locale",
+ *   source: localeGateScript({ locales: SUPPORTED_LOCALES, defaultLocale: DEFAULT_LOCALE, storageKey: "app.locale" }),
+ *   position: "head-prepend",
+ * })
+ * ```
+ *
+ * The entry then renders what the address names and needs no gate of its own.
+ */
+export function localeGateScript<const L extends readonly string[]>(
+  options: LocaleGateOptions<L>,
+): string {
+  const { localeSegment } = createLocales(options.locales, options.defaultLocale);
+  const config: GateConfig = {
+    locales: options.locales,
+    defaultLocale: options.defaultLocale,
+    prefixed: options.locales
+      .filter((locale) => locale !== options.defaultLocale)
+      .map((locale) => [locale, localeSegment(locale)] as const),
+    storageKey: options.storageKey,
+    base: (options.base ?? "").replace(/\/+$/, ""),
+    exclude: (options.exclude ?? []).map((path) =>
+      path.length > 1 ? path.replace(/\/+$/, "") : path,
+    ),
+    // Without `g`/`y`: those make `test()` stateful, and the gate calls it once per stored key.
+    signedIn: options.signedInKey
+      ? {
+          source: options.signedInKey.source,
+          flags: options.signedInKey.flags.replace(/[gy]/g, ""),
+        }
+      : null,
+  };
+  return `(${runLocaleGate.toString()})(${JSON.stringify(config)}, globalThis);\n`;
 }
