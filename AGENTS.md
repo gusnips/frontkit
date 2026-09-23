@@ -1467,6 +1467,43 @@ strongest argument yet for auditing after a migration instead of closing the tic
   down, and re-read the REMOTE, because a stale checkout makes every version claim about the fleet
   wrong in the same direction.
 
+### The locale gate (six adopters, one blink)
+
+Every adopter with per-language addresses showed a reader the default language for about a
+second on a bare address, then jumped to theirs.
+
+- **A redirect decided in the entry runs after the page has painted.** The entry is a module
+  script, so it is deferred: the browser parses and paints the prerendered default-language body
+  first, then runs the redirect. Measured with headless Chromium in Portuguese, recording each
+  document's first animation frame, its address and the text on it: one adopter's bare address
+  showed a visible English frame before the fix, and none after. The fix is a classic,
+  parser-blocking script at the very top of `<head>`, served as a file. `localeGateScript` builds
+  it and `prePaintScript` delivers it, because a `script-src 'self'` policy drops an inline one
+  with no error, and then the blink is simply back.
+- **Moving the decision moved a duty onto the picker.** The gate reads a saved choice first, then
+  the browser. The default language's link is a bare address, so a picker that saves nothing
+  hands that address back to the browser: one adopter's footer made its default language
+  impossible to pick for a reader whose browser preferred another.
+- **Then the middle click, in every adopter at once.** Nine pickers saved the choice in
+  `onClick`. A middle click opens the link in a new tab and fires `auxclick`, never `click`, so
+  the new tab's gate reads the old choice and sends the reader back. Six of the nine are real
+  links a mouse can reach, on four sites; the other three render a `<select>` for sighted readers
+  with `sr-only` anchors beside it for crawlers, which no mouse can middle-click. Two comments in
+  the fleet promised a reader could middle-click, above handlers that ignored it. The README
+  states the rule now, because no adopter can import it: a picker's markup is product code.
+- **A browser check that clicks at `load` measures the HTML, not the app.** The first live check
+  after the middle-click fix still showed the bug on a site that had the fix deployed and in its
+  bundle. The click had landed before hydration attached React's listeners. The control that had
+  "reproduced" the bug on the unfixed sites had the same flaw, so it proved nothing either. Both
+  were rerun two seconds after load: the three sites still unfixed bounced, and each held once its
+  fix deployed. The first site's pre-fix state was never measured correctly. A check with no
+  settle time can pass or fail for a reason that has nothing to do with the code under test,
+  which is the other half of "a check needs a positive control".
+- **The gate changed a behaviour nobody had written down.** One adopter's old redirect let any
+  English tag anywhere in `navigator.languages` win, and matched `pt` and `pt-PT` to nothing.
+  The gate walks the reader's own order, exact tag first, then the base subtag. A migration that
+  only asks "does it still redirect" would have called both the same.
+
 ### How to migrate a repo — the check that is not optional
 
 **Read the code you are deleting against the code replacing it, function by function. Its
