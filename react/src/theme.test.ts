@@ -78,6 +78,8 @@ function browser({
     storageEvent: (key: string | null) => fire("storage", { key }),
     backForwardRestore: () => fire("pageshow"),
     block: () => (state.blocked = true),
+    /** A page that forces light for its own lifetime, the way a public booking page does. */
+    forceLight: () => classes.delete("dark"),
   };
 }
 
@@ -211,6 +213,24 @@ describe("startTheme", () => {
     unsubscribe();
     theme.setMode("light");
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  // `pageshow` fires on every load, not only on a back-forward restore, so a controller that
+  // repainted on every resync would undo a page's override a moment after the page set it.
+  it("writes to the page only when the theme changes, so a page can override it", () => {
+    const page = browser({ stored: "dark" });
+    const theme = startTheme(options);
+    page.forceLight();
+
+    page.backForwardRestore();
+    page.storageEvent(KEY);
+    page.osSwitches(true);
+    theme.setMode("dark");
+    expect(page.dark()).toBe(false);
+
+    page.otherTabPicks("light");
+    page.otherTabPicks("dark");
+    expect(page.dark()).toBe(true);
   });
 
   it("writes data-theme both ways when asked to", () => {

@@ -378,6 +378,9 @@ What it does that the copies it replaced each missed at least once:
   An inline one under that policy never runs, and nothing tells you.
 - `"system"` follows the OS live, even when the person switched to it mid-page. A laptop that
   turns dark at sunset takes the page with it.
+- It writes to the page only when the theme changes. A page that removes `dark` for as long as
+  it is open, like a booking page that is always light, stays light until the theme really
+  changes.
 - `themeColor: { light: "#fff", dark: "#111" }` moves `<meta name="theme-color">` too, so the
   browser toolbar matches the page instead of the OS.
 - `attribute: "data-theme"` writes `data-theme="dark"` instead of the `dark` class, and

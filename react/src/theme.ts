@@ -108,6 +108,11 @@ declare global {
  *
  * "system" is stored as the word, not as an empty key. An empty key means the default, and the
  * default is not always "system".
+ *
+ * **It writes to the page when the theme changes, and at no other time.** A page may override
+ * the class for its own lifetime — a public booking page that is always light — and keeps that
+ * override until the theme really changes. Repainting on every resync would undo it a moment
+ * later, because `pageshow` fires on every load, not only on a back-forward restore.
  */
 export function startTheme(options: ThemeOptions): ThemeController {
   const running = window.__frontkitTheme;
@@ -142,7 +147,7 @@ export function startTheme(options: ThemeOptions): ThemeController {
   let snapshot: ThemeSnapshot = { mode: initial, resolved: resolve(initial) };
   const apply = (mode: ThemeMode) => {
     const resolved = resolve(mode);
-    paint(resolved);
+    if (resolved !== snapshot.resolved) paint(resolved);
     if (mode === snapshot.mode && resolved === snapshot.resolved) return;
     snapshot = { mode, resolved };
     listeners.forEach((listener) => listener());
