@@ -48,6 +48,8 @@ export {
   type FitResult,
   type OgOverflow,
 } from "./og.ts";
+// The locale gate's delivery. Type-only use of vite, so the barrel still imports no peer.
+export { prePaintScript, type PrePaintScriptOptions } from "./pre-paint.ts";
 // `renderTree` itself is NOT here — it lives at `@gusnips/vite/render`, because it is the one
 // thing in this package that loads React. Its consumer is `entry-server.tsx`, a different file
 // in a different bundle to the prerender script, and a repo using this only for `sitemapXml`

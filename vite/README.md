@@ -165,6 +165,19 @@ from `@gusnips/react/theme`, so the script before paint and the controller the a
 the same function. It is a file rather than an inline script so a `script-src 'self'` policy
 lets it run. Pass it the same options you pass `createTheme`; see that package's README.
 
+`themeScript` is built on `prePaintScript`, which takes any script that has to run before the
+page shows. `@gusnips/locale`'s `localeGateScript` is the other one:
+
+```ts
+import { prePaintScript } from "@gusnips/vite";
+
+prePaintScript({ name: "locale", source: localeGateScript({ ... }), position: "head-prepend" });
+```
+
+The script runs on its own, before your bundle, so it must not use anything outside itself. The
+tag goes at the end of `<head>` by default. `position: "head-prepend"` puts it first instead, so
+it does not wait for your stylesheets to download. Use that for a script that may leave the page.
+
 ## The vite preset
 
 ```ts
