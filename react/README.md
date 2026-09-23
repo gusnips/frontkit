@@ -141,6 +141,11 @@ Choose the words by `code` (GoTrue's `error_code`, such as `otp_expired`), not b
 pressing Cancel at Google; only the last one arrives with no code, and that is what `cancelled`
 means. A cancel was their choice, so say nothing or offer the button again.
 
+A handler you mount for Google's refusals also receives every email link's. An expired magic link
+or reset link comes back with the same parameters, to whatever page `redirectTo` named. If that
+handler only knows Google copy, the person whose link ran out is told Google failed. Check `code`
+before you reach for provider copy: `otp_expired` is a link, never a provider.
+
 Every email link type is accepted, `invite` included, even if your templates never send it. An
 operator can still send one from Studio. Name a destination for each with
 `Record<EmailLinkType, string>`, so a new type is a compile error rather than a wrong page.
