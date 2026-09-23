@@ -97,3 +97,107 @@ export function createSupabaseSessionAdapter(auth: SupabaseSessionAuth): Session
     },
   };
 }
+
+/**
+ * Every link type a GoTrue email can carry — not only the ones this app's templates send today.
+ * One donor rejected `invite` because "invites are never sent", which was true of the product and
+ * false of the deployment: an operator inviting somebody from Studio sent a branded email whose
+ * link then said it was invalid. A type the templates never emit costs nothing to accept: the hash
+ * is the proof, and GoTrue opens a session only for the person whose one-time token it is.
+ *
+ * Closed on purpose: auth-js's own `EmailOtpType` ends in `(string & {})`, so it cannot make a
+ * destination map name every case. `Record<EmailLinkType, string>` can, and that is where an app
+ * decides that `recovery` and `invite` both continue to the new-password screen — GoTrue creates
+ * an invited account with NO password, so landing one "inside" signs them in once and locks them
+ * out after.
+ */
+export type EmailLinkType =
+  "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
+
+const EMAIL_LINK_TYPES: Record<EmailLinkType, true> = {
+  signup: true,
+  invite: true,
+  magiclink: true,
+  recovery: true,
+  email_change: true,
+  email: true,
+};
+
+function isEmailLinkType(value: string): value is EmailLinkType {
+  // Not `in`: `"toString" in EMAIL_LINK_TYPES` is true, and the type is typed by whoever sends
+  // the link.
+  return Object.hasOwn(EMAIL_LINK_TYPES, value);
+}
+
+/** Everything an auth callback address can carry, decided from the address alone. */
+export type AuthCallback =
+  /** An email link with a one-use `token_hash`: trade it with `verifyOtp`, exactly once. */
+  | { kind: "email-link"; tokenHash: string; type: EmailLinkType }
+  /**
+   * A session arriving in the address: a PKCE `code`, or the implicit flow's tokens. In a browser
+   * with `detectSessionInUrl` on, the client has already taken it — wait for the session, and do
+   * not trade it again, which would be a second exchange racing the first. Where nothing reads
+   * the address for you (React Native), `credential` is what `exchangeCodeForSession` or
+   * `setSession` takes.
+   */
+  | {
+      kind: "session";
+      type: EmailLinkType | null;
+      credential: { code: string } | { access_token: string; refresh_token: string };
+    }
+  /**
+   * GoTrue, or the provider behind it, reported a failure in the address. `code` is GoTrue's
+   * stable `error_code` (`otp_expired`, `bad_oauth_state`, …) and is what to choose words by;
+   * `error_description` is left out on purpose — it is English-only and often names the wrong
+   * cause.
+   */
+  | { kind: "error"; error: string | null; code: string | null; cancelled: boolean }
+  /** Nothing usable: cut short between the mail client and here, or edited by hand. */
+  | { kind: "invalid" };
+
+/**
+ * Reads an auth callback address. Pure, so every edge case is testable without a router or a
+ * client — pass `location.search` and `location.hash`, or the two halves of a deep link.
+ *
+ * GoTrue writes a failure into the FRAGMENT on every path and into the query only on some — the
+ * query too after a provider round trip, the fragment alone after an implicit-flow email link —
+ * so a callback reading one of the two misses a failure the other carries, and the person lands
+ * on a screen that says nothing. Both are read here.
+ *
+ * `cancelled` is the provider refusing on its own, which for Google is the person pressing Cancel
+ * — their choice, not a failure to report. It is NOT `error === "access_denied"`: GoTrue writes
+ * that same value for an expired email link, a banned user and a disabled signup, each with an
+ * `error_code` beside it, while a refusal relayed from the provider arrives with none. The obvious
+ * test reads an expired link as a change of mind. And `error` itself is absent for a status
+ * outside GoTrue's OAuth mapping — a rate-limited link arrives with `error_code` alone.
+ */
+export function parseAuthCallback(search: string | URLSearchParams, hash = ""): AuthCallback {
+  const query = new URLSearchParams(search);
+  const fragment = new URLSearchParams(hash.replace(/^#/, ""));
+  const read = (name: string) => query.get(name) || fragment.get(name) || null;
+
+  const error = read("error");
+  const code = read("error_code");
+  if (error || code || read("error_description"))
+    return { kind: "error", error, code, cancelled: error === "access_denied" && code === null };
+
+  const rawType = read("type") ?? "";
+  const type = isEmailLinkType(rawType) ? rawType : null;
+
+  const tokenHash = query.get("token_hash")?.trim();
+  if (tokenHash) return type ? { kind: "email-link", tokenHash, type } : { kind: "invalid" };
+
+  const pkceCode = query.get("code");
+  if (pkceCode) return { kind: "session", type, credential: { code: pkceCode } };
+
+  const accessToken = fragment.get("access_token");
+  const refreshToken = fragment.get("refresh_token");
+  if (accessToken && refreshToken)
+    return {
+      kind: "session",
+      type,
+      credential: { access_token: accessToken, refresh_token: refreshToken },
+    };
+
+  return { kind: "invalid" };
+}

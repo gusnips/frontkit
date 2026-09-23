@@ -117,6 +117,34 @@ must also tell a used or expired link apart from a request that never landed —
 and came back 5xx: the first needs a new link, and the other two can retry the same one, because
 the hash was never spent.
 
+`parseAuthCallback` reads a callback address and says what arrived:
+
+```ts
+import { parseAuthCallback } from "@gusnips/react/supabase";
+
+parseAuthCallback("?token_hash=abc&type=recovery");
+// → { kind: "email-link", tokenHash: "abc", type: "recovery" }
+```
+
+There are four kinds. `email-link` needs your one `verifyOtp` call. `session` is a PKCE `code` or
+implicit-flow tokens; in a browser the client has already taken it, so wait for the session, and on
+React Native hand `credential` to `exchangeCodeForSession` or `setSession`. `error` is a failure
+GoTrue wrote into the address. `invalid` is a link that was cut short or edited.
+
+Pass the fragment too — `parseAuthCallback(location.search, location.hash)`. GoTrue writes a
+failure into the fragment every time and into the query only sometimes: after an implicit-flow
+email link it is in the fragment alone, so a query-only reader shows nothing to somebody whose
+link expired.
+
+Choose the words by `code` (GoTrue's `error_code`, such as `otp_expired`), not by `error`.
+`access_denied` covers an expired link, a banned user and a disabled signup as well as a person
+pressing Cancel at Google; only the last one arrives with no code, and that is what `cancelled`
+means. A cancel was their choice, so say nothing or offer the button again.
+
+Every email link type is accepted, `invite` included, even if your templates never send it. An
+operator can still send one from Studio. Name a destination for each with
+`Record<EmailLinkType, string>`, so a new type is a compile error rather than a wrong page.
+
 There is also a deadline on every request, which none of the codebases this came from had. A
 request with no timeout is a spinner with no end.
 
@@ -369,15 +397,15 @@ something.
 `@gusnips/react` itself needs `react` and nothing else. Anything that needs another runtime peer
 lives behind a subpath, so you install a dependency only if you import the thing that uses it:
 
-| Import from               | What is in it                  | What you must have    |
-| ------------------------- | ------------------------------ | --------------------- |
-| `@gusnips/react`          | the client and rest            | react                 |
-| `@gusnips/react/store`    | `createAuthStore`, `authSlice` | zustand               |
-| `@gusnips/react/guards`   | the route guards               | react-router-dom      |
-| `@gusnips/react/hydrate`  | `hydrateOrMount`               | react-dom             |
-| `@gusnips/react/supabase` | the session adapter            | @supabase/supabase-js |
-| `@gusnips/react/ui`       | the seven wrappers             | @base-ui/react        |
-| `@gusnips/react/contract` | two prerender names            | nothing               |
+| Import from               | What is in it                            | What you must have    |
+| ------------------------- | ---------------------------------------- | --------------------- |
+| `@gusnips/react`          | the client and rest                      | react                 |
+| `@gusnips/react/store`    | `createAuthStore`, `authSlice`           | zustand               |
+| `@gusnips/react/guards`   | the route guards                         | react-router-dom      |
+| `@gusnips/react/hydrate`  | `hydrateOrMount`                         | react-dom             |
+| `@gusnips/react/supabase` | the session adapter, `parseAuthCallback` | @supabase/supabase-js |
+| `@gusnips/react/ui`       | the seven wrappers                       | @base-ui/react        |
+| `@gusnips/react/contract` | two prerender names                      | nothing               |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
 point.** An optional peer the barrel imports anyway is not optional — it is a required one whose

@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSupabaseSessionAdapter,
   isAuthOutage,
+  parseAuthCallback,
   type SupabaseSessionAuth,
 } from "./supabase-session.ts";
 
@@ -152,5 +153,72 @@ describe("isAuthOutage", () => {
     const unreadable = new AuthUnknownError("Unexpected token < in JSON", new Error("parse"));
     expect(unreadable.status).toBeUndefined();
     expect(isAuthOutage(unreadable)).toBe(false);
+  });
+});
+
+describe("parseAuthCallback", () => {
+  it("reads an email link, including the types an app's templates may not send yet", () => {
+    expect(parseAuthCallback("?token_hash=pkce_abc&type=recovery")).toEqual({
+      kind: "email-link",
+      tokenHash: "pkce_abc",
+      type: "recovery",
+    });
+    // An operator can invite from Studio whatever the product does; rejecting the type put
+    // "invalid link" on a real, branded invitation.
+    expect(parseAuthCallback(new URLSearchParams("token_hash=abc&type=invite"))).toMatchObject({
+      kind: "email-link",
+      type: "invite",
+    });
+  });
+
+  it("refuses an email link whose type is missing or made up", () => {
+    expect(parseAuthCallback("?token_hash=abc")).toEqual({ kind: "invalid" });
+    expect(parseAuthCallback("?token_hash=abc&type=admin")).toEqual({ kind: "invalid" });
+    // A key every object inherits is still not a link type.
+    expect(parseAuthCallback("?token_hash=abc&type=toString")).toEqual({ kind: "invalid" });
+    expect(parseAuthCallback("", "")).toEqual({ kind: "invalid" });
+  });
+
+  it("hands back the session a URL carries, in either flow", () => {
+    expect(parseAuthCallback("?code=4f1c")).toEqual({
+      kind: "session",
+      type: null,
+      credential: { code: "4f1c" },
+    });
+    // The implicit flow puts the tokens, and a recovery's type, in the fragment.
+    expect(
+      parseAuthCallback("", "#access_token=at&expires_in=3600&refresh_token=rt&type=recovery"),
+    ).toEqual({
+      kind: "session",
+      type: "recovery",
+      credential: { access_token: "at", refresh_token: "rt" },
+    });
+    expect(parseAuthCallback("", "#access_token=at")).toEqual({ kind: "invalid" });
+  });
+
+  it("tells a person who pressed Cancel from a link that expired", () => {
+    // A refusal relayed from the provider: GoTrue writes it to both halves, with no code.
+    const cancel = "error=access_denied&error_description=The+user+denied+the+request";
+    expect(parseAuthCallback(`?${cancel}`, `#${cancel}&sb=`)).toEqual({
+      kind: "error",
+      error: "access_denied",
+      code: null,
+      cancelled: true,
+    });
+    // GoTrue's own refusal of an implicit-flow email link: the SAME error, a code beside it,
+    // and only in the fragment — a query-only reader sees nothing at all.
+    expect(
+      parseAuthCallback(
+        "",
+        "#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired&sb=",
+      ),
+    ).toEqual({ kind: "error", error: "access_denied", code: "otp_expired", cancelled: false });
+  });
+
+  it("reads a failure that carries no `error` at all", () => {
+    // Statuses outside GoTrue's OAuth mapping, a 429 among them, write only the code.
+    expect(
+      parseAuthCallback("", "#error_code=over_email_send_rate_limit&error_description=x&sb="),
+    ).toEqual({ kind: "error", error: null, code: "over_email_send_rate_limit", cancelled: false });
   });
 });
