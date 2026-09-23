@@ -204,6 +204,16 @@ describe("queryView", () => {
     unsubscribe();
   });
 
+  it("reads a missing error as none, not as a failed refresh", () => {
+    // A hook that merges two queries can hand over `undefined`; react-query never does.
+    expect(queryView({ data: 2, error: undefined })).toStrictEqual({
+      state: "ready",
+      data: 2,
+      refreshError: null,
+    });
+    expect(queryView({ data: undefined })).toStrictEqual({ state: "waiting" });
+  });
+
   it("treats null as an answer, not as waiting", () => {
     expect(queryView({ data: null, error: null })).toEqual({
       state: "ready",

@@ -156,6 +156,9 @@ export function queryDefaults({
  * an error beside data IS `isRefetchError`, and an error without data IS `isLoadingError`. It
  * takes any query result, infinite ones included, and a test passes a plain object.
  *
+ * A missing `error` counts as none. react-query always sends `null`, but a hook that merges two
+ * queries can send `undefined`, and a screen must not report a failed refresh for that.
+ *
  * Which control to offer is not decided here. Hand the error to the describer: its `recover` comes
  * from the same rule the query client retries by, so the button and the retry cannot disagree.
  */
@@ -166,9 +169,10 @@ export type QueryView<T, E = unknown> =
 
 export function queryView<T, E>(query: {
   readonly data: T | undefined;
-  readonly error: E | null;
+  readonly error?: E | null;
 }): QueryView<T, E> {
-  const { data, error } = query;
+  const { data } = query;
+  const error = query.error ?? null;
   if (data !== undefined) return { state: "ready", data, refreshError: error };
   if (error !== null) return { state: "failed", error };
   return { state: "waiting" };
