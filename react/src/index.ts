@@ -13,6 +13,8 @@
 //   @gusnips/react/guards    the route guards       → react-router-dom
 //   @gusnips/react/hydrate   hydrateOrMount         → react-dom
 //   @gusnips/react/supabase  the session adapter    → @supabase/supabase-js
+//   @gusnips/react/theme     the theme controller   → react only, but `@gusnips/vite/theme`
+//                                                    serializes it and must not load the rest
 //
 // `react-dom` is the one the second migration added, and it is the sharpest case yet: that
 // adopter ships a REACT NATIVE app beside its two web apps, and React Native has no react-dom to

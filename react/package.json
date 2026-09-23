@@ -37,6 +37,10 @@
     "./contract": {
       "types": "./dist/prerender-contract.d.ts",
       "default": "./dist/prerender-contract.js"
+    },
+    "./theme": {
+      "types": "./dist/theme.d.ts",
+      "default": "./dist/theme.js"
     }
   },
   "types": "./dist/index.d.ts",

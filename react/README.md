@@ -338,6 +338,55 @@ Some APIs write `message` for whoever reads the screen. Some write it for whoeve
 in English, in an app that ships three languages. Your arm also gets the stated wait, which the
 default has nowhere to put.
 
+## Light, dark, or the system's
+
+```ts
+const { mode, resolved, setMode } = useTheme();
+```
+
+`mode` is what the person picked: `"light"`, `"dark"` or `"system"`. `resolved` is what is on
+screen. `setMode("dark")` switches, saves the choice, and every other open tab follows.
+
+You make `useTheme` once, with the storage key your app already uses:
+
+```ts
+// src/theme.ts
+import { createTheme, type ThemeOptions } from "@gusnips/react/theme";
+
+export const THEME = { key: "app.theme" } satisfies ThemeOptions;
+export const { useTheme } = createTheme(THEME);
+```
+
+Then give the same options to the Vite plugin, which paints the page in the right theme before
+its first frame. Without it, a reader who chose dark sees one light frame on every load.
+
+```ts
+// vite.config.ts
+import { themeScript } from "@gusnips/vite/theme";
+import { THEME } from "./src/theme";
+
+export default defineConfig({ plugins: [themeScript(THEME)] });
+```
+
+What it does that the copies it replaced each missed at least once:
+
+- A browser that blocks site data throws when you touch `localStorage`. Here that is not a white
+  page: the default applies, and a choice made after that lasts until the page is left.
+- The script that runs before paint is not a second copy. The plugin writes this function's own
+  source into a file, so the two cannot disagree about a stale value or blocked storage.
+- That file is a real file, not an inline script, so a `script-src 'self'` policy lets it run.
+  An inline one under that policy never runs, and nothing tells you.
+- `"system"` follows the OS live, even when the person switched to it mid-page. A laptop that
+  turns dark at sunset takes the page with it.
+- `themeColor: { light: "#fff", dark: "#111" }` moves `<meta name="theme-color">` too, so the
+  browser toolbar matches the page instead of the OS.
+- `attribute: "data-theme"` writes `data-theme="dark"` instead of the `dark` class, and
+  `defaultMode` picks what an empty key means (`"system"` unless you say otherwise).
+
+In jsdom tests, mock `window.matchMedia`, which jsdom does not have, and run
+`delete window.__frontkitTheme` between tests. There is one controller per page, and a jsdom
+window lasts the whole file.
+
 ## Also here
 
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
@@ -411,6 +460,7 @@ lives behind a subpath, so you install a dependency only if you import the thing
 | `@gusnips/react/supabase` | the session adapter, `parseAuthCallback` | @supabase/supabase-js |
 | `@gusnips/react/ui`       | the seven wrappers                       | @base-ui/react        |
 | `@gusnips/react/contract` | two prerender names                      | nothing               |
+| `@gusnips/react/theme`    | `createTheme`, `startTheme`              | react                 |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
 point.** An optional peer the barrel imports anyway is not optional — it is a required one whose
