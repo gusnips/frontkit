@@ -93,6 +93,27 @@ It picks the language in this order:
 It never moves a reader off an address that already names a language, and it keeps the query and
 the `#fragment`. A crawler that runs no scripts stays on the default page.
 
+So your language picker has to save the choice. The default language's link is a bare address,
+and without a saved choice the gate decides that address from the browser: a reader with a
+Portuguese browser who clicks "English" lands back in Portuguese. Save on a middle click too. It
+opens the link in a new tab without firing `click`, so that tab never sees the choice:
+
+```tsx
+<a
+  href={localePath("en", path)}
+  hrefLang="en"
+  onClick={() => remember("en")}
+  onAuxClick={(event) => {
+    if (event.button === 1) remember("en");
+  }}
+>
+  English
+</a>
+```
+
+`remember` writes the locale under `storageKey`, inside a `try`, because storage can be blocked. A
+right click and "Open in new tab" fires no event a page can see, so that one path still guesses.
+
 Three options, for sites that need them:
 
 - `base: "/docs"` when the pages live under a path.
