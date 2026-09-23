@@ -1,6 +1,7 @@
+import { QueryClient, QueryObserver, type QueryObserverResult } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api-error.ts";
-import { retryDelayMs, shouldRetry } from "./query.ts";
+import { queryView, retryDelayMs, shouldRetry } from "./query.ts";
 
 const refusal = (status: number, code?: string) =>
   new ApiError(status, code ? { code, message: code } : null);
@@ -142,5 +143,72 @@ describe("retryDelayMs", () => {
 
   it("backs off for a failure that is not an API answer at all", () => {
     expect(retryDelayMs(0, new TypeError("Failed to fetch"))).toBe(1000);
+  });
+});
+
+describe("queryView", () => {
+  /**
+   * One real query, taken through every state a screen meets, with `queryView` checked against
+   * react-query's own flags at each step. A plain object would only check this file against
+   * itself; the observer is what says the reading of `data` and `error` is react-query's.
+   */
+  it("agrees with react-query's own flags through a query's whole life", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    let answer: () => number = () => {
+      throw new Error("down");
+    };
+    const observer = new QueryObserver(client, {
+      queryKey: ["numbers"],
+      queryFn: async () => answer(),
+      enabled: false,
+    });
+    // Subscribed, as a mounted `useQuery` is. An observer nobody listens to never hears the query
+    // change, and reads the last result it computed.
+    const unsubscribe = observer.subscribe(() => {});
+    const now = () => {
+      const result: QueryObserverResult<number, Error> = observer.getCurrentResult();
+      const view = queryView(result);
+      expect(view.state === "failed").toBe(result.isLoadingError);
+      expect(view.state === "ready" && view.refreshError !== null).toBe(result.isRefetchError);
+      return { result, view };
+    };
+
+    // Switched off until something upstream answers: pending, but not loading.
+    const off = now();
+    expect(off.result.isLoading).toBe(false);
+    expect(off.view).toEqual({ state: "waiting" });
+
+    await observer.refetch();
+    expect(now().view.state).toBe("failed");
+
+    // Retrying a failed first load goes back to pending, so the reader sees it working.
+    answer = () => 2;
+    const retry = observer.refetch();
+    expect(now().view.state).toBe("waiting");
+    await retry;
+    expect(now().view).toEqual({ state: "ready", data: 2, refreshError: null });
+
+    // The case this exists for: a refresh fails over data already on screen.
+    answer = () => {
+      throw new Error("blip");
+    };
+    await observer.refetch();
+    const stale = now();
+    expect(stale.result.isError).toBe(true);
+    expect(stale.view).toMatchObject({ state: "ready", data: 2 });
+    expect(stale.view.state === "ready" && stale.view.refreshError?.message).toBe("blip");
+
+    answer = () => 3;
+    await observer.refetch();
+    expect(now().view).toEqual({ state: "ready", data: 3, refreshError: null });
+    unsubscribe();
+  });
+
+  it("treats null as an answer, not as waiting", () => {
+    expect(queryView({ data: null, error: null })).toEqual({
+      state: "ready",
+      data: null,
+      refreshError: null,
+    });
   });
 });

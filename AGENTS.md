@@ -373,6 +373,14 @@ pin them; if one fails, a lesson is being un-learned.
    operator arriving while `/auth/me` is down is told the page does not exist — the wrong cause,
    no retry, no request id to quote. A guard decides between waiting, failing and answering; only
    a real `false` reaches the refusal.
+
+   **And a failed refresh is not a failed page.** `isError` is also true when a background
+   refetch fails over data already on screen, so `isError ? <panel> : <data>` swaps a loaded
+   screen for a failure over one blip. Four adopters' boundaries had learned it and carried the
+   same comment; the fifth, and inline ternaries by the hundred, had not. `queryView` is the
+   shared answer, and its test drives a real observer, so it pins react-query's definitions rather
+   than this package's reading of them.
+
 5. **Every address the app advertises answers 200 — on Cloudflare Pages, that means flat page
    files** (`pricing.html`), not `pricing/index.html`. Cloudflare Pages serves the directory form
    at `/pricing/` and answers `/pricing` with a 308 — so every address the app advertises in its

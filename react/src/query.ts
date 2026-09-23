@@ -134,3 +134,42 @@ export function queryDefaults({
     mutations: { retry: false },
   };
 }
+
+/**
+ * What a screen should show for one query: still waiting, failed with nothing to show, or ready.
+ * When it is ready, `refreshError` says whether the last refresh failed.
+ *
+ * **Never gate a screen on `isError`.** It is also true when a BACKGROUND refetch fails over data
+ * already on screen — a window regaining focus, a poll, the invalidation after a save — so
+ * `isError ? <failure panel> : <data>` throws away what the reader was looking at over one blip.
+ * The adopters that had noticed each wrote `isLoadingError` beside a comment saying so; the ones
+ * that had not were a boundary and a great many inline ternaries. A refresh that failed is not a
+ * page that failed: the data is still real, and `refreshError` is there to say it may be stale.
+ *
+ * `waiting` is anything with no data and no error, and that includes a query switched off until
+ * something upstream answers. `isLoading` is false there, because it means `isPending &&
+ * isFetching`, which is how `isLoading ? <spinner> : <list>` shows an empty list as though the
+ * answer were "nothing".
+ *
+ * Only `data` and `error` are read, and that is react-query's own definition, not a shortcut:
+ * every success clears `error`, and a refetch after a failed first load goes back to pending. So
+ * an error beside data IS `isRefetchError`, and an error without data IS `isLoadingError`. It
+ * takes any query result, infinite ones included, and a test passes a plain object.
+ *
+ * Which control to offer is not decided here. Hand the error to the describer: its `recover` comes
+ * from the same rule the query client retries by, so the button and the retry cannot disagree.
+ */
+export type QueryView<T, E = unknown> =
+  | { readonly state: "waiting" }
+  | { readonly state: "failed"; readonly error: E }
+  | { readonly state: "ready"; readonly data: T; readonly refreshError: E | null };
+
+export function queryView<T, E>(query: {
+  readonly data: T | undefined;
+  readonly error: E | null;
+}): QueryView<T, E> {
+  const { data, error } = query;
+  if (data !== undefined) return { state: "ready", data, refreshError: error };
+  if (error !== null) return { state: "failed", error };
+  return { state: "waiting" };
+}

@@ -44,7 +44,14 @@ export {
 } from "./api-client.ts";
 export { createSseParser, readSseStream, type SseFrame } from "./sse.ts";
 
-export { queryDefaults, retryDelayMs, shouldRetry, type QueryDefaultsOptions } from "./query.ts";
+export {
+  queryDefaults,
+  queryView,
+  retryDelayMs,
+  shouldRetry,
+  type QueryDefaultsOptions,
+  type QueryView,
+} from "./query.ts";
 
 export {
   ErrorBoundary,

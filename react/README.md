@@ -178,6 +178,33 @@ saying waiting will never fix this — a cap that frees only when somebody delet
 slot that frees when another job ends. That `null` is read as the claim it is, not as a field
 somebody forgot, so the code never reaches your list.
 
+## A failed refresh is not a failed page
+
+```tsx
+import { queryView } from "@gusnips/react";
+
+const view = queryView(numbers); // what useQuery returned
+
+if (view.state === "waiting") return <Spinner />;
+if (view.state === "failed") return <ErrorScreen error={view.error} />;
+return <Numbers data={view.data} />;
+```
+
+Don't write `isError ? <ErrorScreen /> : <Numbers />`. `isError` is also true when a refresh fails
+in the background while the numbers are already on screen: the window gets focus back, a poll
+runs, a save reloads the list. One dropped request then swaps a working screen for an error.
+`queryView` shows the error only when there is nothing else to show.
+
+When a refresh fails, the view stays `ready` and `refreshError` holds the error. Use it to say the
+numbers may be out of date, with a button to try again.
+
+`waiting` also covers a query that is switched off until something else loads. `isLoading` is
+false there, so `isLoading ? <Spinner /> : <List />` shows an empty list, as if the answer were
+"nothing".
+
+It reads only `data` and `error`, so a test can pass `{ data: 2, error: null }`. Which button to
+offer comes from `describeError(view.error).recover`, below.
+
 ## Survives your deploys
 
 An app with `lazy()` routes serves chunks by hashed filename. Deploy while someone has a tab
