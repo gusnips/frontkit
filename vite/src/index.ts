@@ -9,9 +9,10 @@
  * Four repos wrote it independently and each learned something the others had not. What is
  * here is the merge; every non-obvious rule carries the reason it exists.
  *
- * Two things live behind their own subpath, because each drags a dependency this barrel would
+ * Three things live behind their own subpath, because each drags a dependency this barrel would
  * otherwise force on everyone: the vite config preset at `@gusnips/vite/preset` (the React and
- * Tailwind plugins) and `renderTree` at `@gusnips/vite/render` (React itself). Nothing here
+ * Tailwind plugins), `renderTree` at `@gusnips/vite/render`, and the theme pre-paint plugin at
+ * `@gusnips/vite/theme` (both React itself). Nothing here
  * imports React or vite, so a prerender script, an OG generator and a repo that only wants a
  * sitemap all install exactly what they use.
  */

@@ -55,8 +55,9 @@ frontkit/               ← repo root (this folder), git root
 **Subpaths, and the rule that decides them.** Anything needing a peer the main entry does not
 already require lives behind one, so an adopter installs a dependency only by importing the thing
 that uses it — `@gusnips/react/ui` (`@base-ui/react`), `/store` (`zustand`), `/guards`
-(`react-router-dom`), `/hydrate` (`react-dom`), `/contract` (nothing), `@gusnips/vite/preset` and
-`/render` (React). See invariant 15; `bun run exports` is what holds the line.
+(`react-router-dom`), `/hydrate` (`react-dom`), `/contract` (nothing), `/theme` (React only, so
+the Vite plugin that serializes it loads nothing else), `@gusnips/vite/preset`, `/render` and
+`/theme` (React). See invariant 15; `bun run exports` is what holds the line.
 
 `react` is the only peer `@gusnips/react`'s main entry requires, and that is deliberate rather
 than incidental: it is what makes the package importable from **React Native**, which has no

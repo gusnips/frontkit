@@ -21,6 +21,10 @@
     "./render": {
       "types": "./dist/render.d.ts",
       "default": "./dist/render.js"
+    },
+    "./theme": {
+      "types": "./dist/theme.d.ts",
+      "default": "./dist/theme.js"
     }
   },
   "types": "./dist/index.d.ts",

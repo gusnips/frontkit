@@ -151,6 +151,20 @@ written `dist/` reads a finished page as its blank and nests one render inside a
 build` empties `dist/` and normally makes that impossible — a restored build cache and a hand-run
 of the script both route around it.
 
+## Theme before the first frame
+
+```ts
+import { themeScript } from "@gusnips/vite/theme";
+
+export default defineConfig({ plugins: [themeScript({ key: "app.theme" })] });
+```
+
+Writes `assets/theme-<hash>.js` and one `<script src>` at the end of `<head>`, so the page is
+painted in the reader's theme before anything else runs. The file is the source of `startTheme`
+from `@gusnips/react/theme`, so the script before paint and the controller the app uses are
+the same function. It is a file rather than an inline script so a `script-src 'self'` policy
+lets it run. Pass it the same options you pass `createTheme`; see that package's README.
+
 ## The vite preset
 
 ```ts
