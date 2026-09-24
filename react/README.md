@@ -417,6 +417,27 @@ In jsdom tests, mock `window.matchMedia`, which jsdom does not have, and run
 `delete window.__frontkitTheme` between tests. There is one controller per page, and a jsdom
 window lasts the whole file.
 
+## A copy button that says when it failed
+
+```tsx
+import { useCopy } from "@gusnips/react";
+
+const { state, copy } = useCopy();
+
+<button onClick={() => void copy(apiKey)} aria-live="polite">
+  {state === "copied" ? "Copied" : state === "failed" ? "Select it and copy it yourself" : "Copy"}
+</button>;
+```
+
+Of eight copy buttons we read, five failed without a word, so the reader pasted whatever was
+already on the clipboard. Two more threw on a page served without https, where there is no
+clipboard API. `useCopy` shows `"copied"` for 2 seconds or `"failed"` for 6, then goes back to
+`"idle"`, and a second copy restarts the clock. `copy` resolves `false` instead of throwing, so a
+toast needs no `catch`. Outside a component, `copyText(text)` does the write on its own.
+
+The words are yours, and so is the live region: a label that changes needs `aria-live` to be
+heard.
+
 ## Also here
 
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
@@ -459,6 +480,8 @@ writes you no longer own.
 The main entry works in React Native. It imports `react` and nothing else you would have to go
 find — no `react-dom`, no router, no store — so the fetch client, the retry rule and the SSE
 parser all come along, and the four things that need a browser stay behind the subpaths above.
+`useCopy` imports fine there but has no `navigator.clipboard` to write to, so every copy answers
+`"failed"`: use the platform's clipboard on a phone.
 
 ## The Base UI wrappers
 

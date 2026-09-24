@@ -31,6 +31,7 @@
 // identical in source.
 
 export { cn } from "./cn.ts";
+export { copyText, useCopy, type CopyOptions, type CopyState } from "./copy.ts";
 export { returnPathFromLocation, safeInternalPath, type PathParts } from "./internal-path.ts";
 
 export { ApiError, isAbortError, retryAfterSecs } from "./api-error.ts";
