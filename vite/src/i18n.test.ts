@@ -422,6 +422,25 @@ describe("fragments", () => {
     );
   });
 
+  it("keeps a list whole, since returnObjects hands it back as one value", async () => {
+    const verbs = { en: { run: { verbs: ["Reading", "Writing"] } } };
+    const root = await tempRoot({
+      "f/a.json": JSON.stringify(verbs),
+      "f/b.json": JSON.stringify(verbs),
+      "f/c.json": JSON.stringify({ en: { run: { count: 3 } } }),
+    });
+    const merged = await mergeFragments(join(root, "f"), ["en"]);
+    expect(merged.errors).toEqual(["c.json [en]: run.count must be a string, a list or an object"]);
+    expect(JSON.parse(merged.files.get("en") ?? "")).toEqual(verbs.en);
+    await writeFile(
+      join(root, "f/b.json"),
+      JSON.stringify({ en: { run: { verbs: ["Reading"] } } }),
+    );
+    expect((await mergeFragments(join(root, "f"), ["en"])).errors).toContain(
+      "b.json [en]: run.verbs is defined twice with different values",
+    );
+  });
+
   it("refuses two fragments that disagree, and writes nothing", async () => {
     const root = await tempRoot({
       ...fragments,

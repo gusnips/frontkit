@@ -406,6 +406,7 @@ type Tree = { [key: string]: unknown };
 const isTree = (value: unknown): value is Tree =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** A list is a value, not a tree: `t(key, { returnObjects: true })` hands it back whole. */
 function mergeInto(
   target: Tree,
   source: Tree,
@@ -423,9 +424,9 @@ function mergeInto(
       const child: Tree = isTree(existing) ? existing : {};
       target[key] = child;
       mergeInto(child, value, `${path}${key}.`, origin, errors);
-    } else if (typeof value !== "string") {
-      errors.push(`${origin}: ${path}${key} must be a string or an object`);
-    } else if (existing !== undefined && existing !== value) {
+    } else if (typeof value !== "string" && !Array.isArray(value)) {
+      errors.push(`${origin}: ${path}${key} must be a string, a list or an object`);
+    } else if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(value)) {
       errors.push(`${origin}: ${path}${key} is defined twice with different values`);
     } else {
       target[key] = value;
