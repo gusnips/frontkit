@@ -1,6 +1,6 @@
 {
   "name": "@gusnips/http",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "The HTTP envelope an API and its clients agree on: {data, meta} or {error:{code, message, messageKey, params, details}}. And, at /retry, whether a failed request is worth another attempt. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",
