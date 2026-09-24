@@ -1,7 +1,7 @@
 {
   "name": "@gusnips/http",
   "version": "0.1.1",
-  "description": "The HTTP envelope an API and its clients agree on: {data, meta} or {error:{code, message, messageKey, params, details}}. Types only, zero dependencies, no framework.",
+  "description": "The HTTP envelope an API and its clients agree on: {data, meta} or {error:{code, message, messageKey, params, details}}. And, at /retry, whether a failed request is worth another attempt. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",
   "author": "Gustavo Salomé",
@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./retry": {
+      "types": "./dist/retry.d.ts",
+      "default": "./dist/retry.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -34,6 +38,8 @@
     "api",
     "envelope",
     "error-codes",
+    "retry",
+    "retry-after",
     "typescript"
   ],
   "scripts": {

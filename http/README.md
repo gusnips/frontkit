@@ -91,4 +91,59 @@ export const ERROR_STATUS = {
 That one line is the point: adding a code to the union without giving it a status becomes a build
 error, instead of a route answering 500 for a refusal it knew how to explain.
 
+## Should this request be tried again?
+
+`@gusnips/http/retry` answers that, and says how long to wait first.
+
+```ts
+import { shouldRetry } from "@gusnips/http/retry";
+
+shouldRetry({ status: 503 }, { repeatable: true }); // → true
+```
+
+It reads fields, not a class, so your SDK's own error type works as it is: `status`, `code` and
+`details` from the envelope, and `retryAfterSecs`, the `Retry-After` header as a number
+(`parseRetryAfter` reads both of the header's forms). A wait sent in `details.retryAfterSecs`
+counts too, after the header. An error with no `status` got no answer at all: offline, DNS, a
+dropped connection.
+
+```ts
+import { retryDelayMs, shouldRetry } from "@gusnips/http/retry";
+
+for (let attempt = 0; ; attempt++) {
+  try {
+    return await send();
+  } catch (error) {
+    if (attempt >= 2 || !shouldRetry(error, { repeatable })) throw error;
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs(attempt, error)));
+  }
+}
+```
+
+| The failure   | `repeatable: true` | `repeatable: false` |
+| ------------- | ------------------ | ------------------- |
+| No answer     | retry              | stop                |
+| 5xx           | retry              | stop                |
+| 408, 425, 429 | retry              | retry               |
+| Any other 4xx | stop               | stop                |
+
+`repeatable` has no default, because either default is wrong for half your calls. Pass `true` for a
+read, or for a write that sends an idempotency key the server honours. A write that got no answer,
+or a 5xx, may already have run, and sending it again can charge a card twice. A 408, 425 or 429
+says the server did not run it, so those are safe to send again either way.
+
+Whatever the status, it stops when:
+
+- the error's `code` is in `durableCodes`. A spent monthly quota clears when someone pays, not
+  when you wait.
+- the body says `details.retryAfterSecs: null`. That is the server saying no wait will clear it.
+- the stated wait is longer than `maxWaitSecs`, 10 seconds by default. Show the wait to the person
+  instead of holding a spinner for a minute.
+
+`retryDelayMs` waits as long as the server asked, and never less than a backoff of 1, 2, 4
+seconds and so on, up to 30.
+
+`@gusnips/react` retries react-query on this same rule, so an SDK and the app that uses it make
+the same call.
+
 MIT · part of [frontkit](https://github.com/gusnips/frontkit)
