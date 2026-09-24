@@ -59,6 +59,22 @@ export function i18nInitOptions({
   queryKey,
   storageWriter = "detector",
 }: I18nInitOptions) {
+  // i18next picks the first EXACT match anywhere in the detected list before it tries a base
+  // subtag, so a reader on [pt-PT, en] got English — "en" is exact and "pt-PT" reaches our pt-BR
+  // only by its base. Settling each tag on its own, exact then base, leaves only supported tags in
+  // the list, in the reader's order. It is the locale gate's rule, written again here rather than
+  // imported because `@gusnips/locale` stays a leaf; the two must agree or the gate sends a reader
+  // to one language and the app renders another.
+  const settle = (tag: string): string => {
+    const lower = tag.toLowerCase();
+    const base = lower.split("-")[0];
+    return (
+      supportedLngs.find((lng) => lng.toLowerCase() === lower) ??
+      supportedLngs.find((lng) => lng.split("-")[0]?.toLowerCase() === base) ??
+      tag
+    );
+  };
+
   return {
     fallbackLng,
     supportedLngs: [...supportedLngs],
@@ -72,6 +88,7 @@ export function i18nInitOptions({
       caches: storageWriter === "detector" ? ["localStorage"] : [],
       ...(queryKey ? { lookupQuerystring: queryKey } : {}),
       lookupLocalStorage: storageKey,
+      convertDetectedLanguage: settle,
     },
     react: { useSuspense: false },
     // `nonExplicitSupportedLngs` is omitted deliberately. It breaks both shapes a catalog comes in.

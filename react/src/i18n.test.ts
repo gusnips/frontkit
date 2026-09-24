@@ -1,5 +1,6 @@
 import { createInstance } from "i18next";
-import { describe, expect, it } from "vitest";
+import LanguageDetector from "i18next-browser-languagedetector";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyBrandVars, i18nInitOptions, type I18nInitOptions } from "./i18n.ts";
 
 describe("applyBrandVars", () => {
@@ -97,5 +98,39 @@ describe("i18nInitOptions", () => {
     // Still READ: the app writes the key, the detector is what notices it.
     expect(app.detection.lookupLocalStorage).toBe("app.locale");
     expect(i18nInitOptions(base).detection.caches).toEqual(["localStorage"]);
+  });
+});
+
+/** For a browser listing `languages`, through the real detector: the language the app settles on. */
+async function detect(supportedLngs: string[], languages: string[]): Promise<string> {
+  vi.stubGlobal("navigator", { language: languages[0], languages });
+  const i18n = createInstance().use(LanguageDetector);
+  await i18n.init({
+    ...i18nInitOptions({ fallbackLng: "en", supportedLngs, storageKey: "app.locale" }),
+    resources: Object.fromEntries(supportedLngs.map((tag) => [tag, { translation: { tag } }])),
+  });
+  return i18n.language;
+}
+
+describe("language detection", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // i18next takes the first EXACT match anywhere in the list before it looks at a base subtag, so
+  // a reader on [pt-PT, en] got English: "en" is exact, "pt-PT" only matches our pt-BR by its base.
+  // Their list is in their order. The locale gate walks it that way, exact tag then base per tag,
+  // and the app it redirects into has to agree with it or the reader lands in one language and
+  // reads another.
+  it("walks the reader's list in their order, exact tag then base per tag", async () => {
+    const regionCoded = ["pt-BR", "en", "es"];
+    expect(await detect(regionCoded, ["pt-PT", "pt", "en-US", "en"])).toBe("pt-BR");
+    expect(await detect(regionCoded, ["en-GB", "pt-BR"])).toBe("en");
+    expect(await detect(regionCoded, ["de-DE", "es-AR", "en"])).toBe("es");
+    expect(await detect(regionCoded, ["de-DE", "fr"])).toBe("en");
+
+    const baseCodes = ["pt", "es", "en"];
+    expect(await detect(baseCodes, ["pt-BR", "en"])).toBe("pt");
+    expect(await detect(baseCodes, ["en-US", "es"])).toBe("en");
   });
 });

@@ -427,6 +427,10 @@ locale. Leave it out and the detector writes it, which is right until you offer 
 browser": going back to that means clearing the key and detecting again, and a detector that
 writes on every change puts the language it just detected straight back in. One writer per key.
 
+Detection walks the browser's language list in the reader's order, exact tag first, then the base
+subtag: `[pt-PT, en]` gets `pt-BR` when that is what you ship, and `[en-GB, pt-BR]` gets `en`.
+`localeGateScript` uses the same rule, so the gate and the app agree about a reader.
+
 `createAuthStore` is at `@gusnips/react/store` — a zustand store whose `isLoading` starts `false`
 where there is no window. A session bootstrap can only be in flight in a browser, and `true`
 during a build is a wait that never ends: it once shipped a spinner as the indexable body of a

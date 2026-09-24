@@ -1503,6 +1503,12 @@ second on a bare address, then jumped to theirs.
   English tag anywhere in `navigator.languages` win, and matched `pt` and `pt-PT` to nothing.
   The gate walks the reader's own order, exact tag first, then the base subtag. A migration that
   only asks "does it still redirect" would have called both the same.
+- **And the kit's own detector had that same old behaviour.** `i18nInitOptions` handed i18next the
+  browser's list, and i18next takes the first EXACT match anywhere in it before it tries a base
+  subtag, so a reader on `[pt-PT, en]` got English. The gate on the bare address sends them to
+  pt-BR, and the app inside then settled on English. It now settles each tag on its own before
+  i18next sees the list. A fleet audit found it by running the real detector on three lists; the
+  test does the same.
 
 ### How to migrate a repo — the check that is not optional
 
