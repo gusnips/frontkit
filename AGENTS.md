@@ -44,7 +44,7 @@ into the history once, and the only fix was rewriting all of it before the first
 frontkit/               ← repo root (this folder), git root
 ├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
 ├── http/               ← @gusnips/http   — the envelope. Types only, zero deps, no framework.
-├── locale/             ← @gusnips/locale — where a language lives in a URL. Zero deps, a leaf.
+├── locale/             ← @gusnips/locale — where a language lives in a URL; /time, what day it is. A leaf.
 ├── br/                 ← @gusnips/br     — CPF, CNPJ, Brazilian phones, CEP. Zero deps, a leaf.
 ├── react/              ← @gusnips/react  — the headless runtime. One required peer: react.
 │   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
@@ -59,6 +59,12 @@ that uses it — `@gusnips/react/ui` (`@base-ui/react`), `/store` (`zustand`), `
 (`react-router-dom`), `/hydrate` (`react-dom`), `/contract` (nothing), `/theme` (React only, so
 the Vite plugin that serializes it loads nothing else), `@gusnips/vite/preset`, `/render` and
 `/theme` (React). See invariant 15; `bun run exports` is what holds the line.
+
+`@gusnips/locale/time` is the one subpath no peer forced. What day it is in a zone has the same
+profile as the rest of that package — servers, browsers and Workers, `Intl` only — and `formatDayKey`
+takes a locale, so a sixth leaf would be one more version to keep in step and save no one an
+install. It stays off the main entry because that entry is about addresses: a server reading
+`asLocale` should not page through date arithmetic to find it.
 
 `react` is the only peer `@gusnips/react`'s main entry requires, and that is deliberate rather
 than incidental: it is what makes the package importable from **React Native**, which has no

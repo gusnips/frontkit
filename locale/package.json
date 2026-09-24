@@ -1,7 +1,7 @@
 {
   "name": "@gusnips/locale",
   "version": "0.1.2",
-  "description": "Where a language lives in a URL, and how it crosses to another origin. Path prefixes, the inverse split, and the query parameter a separate origin needs. Zero dependencies, no framework.",
+  "description": "Where a language lives in a URL, how it crosses to another origin, which one a request asks for, and what day it is in a time zone. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",
   "author": "Gustavo Salomé",
@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./time": {
+      "types": "./dist/time.d.ts",
+      "default": "./dist/time.js"
     }
   },
   "types": "./dist/index.d.ts",
@@ -35,12 +39,15 @@
     "hreflang",
     "url",
     "prerender",
+    "accept-language",
+    "timezone",
+    "date",
     "typescript"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "TZ=America/Sao_Paulo vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint src",
     "sync:docs": "cp ../LICENSE .",

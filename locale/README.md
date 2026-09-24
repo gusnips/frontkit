@@ -1,8 +1,8 @@
 # @gusnips/locale
 
-Where a language lives in a URL, and how it crosses to another origin. No dependencies, and
-nothing tied to a framework — your API server, your browser entry and your prerender script all
-compile this same file.
+Where a language lives in a URL, how it crosses to another origin, which one a reader asked for,
+and what day it is in a time zone. No dependencies, and nothing tied to a framework — your API
+server, your browser entry and your prerender script all compile these same files.
 
 ```bash
 bun add @gusnips/locale
@@ -16,7 +16,7 @@ const { localePath } = createLocales(["en", "pt-BR"] as const, "en");
 localePath("pt-BR", "/terms"); // → "/pt/terms"
 ```
 
-## One list in, seven functions out
+## One list in, nine functions out
 
 The list of languages and which one is the default are yours — they are your content plan, not
 plumbing. Everything derived from them is here.
@@ -34,15 +34,17 @@ export const { asLocale, localePath, splitLocalePath, localeUrl, localeQueryUrl 
 
 Every function is typed on your list, so `localePath("fr", "/")` is a compile error.
 
-|                                        |                                                                        |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| `localePath(locale, path)`             | `("pt-BR", "/terms")` → `/pt/terms`. The default locale is unprefixed. |
-| `splitLocalePath(pathname)`            | The inverse: `/pt/terms` → `{ locale: "pt-BR", path: "/terms" }`.      |
-| `localePrefix(locale)`                 | `""`, `/pt`, `/es` — the prefix on its own.                            |
-| `localeSegment(locale)`                | `""`, `pt`, `es` — the segment without the slash.                      |
-| `asLocale(value)`                      | Narrows an untrusted string to one of yours, or `null`.                |
-| `localeUrl(origin, locale, path)`      | A link to another origin that has per-language addresses.              |
-| `localeQueryUrl(origin, locale, path)` | A link to one that does not.                                           |
+|                                        |                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------ |
+| `localePath(locale, path)`             | `("pt-BR", "/terms")` → `/pt/terms`. The default locale is unprefixed.   |
+| `splitLocalePath(pathname)`            | The inverse: `/pt/terms` → `{ locale: "pt-BR", path: "/terms" }`.        |
+| `localePrefix(locale)`                 | `""`, `/pt`, `/es` — the prefix on its own.                              |
+| `localeSegment(locale)`                | `""`, `pt`, `es` — the segment without the slash.                        |
+| `asLocale(value)`                      | Narrows an untrusted string to one of yours, or `null`.                  |
+| `matchLocale(tags)`                    | The first of a reader's languages you ship: `["pt-PT", "en"]` → `pt-BR`. |
+| `localeFromAcceptLanguage(header)`     | The same, from an `Accept-Language` header.                              |
+| `localeUrl(origin, locale, path)`      | A link to another origin that has per-language addresses.                |
+| `localeQueryUrl(origin, locale, path)` | A link to one that does not.                                             |
 
 ## Why the default language has no prefix
 
@@ -126,6 +128,25 @@ Serve it as a file, which is what `prePaintScript` does. A `script-src 'self'` p
 inline script without any error, and the blink comes back. Then take the redirect out of your
 entry file: the entry just renders the language the address names.
 
+## Read the language a request asks for
+
+```ts
+localeFromAcceptLanguage("de-DE,de;q=0.9,pt-BR;q=0.8"); // → "pt-BR"
+```
+
+Use it for a first guess: a new account, or an e-mail to someone who never picked a language. A
+language the reader chose always wins over it. It returns `null` when nothing matches, so the
+fallback is yours to pick.
+
+It reads every tag, ranked by `q`, and skips `q=0`, which means "not this one". Reading only the
+first tag is the common bug: the reader above is German and also reads Portuguese, and gets your
+default language instead — on the account, and in every e-mail after.
+
+`matchLocale(tags)` does the same for a list you already have, like `navigator.languages`. Both
+keep the redirect script's rule: go through the reader's languages in their order, and for each
+one take an exact match first, then one with the same base language. So `["pt-PT", "en"]` gets
+your `pt-BR`, because the reader put Portuguese first.
+
 ## A language does not survive a jump to another origin
 
 This is the part that gets written last and is usually a bug first. If your site is on
@@ -163,10 +184,51 @@ a reader on an unprefixed address has that language as their resolved preference
 parameter off would let the app re-sniff a browser that disagrees with what the reader is plainly
 reading.
 
+## What day it is, in a time zone
+
+```ts
+import { dayKey } from "@gusnips/locale/time";
+
+dayKey(new Date(), "America/Sao_Paulo"); // → "2026-09-23"
+```
+
+A day only exists in a time zone. At 22:00 in São Paulo it is already the next day in UTC, so a
+server that asks "what day is it" without naming a zone gets its own machine's answer. Every
+function here takes the zone as an argument, and none of them reads the machine's.
+
+A date with no time — a due date, a birthday — is a **day key**: the string `"2026-09-23"`, which
+is what a Postgres `date` column holds. Keep it a string, and compare it as one:
+
+```ts
+const overdue = dayKey(new Date(), zone) > invoice.dueDay;
+```
+
+Don't turn it into a `Date` to compare. A `Date` needs an hour, and any hour you pick is wrong for
+part of the day: pin it to noon, and the invoice shows overdue from noon on the day it is due.
+
+|                                                   |                                                                                             |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `dayKey(at, zone)`                                | The day an instant falls on in a zone.                                                      |
+| `wallClock(at, zone)`                             | The day, hour, minute, second and weekday there.                                            |
+| `zonedInstant(day, "09:00", zone)`                | The instant a wall time names. A skipped time moves forward; a doubled one takes the first. |
+| `startOfDay(day, zone)`                           | When a day begins: midnight, or 01:00 where the clocks skipped midnight.                    |
+| `periodAt(at, zone)`                              | The day and month keys, and when each one ends — for a daily cap or a monthly quota.        |
+| `addDays`, `addMonths`, `daysBetween`, `monthKey` | Arithmetic on day keys. `addMonths("2026-01-31", 1)` is `"2026-02-28"`.                     |
+| `formatDayKey(day, locale)`                       | `("2026-09-23", "pt-BR")` → `23/09/2026`, on every machine.                                 |
+| `parseDayKey(raw)`                                | A real date in `YYYY-MM-DD` form, or `null`. Check untrusted input with it.                 |
+| `canonicalTimeZone(raw)`                          | A zone name the runtime can use, or `null`. Refuses a bare offset like `-03:00`.            |
+
+Use `formatDayKey`, not `new Date(day).toLocaleDateString()`. That reads the key as midnight UTC
+and prints it in the reader's zone, which is the day before for everyone west of UTC.
+
+Which zone to use is your call — the customer's, your billing zone, or UTC — and nothing here
+guesses. It uses only `Intl`, so it runs on a server, in a browser and in a Worker.
+
 ## Two things it does not do
 
-**It picks a language in one place only:** the redirect off a bare address, above. Inside an app,
-detection is `@gusnips/react`'s `i18nInitOptions`.
+**It never detects a language on its own.** The redirect script reads the browser on a bare
+address, and `matchLocale` answers when you hand it a list. Inside an app, detection is
+`@gusnips/react`'s `i18nInitOptions`, which follows the same rule.
 
 **It does not write `og:locale`.** That tag needs a territory your list does not carry (`en` is
 not valid there; `en_US` is), and which territory to claim is a product decision.
