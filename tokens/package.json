@@ -1,6 +1,6 @@
 {
   "name": "@gusnips/tokens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One Tailwind 4 @theme file: the semantic token contract, the dark-mode mechanism, and the base rules every app needs. Colours stay per-brand.",
   "type": "module",
   "license": "MIT",
