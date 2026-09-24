@@ -97,6 +97,11 @@ export function retryAfterSecs(error: unknown): number | null {
 /**
  * `Retry-After` in either form RFC 9110 allows: seconds, or an HTTP date. The date form is the
  * one that gets skipped, which turns a stated wait into none. A date already past is 0.
+ *
+ * The date form rounds UP. It names a whole second and the clock is somewhere inside the one
+ * before, so rounding to nearest sends a retry up to half a second early, into the limiter that
+ * refused it, about half the time. A wait until you are allowed rounds up; the server kit's
+ * webhook sender has always read it that way.
  */
 export function parseRetryAfter(value: string | null | undefined): number | undefined {
   const raw = value?.trim();
@@ -111,7 +116,7 @@ export function parseRetryAfter(value: string | null | undefined): number | unde
 
   const at = Date.parse(raw);
   if (Number.isNaN(at)) return undefined;
-  return Math.max(0, Math.round((at - Date.now()) / 1000));
+  return Math.max(0, Math.ceil((at - Date.now()) / 1000));
 }
 
 /**

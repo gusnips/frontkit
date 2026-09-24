@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseRetryAfter, retryAfterSecs, retryDelayMs, shouldRetry } from "./retry.ts";
 
 // Plain objects on purpose: the rule reads fields, never a class, so an SDK's own error type and
@@ -129,6 +129,16 @@ describe("parseRetryAfter", () => {
     expect(parseRetryAfter(at)).toBeGreaterThanOrEqual(119);
     expect(parseRetryAfter(at)).toBeLessThanOrEqual(120);
     expect(parseRetryAfter(new Date(Date.now() - 60_000).toUTCString())).toBe(0);
+  });
+
+  it("rounds a date up, so the retry is never early", () => {
+    // 119.4 seconds away. Rounded to nearest that is 119, and the retry lands inside the refusal.
+    vi.useFakeTimers({ now: Date.parse("2026-09-24T12:00:00.600Z") });
+    try {
+      expect(parseRetryAfter("Thu, 24 Sep 2026 12:02:00 GMT")).toBe(120);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("answers nothing for a header that is missing or not a wait", () => {
