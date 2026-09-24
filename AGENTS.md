@@ -43,7 +43,7 @@ into the history once, and the only fix was rewriting all of it before the first
 ```
 frontkit/               ← repo root (this folder), git root
 ├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
-├── http/               ← @gusnips/http   — the envelope. Types only, zero deps, no framework.
+├── http/               ← @gusnips/http   — the envelope; /retry, when to try again. Zero deps, no framework.
 ├── locale/             ← @gusnips/locale — where a language lives in a URL; /time, what day it is. A leaf.
 ├── br/                 ← @gusnips/br     — CPF, CNPJ, Brazilian phones, CEP. Zero deps, a leaf.
 ├── react/              ← @gusnips/react  — the headless runtime. One required peer: react.
@@ -69,6 +69,11 @@ install. It stays off the main entry because that entry is about addresses: a se
 `@gusnips/vite/i18n` is the second, for the same reason. The catalog check needs only `node:fs`,
 which the main entry already uses, but it runs in CI and never in a build. A prerender script
 reading `bakeHead` should not load it.
+
+`@gusnips/http/retry` is the third. Invariant 8's rule moved there from `@gusnips/react` so an SDK
+with no React in it can follow it, and every server imports the main entry for the envelope and
+never retries anything. `@gusnips/react` re-exports `retryAfterSecs` from it and keeps
+`shouldRetry(error, codes, maxWait)` as the react-query binding.
 
 `react` is the only peer `@gusnips/react`'s main entry requires, and that is deliberate rather
 than incidental: it is what makes the package importable from **React Native**, which has no
@@ -427,7 +432,17 @@ pin them; if one fails, a lesson is being un-learned.
 8. **Never retry what waiting cannot fix, and when it says how long, believe it.** 402 and a
    durable 429 (`QUOTA_EXCEEDED`, `PAYMENT_REQUIRED`) clear by buying, not by waiting; retrying
    them burns another request against the limiter and says the same thing three times. Retry 408,
-   a transient 429, 5xx, and no-response-at-all — nothing else.
+   425, a transient 429, 5xx, and no-response-at-all — nothing else.
+
+   **The rule lives in `@gusnips/http/retry`, because five SDKs each wrote their own and each
+   missed part of it.** None retried a 408, none read an explicit `retryAfterSecs: null`, four read
+   the body's wait before the header, and the one that sent an idempotency key retried writes that
+   had none. The rule reads an error by its fields, never its class, so an SDK's own error type
+   works unchanged. `@gusnips/react` hands it only its own `ApiError` and passes anything else as
+   "no answer", because the describer reads a vendor's error that way too, and the button and the
+   retry must not disagree. 425 joined the list with the move: "too early" is a server declining
+   to run a request sent in a TLS handshake's early data, so like 408 and 429 it says the request
+   did not run.
 
    **Measured on the server side, where these are raised: of 13 raises of a 402 across five
    backends, none states a wait.** So the rule is not only a client-side policy — it is what every
@@ -455,6 +470,9 @@ pin them; if one fails, a lesson is being un-learned.
    wrong question for a write: a transient 5xx on a charge is exactly the case this rule currently
    tells you to retry, and exactly the case where a retry can bill someone twice. Unless a request
    carries an idempotency key the server honours, a non-idempotent method gets one attempt.
+   `@gusnips/http/retry` makes that a required argument, `repeatable`, with no default: `false`
+   retries only 408, 425 and 429, the answers that say nothing ran. The react binding passes
+   `true`, because a query is a read and `queryDefaults` never retries a mutation.
 
    The second half arrived with the second migration: a refusal that states its own expiry has already answered the question, so a
    short wait is WAITED OUT (`retryDelay` takes the stated seconds over the backoff) and a long

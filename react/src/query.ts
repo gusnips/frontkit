@@ -1,5 +1,6 @@
+import { retryDelayMs as delayFor, shouldRetry as retryRule } from "@gusnips/http/retry";
 import type { DefaultOptions } from "@tanstack/react-query";
-import { ApiError, retryAfterSecs, waitingNeverHelps } from "./api-error.ts";
+import { ApiError } from "./api-error.ts";
 
 /**
  * react-query defaults — the merge of three repos that each got part of this right.
@@ -26,13 +27,9 @@ import { ApiError, retryAfterSecs, waitingNeverHelps } from "./api-error.ts";
  * "did not say how long" — which is what every version before this one did — that 429 is retried
  * against a limit no amount of time moves.
  *
- * This is invariant 8.
+ * This is invariant 8. The rule itself lives in `@gusnips/http/retry`, so an SDK with no React
+ * in it follows the same one; what is here is the binding to react-query.
  */
-
-/** 4xx statuses a second attempt can fix. Everything else in the 4xx family is an answer. */
-const RETRYABLE_CLIENT_STATUS = new Set([408, 429]);
-
-const DEFAULT_MAX_RETRY_WAIT_SECS = 10;
 
 export interface QueryDefaultsOptions {
   /**
@@ -70,33 +67,19 @@ export interface QueryDefaultsOptions {
  * Should this failure be retried?
  *
  * Exported on its own because an app with its own QueryClient config still wants this rule, and
- * because it is the part worth testing.
+ * because the describer derives the control it offers from it.
  */
 export function shouldRetry(
   error: unknown,
   durableLimitCodes: readonly string[] = [],
-  maxRetryWaitSecs = DEFAULT_MAX_RETRY_WAIT_SECS,
+  maxRetryWaitSecs?: number,
 ): boolean {
-  // No response at all — offline, DNS, a dropped connection. The request never landed, so
-  // nothing about it is an answer, and a second attempt is exactly right.
-  if (!(error instanceof ApiError)) return true;
-
-  if (error.code !== undefined && durableLimitCodes.includes(error.code)) return false;
-
-  // The same judgement, made by the server instead of by a list the app maintains: an explicit
-  // `details.retryAfterSecs: null` means waiting will never fix this. Checked before the stated
-  // wait because the two can contradict each other, and the `null` is written by whoever raised
-  // this particular refusal where a number can come from a limiter that attaches one to every
-  // 429 it emits.
-  if (waitingNeverHelps(error)) return false;
-
-  // It told us when it clears. A wait we are not willing to hold is a refusal, not a hiccup —
-  // and it is the same judgement `durableLimitCodes` makes, except the server did the naming.
-  const wait = retryAfterSecs(error);
-  if (wait !== null && wait > maxRetryWaitSecs) return false;
-
-  if (error.status >= 500) return true;
-  return RETRYABLE_CLIENT_STATUS.has(error.status);
+  // Every caller here is a query, or a person pressing "try again", so the request may run twice.
+  return retryRule(answerOf(error), {
+    repeatable: true,
+    durableCodes: durableLimitCodes,
+    maxWaitSecs: maxRetryWaitSecs,
+  });
 }
 
 /**
@@ -105,16 +88,23 @@ export function shouldRetry(
  * server saying "immediately", which for a client that just got refused is still too soon.
  */
 export function retryDelayMs(attemptIndex: number, error: unknown): number {
-  const backoff = Math.min(1000 * 2 ** attemptIndex, 30_000);
-  if (!(error instanceof ApiError)) return backoff;
-  const wait = retryAfterSecs(error);
-  return wait === null ? backoff : Math.max(backoff, wait * 1000);
+  return delayFor(attemptIndex, answerOf(error));
+}
+
+/**
+ * Only this client's `ApiError` is an answer. The shared rule reads any error by its fields, so a
+ * vendor's error with a `status` of its own would count as one — and the describer reads anything
+ * that is not an `ApiError` as a request that never landed, offering "try again" where the retry
+ * rule would refuse. Handing the rule `null` keeps the two reading one failure the same way.
+ */
+function answerOf(error: unknown): ApiError | null {
+  return error instanceof ApiError ? error : null;
 }
 
 export function queryDefaults({
   durableLimitCodes = [],
   maxRetries = 2,
-  maxRetryWaitSecs = DEFAULT_MAX_RETRY_WAIT_SECS,
+  maxRetryWaitSecs,
   staleTime = 2 * 60 * 1000,
   gcTime = 10 * 60 * 1000,
   refetchOnWindowFocus = false,

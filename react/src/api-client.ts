@@ -1,5 +1,6 @@
 import { isApiError, type ApiSuccess } from "@gusnips/http";
-import { ApiError, parseRetryAfter } from "./api-error.ts";
+import { parseRetryAfter } from "@gusnips/http/retry";
+import { ApiError } from "./api-error.ts";
 
 /**
  * The app's one door to the API. Nothing else should call `fetch`.

@@ -26,6 +26,17 @@ describe("shouldRetry", () => {
     expect(shouldRetry(new TypeError("Failed to fetch"))).toBe(true);
   });
 
+  // The describer reads anything that is not an `ApiError` as a request that never landed and
+  // offers "try again". A vendor's error carrying a `status` of its own must get the same answer
+  // here, or the button and the retry disagree.
+  it("reads only its own ApiError as an answer", () => {
+    const vendor = Object.assign(new Error("Invalid login credentials"), { status: 400 });
+    expect(shouldRetry(vendor)).toBe(true);
+    expect(retryDelayMs(0, Object.assign(new Error("x"), { status: 429, retryAfterSecs: 5 }))).toBe(
+      1000,
+    );
+  });
+
   it("retries 5xx", () => {
     expect(shouldRetry(refusal(500))).toBe(true);
     expect(shouldRetry(refusal(503))).toBe(true);

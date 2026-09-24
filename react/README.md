@@ -163,8 +163,10 @@ new QueryClient({
 });
 ```
 
-Retries 408, a transient 429, 5xx, and no-response-at-all. Nothing else — every other 4xx is an
-answer, and a second attempt just says it again.
+Retries 408, 425, a transient 429, 5xx, and no-response-at-all. Nothing else — every other 4xx is
+an answer, and a second attempt just says it again. The rule itself is
+[`@gusnips/http/retry`](../http#should-this-request-be-tried-again), so an SDK with no React in it
+can retry the same way.
 
 `durableLimitCodes` is the part a status code cannot tell you. A spent monthly quota and a burst
 limit both arrive as 429, but one clears by waiting and the other clears by buying. Retrying the

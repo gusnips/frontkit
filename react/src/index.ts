@@ -34,7 +34,8 @@ export { cn } from "./cn.ts";
 export { copyText, useCopy, type CopyOptions, type CopyState } from "./copy.ts";
 export { returnPathFromLocation, safeInternalPath, type PathParts } from "./internal-path.ts";
 
-export { ApiError, isAbortError, retryAfterSecs } from "./api-error.ts";
+export { ApiError, isAbortError } from "./api-error.ts";
+export { retryAfterSecs } from "@gusnips/http/retry";
 export {
   createApiClient,
   type ApiClient,

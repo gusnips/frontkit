@@ -1,4 +1,5 @@
-import { ApiError, retryAfterSecs } from "./api-error.ts";
+import { retryAfterSecs } from "@gusnips/http/retry";
+import { ApiError } from "./api-error.ts";
 import { shouldRetry } from "./query.ts";
 
 /**
