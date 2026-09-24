@@ -241,7 +241,7 @@ function main(): void {
     !css.includes('[role="combobox"]'),
     "the text-field outline suppression is back — it takes the keyboard focus ring off " +
       "every adopter's plain <input> (WCAG 2.4.7). Opt out per component with " +
-      "`focus-visible:outline-none`, which beats the base rule on layer order.",
+      "`focus-visible:outline-hidden`, which beats the base rule on layer order.",
   );
 
   // 7. The contrast floors, in both modes, on the values that actually shipped. The light
@@ -281,6 +281,9 @@ function main(): void {
     ["light color-scheme", "color-scheme: light"],
     ["dark color-scheme", "color-scheme: dark"],
     ["the focus ring", "outline: 2px solid var(--color-ring)"],
+    // Forced colors draw no box-shadow, so without this a ring beside an `outline-none` leaves
+    // a Windows High Contrast reader with no focus indicator anywhere.
+    ["the forced-colors focus outline", "outline: 2px solid CanvasText !important"],
     ["the scrollbar thumb", "background: var(--color-input)"],
     ["`.scrollbar-none`", "scrollbar-width: none"],
     ["the reduced-motion clamp", "@media (prefers-reduced-motion: reduce)"],

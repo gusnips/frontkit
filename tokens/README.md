@@ -72,12 +72,18 @@ real rule. One codebase had 61 of these.
 `index.css` also brings a handful of rules that every app needs and nobody remembers:
 
 - one `:focus-visible` outline, drawn with `--color-ring`, so it follows your theme into dark
+- the same outline in Windows High Contrast, in the reader's own text colour. That mode draws no
+  shadows, so a `ring-*` focus ring vanishes there, and nothing in your app can turn this one off
 - `cursor: pointer` on buttons, which browsers do not give you
 - `color-scheme`, which stops a two-tone seam where a phone toolbar retracts
 - reduced motion clamped to `0.01ms` rather than `none`, so animations still land on their end
   pose instead of never appearing — including the two delay properties, which are the half
   people forget
 - a thin scrollbar whose thumb reads `--color-input`, and `.scrollbar-none` for a tab strip
+
+To hide the outline on a control that shows focus some other way, put
+`focus-visible:outline-hidden` on it. Not `outline-none`: in Tailwind 4, only `outline-hidden`
+comes back in High Contrast.
 
 Want them separately? `@gusnips/tokens/theme.css` is the names with no rules,
 `@gusnips/tokens/base.css` the rules with no names.

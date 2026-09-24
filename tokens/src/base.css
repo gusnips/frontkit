@@ -60,9 +60,25 @@
      get to make that trade, and a comment telling adopters to put the ring back is not a
      fix, because it only works for the ones who read it.
      A control that genuinely draws its own focus treatment opts out on itself, with
-     `focus-visible:outline-none` on the element. Utilities sit in a later cascade layer
+     `focus-visible:outline-hidden` on the element. Utilities sit in a later cascade layer
      than base, so it wins with no specificity fight, and the opt-out stays local to the one
-     component that earned it. */
+     component that earned it. `-hidden`, not `-none`: in Tailwind 4 `outline-none` is a bare
+     `outline-style: none`, and `outline-hidden` is the one that keeps an outline in forced
+     colors. */
+
+  /* Windows High Contrast (forced colors) draws no box-shadow, so a focus ring made with
+     `ring-*` is gone there, and an `outline-none` beside it leaves nothing at all: the
+     keyboard user sees no focus anywhere. Nine products in one fleet shipped that pair, on
+     493 lines of markup. `!important` is what lets one rule here cover every control in
+     the app: an important declaration beats every normal one whatever its layer, so no
+     `outline-none` in the utilities layer can remove this outline. It sets no offset, so a
+     control inside a clipping list can still pull it inward. Only forced colors get it, and
+     the colour is the system's own text colour, which the reader chose. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline: 2px solid CanvasText !important;
+    }
+  }
 
   /* A thin scrollbar, because the OS default is a wide light bar that stays light on a
      dark app. The thumb reads `--color-input`, the one token defined to clear 3:1 against
