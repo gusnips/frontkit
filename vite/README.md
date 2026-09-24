@@ -178,6 +178,82 @@ The script runs on its own, before your bundle, so it must not use anything outs
 tag goes at the end of `<head>` by default. `position: "head-prepend"` puts it first instead, so
 it does not wait for your stylesheets to download. Use that for a script that may leave the page.
 
+## Check your translations
+
+```ts
+// scripts/check-i18n.ts
+import { readFile } from "node:fs/promises";
+import { checkI18n, formatI18nReport, type I18nBundle } from "@gusnips/vite/i18n";
+
+const web: I18nBundle = {
+  name: "web",
+  locales: ["en", "pt-BR", "es"],
+  canonical: "en",
+  load: async (locale) => ({
+    translation: JSON.parse(await readFile(`src/i18n/locales/${locale}.json`, "utf8")),
+  }),
+};
+
+const report = await checkI18n([web]);
+
+console.log(formatI18nReport(report));
+process.exit(report.problems.some((p) => p.level === "error") ? 1 : 0);
+```
+
+Your `canonical` language is typed, so a `t("key")` it lacks already fails to compile. The other
+languages are not, and neither is anything inside a string. This checks what the compiler can't:
+
+| It fails when                                                  | Because the reader gets                               |
+| -------------------------------------------------------------- | ----------------------------------------------------- |
+| a key is in one language and not another, or is blank          | the canonical language, in the middle of their own    |
+| a counted key lacks a form its language needs (pt `_many`)     | English for exactly 1,000,000 of something            |
+| `{{name}}` became `{{nome}}`, or `{{n, number}}` lost `number` | a gap, or 5000 where they write 5.000                 |
+| `<0>…</0>` is out of order or not closed                       | the wrong words bold, or the tag as text              |
+| a placeholder is named `lng`, `ns` or another `t()` option     | another language, not the value                       |
+| a language fails to load                                       | nothing — every other rule would have passed it empty |
+
+`load` returns one language's catalogs by namespace, so JSON files, TS modules and a runtime
+merge all fit. If it throws, the check fails with the error. It never skips.
+
+Give it `code` and it reads your source too: every static `t("key")` exists, a template key's
+fixed start exists (``t(`plan.${id}.title`)`` needs `plan`), `<Trans>` has no children (they
+shift every `<0>`), and copy with `<strong>` in it is not read through `t()`, which prints the
+tag as text.
+
+```ts
+await checkI18n([{ ...web, code: ["src/**/*.{ts,tsx}"] }]);
+```
+
+Keys the server sends are shown in whatever language the reader has, so each one must be in every
+language. Pass the list if you can import it, or the server's source to scan for `messageKey:`:
+
+```ts
+await checkI18n([{ ...web, serverKeys: MESSAGE_KEYS }]);
+// or, with no list to import:
+await checkI18n([
+  { ...web, serverCode: ["apps/api/src/**/*.ts"], serverKeyPrefixes: ["serverErrors."] },
+]);
+```
+
+`report.unused` lists canonical keys no code seems to reach. It is a hint, not a failure: a key
+built at runtime from a variable can't be seen by a scan.
+
+If your prices come from a formatter, pass `{ price: /\$\s?\d/ }` as the second argument and a
+price typed into copy fails too.
+
+**Fragments.** If several people write screens at once, keep one file per area with every
+language side by side — `{ "en": {…}, "pt-BR": {…} }` — and merge them. `writeFragments` writes
+`out/<locale>.json` with sorted keys, so two runs write the same bytes, and writes nothing if two
+fragments disagree. The check then fails if a committed catalog no longer matches its fragments:
+
+```ts
+await checkI18n([{ ...web, fragments: { dir: "src/i18n/fragments", out: "src/i18n/locales" } }]);
+```
+
+If the app merges fragments at runtime with a spread (`{ ...auth.en, ...nav.en }`), leave `out`
+off and set `ownTopLevel: true`. A spread keeps only the second of two fragments that share a
+top-level key, so that is refused.
+
 ## The vite preset
 
 ```ts

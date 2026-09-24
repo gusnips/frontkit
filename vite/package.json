@@ -1,7 +1,7 @@
 {
   "name": "@gusnips/vite",
   "version": "0.8.16",
-  "description": "The build-time half of a prerendered Vite SPA: head baking, sitemap, robots, the prerender driver, and a shared vite preset.",
+  "description": "The build-time half of a prerendered Vite SPA: head baking, sitemap, robots, the prerender driver, a shared vite preset, and the translation catalog check.",
   "type": "module",
   "license": "MIT",
   "author": "Gustavo Salomé",
@@ -17,6 +17,10 @@
     "./preset": {
       "types": "./dist/preset.d.ts",
       "default": "./dist/preset.js"
+    },
+    "./i18n": {
+      "types": "./dist/i18n.d.ts",
+      "default": "./dist/i18n.js"
     },
     "./render": {
       "types": "./dist/render.d.ts",
@@ -48,7 +52,9 @@
     "sitemap",
     "open-graph",
     "seo",
-    "react"
+    "react",
+    "i18n",
+    "i18next"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",

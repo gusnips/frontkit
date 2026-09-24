@@ -60,11 +60,15 @@ that uses it — `@gusnips/react/ui` (`@base-ui/react`), `/store` (`zustand`), `
 the Vite plugin that serializes it loads nothing else), `@gusnips/vite/preset`, `/render` and
 `/theme` (React). See invariant 15; `bun run exports` is what holds the line.
 
-`@gusnips/locale/time` is the one subpath no peer forced. What day it is in a zone has the same
+`@gusnips/locale/time` is a subpath no peer forced. What day it is in a zone has the same
 profile as the rest of that package — servers, browsers and Workers, `Intl` only — and `formatDayKey`
 takes a locale, so a sixth leaf would be one more version to keep in step and save no one an
 install. It stays off the main entry because that entry is about addresses: a server reading
 `asLocale` should not page through date arithmetic to find it.
+
+`@gusnips/vite/i18n` is the second, for the same reason. The catalog check needs only `node:fs`,
+which the main entry already uses, but it runs in CI and never in a build. A prerender script
+reading `bakeHead` should not load it.
 
 `react` is the only peer `@gusnips/react`'s main entry requires, and that is deliberate rather
 than incidental: it is what makes the package importable from **React Native**, which has no
