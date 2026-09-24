@@ -46,6 +46,15 @@ client owns the _prose_. That is what lets an API refuse something without knowi
 the person reads, and `details` is what lets the client offer a way forward instead of a dead
 end.
 
+When a request fails validation, `details` is a `ValidationIssue[]`:
+
+```ts
+[{ path: ["items", 0, "qty"], code: "too_big", maximum: 200 }];
+```
+
+The field, the rule, and the bound, so a form can say "at most 200" next to the right input. Never
+the value that was sent, the validator's own sentence, or the list of allowed values.
+
 ## The codes are yours
 
 Everything is generic over your own code union. Two codebases this came from had 30 codes and 16

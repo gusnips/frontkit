@@ -62,6 +62,27 @@ export interface ApiError<Code extends string = string> {
   };
 }
 
+/**
+ * One rejected field. When a request fails validation, `details` is an array of these.
+ *
+ * Enough to fix the call and nothing about the schema: the field, the rule, and a range's
+ * bound. Never the rejected value, the validator's English sentence or an enum's allowed values;
+ * the server builds this from an allow-list, so a validator upgrade cannot add them. That covers
+ * the caller's own key names too, so an `unrecognized_keys` issue names no keys.
+ *
+ * Four codebases defined this shape before it lived here, and two more dropped the bound, so no
+ * client could say "at most 200" about a limit the API's own docs state.
+ */
+export interface ValidationIssue {
+  /** The field that failed, as the caller spelled it: `["items", 0, "qty"]`. */
+  path: (string | number)[];
+  /** The rule that rejected it, such as `too_big`. */
+  code: string;
+  /** The numeric bound, when the rule has one. */
+  maximum?: number;
+  minimum?: number;
+}
+
 export type ApiResponse<T, Code extends string = string, M = PaginationMeta> =
   ApiSuccess<T, M> | ApiError<Code>;
 
