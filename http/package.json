@@ -1,6 +1,6 @@
 {
   "name": "@gusnips/http",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The HTTP envelope an API and its clients agree on: {data, meta} or {error:{code, message, messageKey, params, details}}. Types only, zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",
