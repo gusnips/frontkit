@@ -1,0 +1,62 @@
+{
+  "name": "@gusnips/br",
+  "version": "0.1.0",
+  "description": "Brazilian documents and phone numbers: CPF and CNPJ (the alphanumeric CNPJ too), phones, CEP. Check digits, display, input masks. Zero dependencies, no framework.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Gustavo Salomé",
+  "homepage": "https://github.com/gusnips/frontkit/tree/main/br#readme",
+  "bugs": {
+    "url": "https://github.com/gusnips/frontkit/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "brazil",
+    "cpf",
+    "cnpj",
+    "cep",
+    "phone",
+    "validation",
+    "typescript"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "sync:docs": "cp ../LICENSE .",
+    "prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run build && bun run sync:docs",
+    "release:patch": "bun pm version patch && bun publish --access public",
+    "release:minor": "bun pm version minor && bun publish --access public",
+    "release:major": "bun pm version major && bun publish --access public"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gusnips/frontkit.git",
+    "directory": "br"
+  }
+}

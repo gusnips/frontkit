@@ -28,7 +28,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
-const PACKAGES = ["tokens", "http", "locale", "react", "vite"];
+const PACKAGES = ["tokens", "http", "locale", "br", "react", "vite"];
 
 interface Manifest {
   name: string;

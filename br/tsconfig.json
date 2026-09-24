@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // No DOM, no @types/node. An API validates a CNPJ, a form masks it as it is typed, and a React
+    // Native screen does both; the narrowest lib is what proves one build of this file serves all
+    // three.
+    "lib": ["ES2022"],
+    "types": [],
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}

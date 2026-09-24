@@ -45,6 +45,7 @@ frontkit/               ← repo root (this folder), git root
 ├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
 ├── http/               ← @gusnips/http   — the envelope. Types only, zero deps, no framework.
 ├── locale/             ← @gusnips/locale — where a language lives in a URL. Zero deps, a leaf.
+├── br/                 ← @gusnips/br     — CPF, CNPJ, Brazilian phones, CEP. Zero deps, a leaf.
 ├── react/              ← @gusnips/react  — the headless runtime. One required peer: react.
 │   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
 ├── vite/               ← @gusnips/vite   — the build rig. The ONLY package allowed node:fs.
@@ -63,7 +64,7 @@ the Vite plugin that serializes it loads nothing else), `@gusnips/vite/preset`, 
 than incidental: it is what makes the package importable from **React Native**, which has no
 react-dom to give. See migration 2.
 
-**Five packages, split by dependency profile.** That split is not taste; it is what each
+**Six packages, split by dependency profile.** That split is not taste; it is what each
 consumer can afford to install:
 
 - `tokens/` is imported by the Astro marketing sites too, so it cannot contain JavaScript.
@@ -75,6 +76,11 @@ consumer can afford to install:
   imports a path helper. The list is product data that stays home either way, so the server's
   whole use of the shared half is one narrowing function — and putting that behind the react
   package's name would put react in six servers' dependency graphs to get it.
+- `br/` is imported by `apps/api`, by web forms and by a React Native screen, so it has the
+  profile of `http/` and `locale/`: no framework, no platform, no dependency. It is its own package
+  rather than a part of either because a country's documents are neither the envelope nor a
+  language — an English UI in Brazil still validates a CNPJ. Six adopters had written it, in three
+  independent lineages, and none accepted the alphanumeric CNPJ.
 - `react/` runs in a browser AND inside a prerender, so it cannot contain `node:*`.
 - `vite/` needs `node:fs`. Having somewhere for that to live is what lets the other three be
   strict.
@@ -83,7 +89,7 @@ Dependency edges run one way: `vite/ → react/ → http/`. Never the reverse. I
 `PRERENDERED_ROUTE_ATTR` lives in `react/`, not `vite/`, because a **browser entry** reads it —
 putting it in the build-time package would drag `node:` into the client bundle.
 
-`locale/` is a **leaf**: nothing in frontkit imports it, deliberately. A package that depends on
+`locale/` and `br/` are **leaves**: nothing in frontkit imports them, deliberately. A package that depends on
 it would pin it at an exact version at pack time, which is the hazard the `vite → react` pin
 already costs us a paired bump for; a leaf has no version anyone else can get wrong. That is also
 why `i18nInitOptions` does not read `LOCALE_QUERY_PARAM` itself — the adopter passes it, one line,
@@ -135,7 +141,7 @@ Per package: `cd react && bun run test`, etc.
 - **`bun run release:check` packs each package and reads the manifest that comes out.** It is the
   only thing here that looks at what the registry will actually receive, and the only reason the
   bug above is a caught error rather than a broken tarball.
-- **Publish in dependency order** — `tokens`, `http`, `locale`, `react`, `vite` — and bump `vite` whenever
+- **Publish in dependency order** — `tokens`, `http`, `locale`, `br`, `react`, `vite` — and bump `vite` whenever
   `react` ships, because the pin inside it changed even when none of its own code did.
 - **And the adopter's half of that pin: the two carets move together, or the install grows a second
   copy of `react`.** That exact pin inside `vite` is reachable through the ADOPTER's `vite` caret,

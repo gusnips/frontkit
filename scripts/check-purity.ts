@@ -50,6 +50,7 @@ const BROWSER_RULE: Rule = {
 const PACKAGES: Record<string, Rule[]> = {
   http: [NODE_RULE, BROWSER_RULE],
   locale: [NODE_RULE, BROWSER_RULE],
+  br: [NODE_RULE, BROWSER_RULE],
   react: [NODE_RULE],
   // vite/ is deliberately absent — it is the package that gets to touch the filesystem.
   // tokens/ too, and for a different reason worth saying rather than leaving as a gap in a map:
