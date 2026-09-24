@@ -136,3 +136,50 @@ describe("crossing to another origin", () => {
     expect(custom.localeQueryUrl(APP, "pt-BR", "/x")).toBe("https://app.example.com/x?hl=pt-BR");
   });
 });
+
+describe("reading what a reader asks for", () => {
+  it("walks the reader's list in their order, exact tag before base subtag", () => {
+    expect(EN.matchLocale(["es", "en"])).toBe("es");
+    // i18next's own matcher answers English here: it takes an exact match anywhere in the list
+    // before it tries a base subtag. The reader put Portuguese first.
+    expect(EN.matchLocale(["pt-PT", "en"])).toBe("pt-BR");
+    expect(EN.matchLocale(["pt"])).toBe("pt-BR");
+    expect(EN.matchLocale(["PT-br"])).toBe("pt-BR");
+    expect(EN.matchLocale(["de", "es-MX"])).toBe("es");
+    expect(EN.matchLocale(["de", "fr"])).toBeNull();
+    expect(EN.matchLocale(["", " "])).toBeNull();
+    expect(EN.matchLocale([])).toBeNull();
+  });
+
+  it("takes an exact tag over an earlier locale that only shares its base", () => {
+    const both = createLocales(["pt-BR", "pt-PT"] as const, "pt-BR");
+    expect(both.matchLocale(["pt-PT"])).toBe("pt-PT");
+    // A bare base names neither; the first one listed answers.
+    expect(both.matchLocale(["pt"])).toBe("pt-BR");
+  });
+
+  it("reads every tag of an Accept-Language header, not just the first", () => {
+    // A German speaker who also reads Portuguese. Reading only the first tag saved the default
+    // language on their account, and with it every e-mail after.
+    expect(EN.localeFromAcceptLanguage("de-DE,de;q=0.9,pt-BR;q=0.8,en;q=0.7")).toBe("pt-BR");
+    expect(EN.localeFromAcceptLanguage("pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7")).toBe("pt-BR");
+    expect(EN.localeFromAcceptLanguage("es-MX")).toBe("es");
+  });
+
+  it("ranks by weight, keeps the order sent for equal weights, and drops q=0", () => {
+    expect(EN.localeFromAcceptLanguage("en;q=0.5, es;q=0.8")).toBe("es");
+    expect(EN.localeFromAcceptLanguage("es, pt-BR")).toBe("es");
+    expect(EN.localeFromAcceptLanguage("pt-BR;q=0.7, es;q=0.7")).toBe("pt-BR");
+    // `q=0` means "not this one", so the tag it sits on is no answer at all.
+    expect(EN.localeFromAcceptLanguage("pt-BR;q=0, fr")).toBeNull();
+    expect(EN.localeFromAcceptLanguage("pt-BR;Q=0.000, es;q=0.1")).toBe("es");
+  });
+
+  it("answers null for a header that asks for nothing we ship", () => {
+    expect(EN.localeFromAcceptLanguage(null)).toBeNull();
+    expect(EN.localeFromAcceptLanguage(undefined)).toBeNull();
+    expect(EN.localeFromAcceptLanguage("")).toBeNull();
+    expect(EN.localeFromAcceptLanguage("*")).toBeNull();
+    expect(EN.localeFromAcceptLanguage("fr-FR,fr;q=0.9")).toBeNull();
+  });
+});

@@ -27,6 +27,10 @@ export const LOCALE_QUERY_PARAM = "lang";
 export interface Locales<L extends string> {
   /** Narrow an untrusted string — a column, a header, a query parameter — to a locale we ship. */
   asLocale: (value: string | null | undefined) => L | null;
+  /** The locale we ship that a reader's preference list asks for first: `["pt-PT", "en"]` → `pt-BR`. */
+  matchLocale: (tags: readonly string[]) => L | null;
+  /** The same, from an `Accept-Language` header, honouring `q` and skipping `q=0`. */
+  localeFromAcceptLanguage: (header: string | null | undefined) => L | null;
   /** A locale's segment in a URL path: `""` for the default, `pt`, `es`. */
   localeSegment: (locale: L) => string;
   /** Where a locale's pages live: `""` for the default, `/pt`, `/es`. */
@@ -69,6 +73,59 @@ export function createLocales<const L extends readonly string[]>(
 
   const asLocale = (value: string | null | undefined): Locale | null =>
     locales.find((locale) => locale === value) ?? null;
+
+  /**
+   * Walk the reader's list in THEIR order, and for each tag take an exact match (any case), then a
+   * locale with the same base subtag. So `["pt-PT", "en"]` is Portuguese: the reader put it first,
+   * and our Portuguese is the one they would pick over English.
+   *
+   * i18next's own matcher answers English there. It takes the first EXACT match anywhere in the
+   * list before it tries any base subtag, so an English tag lower down beats a Portuguese variant
+   * we don't list by name. The locale gate and `i18nInitOptions` in `@gusnips/react` keep this same
+   * rule — the gate inlined because it runs as a serialized script, react because this package is a
+   * leaf nothing may depend on — so one reader lands on one language on every road. The gate's test
+   * holds the two copies here to the same table.
+   *
+   * When two locales share a base (`pt-BR` and `pt-PT`), a bare `pt` takes the first one listed.
+   */
+  const matchLocale = (tags: readonly string[]): Locale | null => {
+    for (const tag of tags) {
+      const lower = tag.trim().toLowerCase();
+      if (lower === "") continue;
+      const base = lower.split("-")[0];
+      const found =
+        locales.find((locale) => locale.toLowerCase() === lower) ??
+        locales.find((locale) => locale.split("-")[0]?.toLowerCase() === base);
+      if (found !== undefined) return found;
+    }
+    return null;
+  };
+
+  /**
+   * The language a request asks for, narrowed to one we ship: a first-sight hint for a new account
+   * or a page with no stored choice, never a replacement for one the person made.
+   *
+   * Every tag counts, not just the first. Five servers read only the first, so
+   * `de-DE,de;q=0.9,pt-BR;q=0.8` — a German speaker who also reads Portuguese — got the default
+   * language saved on their account, and with it every e-mail after. Tags are ranked by `q`
+   * (stable, so equal weights keep the order sent), and `q=0`, which means "not this one", is
+   * dropped. Null when nothing matches, so the caller picks its own default.
+   */
+  const localeFromAcceptLanguage = (header: string | null | undefined): Locale | null => {
+    if (header === null || header === undefined) return null;
+    const ranked = header
+      .split(",")
+      .map((entry) => {
+        const [tag = "", ...params] = entry.split(";");
+        const weight = params
+          .map((param) => /^\s*q\s*=\s*([\d.]+)\s*$/i.exec(param)?.[1])
+          .find((value) => value !== undefined);
+        return { tag: tag.trim(), q: weight === undefined ? 1 : Number(weight) };
+      })
+      .filter((entry) => entry.tag !== "" && entry.q > 0)
+      .sort((a, b) => b.q - a.q);
+    return matchLocale(ranked.map((entry) => entry.tag));
+  };
 
   /**
    * The BASE subtag, lowercase: `pt`, `es`.
@@ -184,6 +241,8 @@ export function createLocales<const L extends readonly string[]>(
 
   return {
     asLocale,
+    matchLocale,
+    localeFromAcceptLanguage,
     localeSegment,
     localePrefix,
     localePath,

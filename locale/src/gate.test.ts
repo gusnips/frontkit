@@ -148,6 +148,28 @@ describe("localeGateScript", () => {
     expect(visit(pt, { address: "/en/precos", languages: ["pt-BR"] })).toBeNull();
   });
 
+  // The gate carries its own copy of `matchLocale`'s rule, because it runs as serialized text and
+  // cannot import one. This is what keeps the two copies one rule.
+  it("picks the language matchLocale picks, for every list in the table", () => {
+    const { matchLocale, localePath } = createLocales(EN, "en");
+    for (const languages of [
+      ["pt-BR"],
+      ["pt-PT", "en"],
+      ["pt"],
+      ["PT-br"],
+      ["es", "en"],
+      ["en-GB", "pt-BR"],
+      ["de", "es-MX"],
+      ["de", "fr"],
+      ["fr", "pt", "es"],
+      [],
+    ]) {
+      const locale = matchLocale(languages);
+      const expected = locale === null || locale === "en" ? null : localePath(locale, "/x");
+      expect(visit(site, { address: "/x", languages }), languages.join(",")).toBe(expected);
+    }
+  });
+
   // The addresses come from `createLocales`, so the gate and the router cannot disagree.
   it("sends every reader to the address createLocales gives their language", () => {
     const { localePath } = createLocales(EN, "en");
