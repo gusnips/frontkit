@@ -25,7 +25,8 @@ export function htmlPlaceholders(values: Readonly<Record<string, string>>): Plug
     name: "frontkit:html-placeholders",
     transformIndexHtml(html: string) {
       return Object.entries(values).reduce(
-        (out, [name, value]) => out.replaceAll(`%${name}%`, value),
+        // A function, because a replacement string reads `$$` as `$` (see `rewriteAttr`).
+        (out, [name, value]) => out.replaceAll(`%${name}%`, () => value),
         html,
       );
     },

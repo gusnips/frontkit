@@ -45,10 +45,18 @@ const metaRes = (selector: string): readonly RegExp[] => metaResFor(escapeRegex(
 /**
  * Rewrite the value the first matching pattern captures between `$1` and `$2`, or null when the
  * template carries no such tag. Tag-agnostic on purpose — the canonical `<link>` uses it too.
+ *
+ * Every page text in this file goes into `replace` through a FUNCTION, never as the replacement
+ * string. A string is read for `$` patterns: `$$` becomes `$`, and `$'` pastes in the rest of the
+ * template. One adopter's docs showed a place priced `"$$"`; the file said `"$"`, and React threw
+ * on hydration because the page no longer matched its own render.
  */
 function rewriteAttr(html: string, patterns: readonly RegExp[], value: string): string | null {
   for (const re of patterns) {
-    if (re.test(html)) return html.replace(re, `$1${escapeAttr(value)}$2`);
+    if (re.test(html))
+      return html.replace(re, (_tag, before: string, after: string) => {
+        return before + escapeAttr(value) + after;
+      });
   }
   return null;
 }
@@ -188,7 +196,10 @@ export function bakeHead(template: string, tags: HeadTags): string {
   const shareTitle = tags.ogTitle ?? tags.title;
   const shareDescription = tags.ogDescription ?? tags.description;
 
-  let html = template.replace(/<title>[^<]*<\/title>/, `<title>${escapeAttr(tags.title)}</title>`);
+  let html = template.replace(
+    /<title>[^<]*<\/title>/,
+    () => `<title>${escapeAttr(tags.title)}</title>`,
+  );
   html = setMeta(html, 'name="description"', tags.description);
   html = setMeta(html, 'property="og:title"', shareTitle);
   html = setMeta(html, 'property="og:description"', shareDescription);
@@ -240,7 +251,7 @@ export function bakeHead(template: string, tags: HeadTags): string {
           `    <link rel="alternate" hreflang="${escapeAttr(alt.hreflang)}" href="${escapeAttr(alt.href)}" />`,
       )
       .join("\n");
-    html = html.replace("</head>", `${links}\n  </head>`);
+    html = html.replace("</head>", () => `${links}\n  </head>`);
   }
 
   if (tags.lang !== undefined) {
@@ -259,11 +270,13 @@ export function bakeHead(template: string, tags: HeadTags): string {
         (alt) =>
           `    <meta property="og:locale:alternate" content="${escapeAttr(ogLocale(alt.hreflang))}" />`,
       );
+    const locale = escapeAttr(ogLocale(tags.lang));
     html = html.replace(
       "</head>",
-      `    <meta property="og:locale" content="${escapeAttr(ogLocale(tags.lang))}" />\n${
-        alternates.length ? `${alternates.join("\n")}\n` : ""
-      }  </head>`,
+      () =>
+        `    <meta property="og:locale" content="${locale}" />\n${
+          alternates.length ? `${alternates.join("\n")}\n` : ""
+        }  </head>`,
     );
   }
 
@@ -275,12 +288,14 @@ export function bakeHead(template: string, tags: HeadTags): string {
       rewriteAttr(html, metaRes('name="robots"'), "noindex") ??
       html.replace("</head>", `    <meta name="robots" content="noindex" />\n  </head>`);
   }
-  if (tags.headExtra) html = html.replace("</head>", `    ${tags.headExtra}\n  </head>`);
+  const { headExtra } = tags;
+  if (headExtra) html = html.replace("</head>", () => `    ${headExtra}\n  </head>`);
 
   if (tags.lang !== undefined) {
     const re = /(<html[^>]*\blang=")[^"]*(")/;
     if (!re.test(html)) throw new Error("prerender: <html lang> not found in index.html");
-    html = html.replace(re, `$1${escapeAttr(tags.lang)}$2`);
+    const lang = escapeAttr(tags.lang);
+    html = html.replace(re, (_tag, before: string, after: string) => before + lang + after);
   }
 
   if (tags.body !== undefined) {
@@ -288,9 +303,10 @@ export function bakeHead(template: string, tags: HeadTags): string {
     // already-filled root would nest one render inside another.
     if (!html.includes(EMPTY_ROOT))
       throw new Error(`prerender: ${EMPTY_ROOT} not found in index.html`);
+    const { route, html: page } = tags.body;
     html = html.replace(
       EMPTY_ROOT,
-      `<div id="root" ${PRERENDERED_ROUTE_ATTR}="${escapeAttr(tags.body.route)}">${tags.body.html}</div>`,
+      () => `<div id="root" ${PRERENDERED_ROUTE_ATTR}="${escapeAttr(route)}">${page}</div>`,
     );
   }
 

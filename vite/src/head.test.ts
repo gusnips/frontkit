@@ -273,6 +273,31 @@ describe("bakeHead", () => {
     );
   });
 
+  it("writes a page's dollar signs as they are, in every field that takes page text", () => {
+    // A replacement STRING reads `$$` as `$` and `$'` as the rest of the template. One adopter's
+    // docs priced a place `"$$"`, the file said `"$"`, and hydration threw.
+    const money = "$$ $& $' $` $1";
+    const html = bakeHead(TEMPLATE, {
+      title: money,
+      description: money,
+      canonical: `https://acme.com/${money}`,
+      image: `https://acme.com/${money}.png`,
+      lang: "pt-BR",
+      alternates: [{ hreflang: "en", href: `https://acme.com/en/${money}` }],
+      headExtra: `<script type="application/ld+json">{"priceRange":"${money}"}</script>`,
+      body: { route: "/", html: `<p>${money}</p>` },
+    });
+    const escaped = "$$ $&amp; $' $` $1";
+    expect(html).toContain(`<title>${escaped}</title>`);
+    expect(html).toContain(`<meta name="description" content="${escaped}" />`);
+    expect(html).toContain(`<link rel="canonical" href="https://acme.com/${escaped}" />`);
+    expect(html).toContain(`content="https://acme.com/${escaped}.png"`);
+    expect(html).toContain(`href="https://acme.com/en/${escaped}"`);
+    expect(html).toContain(`{"priceRange":"${money}"}`);
+    expect(html).toContain(`<p>${money}</p></div>`);
+    expect(html.match(/<\/html>/g)).toHaveLength(1);
+  });
+
   it("refuses to bake a page into a page", () => {
     const once = bakeHead(TEMPLATE, { ...BASE, body: { route: "/", html: "<main>hi</main>" } });
     expect(() =>
