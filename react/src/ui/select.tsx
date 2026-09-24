@@ -145,6 +145,11 @@ export function Select<T extends string = string>({
               popupClassName,
             )}
           >
+            {/* An item takes real focus as the arrow keys move, and its highlight is what shows
+                it, so the items hide the app's outline. `outline-hidden`, not `outline-none`:
+                forced colors paint no background, so the highlight is gone there, and
+                `outline-hidden` is the one that comes back as an outline. Inset, or the list's
+                overflow clips it at both edges. */}
             <Primitive.List className="max-h-[var(--available-height)] overflow-y-auto">
               {clearLabel !== undefined && value != null ? (
                 // An Item with `value={null}`, not a button above the list: only an item is
@@ -152,7 +157,7 @@ export function Select<T extends string = string>({
                 // on its own. `null` is what arrives at `onValueChange`.
                 <Primitive.Item
                   value={null}
-                  className="flex cursor-default items-center gap-2 px-3 py-2 text-muted-foreground outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                  className="flex cursor-default items-center gap-2 px-3 py-2 text-muted-foreground focus-visible:outline-hidden focus-visible:-outline-offset-2 data-highlighted:bg-accent data-highlighted:text-accent-foreground"
                 >
                   <span className="size-4 shrink-0" aria-hidden="true" />
                   <Primitive.ItemText>{clearLabel}</Primitive.ItemText>
@@ -166,7 +171,7 @@ export function Select<T extends string = string>({
                     key={option.value}
                     value={option.value}
                     disabled={option.disabled}
-                    className="flex cursor-default items-center gap-2 px-3 py-2 outline-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                    className="flex cursor-default items-center gap-2 px-3 py-2 focus-visible:outline-hidden focus-visible:-outline-offset-2 data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground"
                   >
                     {/* The mark keeps a column of its own whether or not it is showing, so
                         the labels do not shift by 16px when the selection moves. */}

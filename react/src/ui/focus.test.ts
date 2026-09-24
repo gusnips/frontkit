@@ -27,15 +27,18 @@ const sources = readdirSync(here)
  * guard that fails on its own explanation teaches people to delete the explanation.
  */
 function linesMatching(text: string, pattern: RegExp): number[] {
+  return codeLines(text)
+    .map((line, i) => (pattern.test(line) ? i + 1 : 0))
+    .filter(Boolean);
+}
+
+function codeLines(text: string): string[] {
   // Block comments are BLANKED, not deleted: removing them would collapse lines and every number
   // reported after one would point at the wrong place. (That is also why this cannot share
   // `menu.test.ts`'s `codeOf`, which strips outright because it only ever counts occurrences.)
   // Blanking also means a wrapped comment line is ignored whether or not it opens with a `*`.
   const code = text.replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, " "));
-  return code
-    .split("\n")
-    .map((line, i) => (!line.trim().startsWith("//") && pattern.test(line) ? i + 1 : 0))
-    .filter(Boolean);
+  return code.split("\n").map((line) => (line.trim().startsWith("//") ? "" : line));
 }
 
 describe("the wrappers do not draw their own focus ring", () => {
@@ -49,21 +52,21 @@ describe("the wrappers do not draw their own focus ring", () => {
   });
 
   // The other half: `outline-none` is legitimate on a container that takes focus
-  // programmatically (a Popup, its Positioner, a highlighted Item), and nowhere else. It is
-  // only a bug when it removes the outline without the primitive putting focus somewhere that
-  // still shows one — which is what the rule above now makes impossible, since there is no
-  // replacement ring left to write. This asserts the reset stayed inside the popup parts.
-  it.each(sources)("$name resets the outline only on popup parts", ({ text }) => {
+  // programmatically (a Popup, its Positioner, a Backdrop), and nowhere else. An ITEM is not one
+  // of those, even though its highlight shows focus: forced colors paint no background, so the
+  // highlight is gone there and a bare `outline-none` leaves the item with nothing at all. An item
+  // hides the outline with `outline-hidden`, which Tailwind brings back in forced colors.
+  it.each(sources)("$name resets the outline only on popup containers", ({ text }) => {
+    const containers = new Set(["Popup", "Positioner", "Backdrop", "Viewport"]);
+    const code = codeLines(text);
     const offenders = linesMatching(text, /outline-none/).filter((line) => {
-      // ponytail: "the nearest Primitive tag above" approximated as a 12-line lookback, which
-      // clears every part in this folder today with room to spare. The ceiling is a part whose
-      // props run longer than that, which would read as a violation while being correct. If that
-      // happens, parse the enclosing JSX element instead of counting lines — do not just raise 12.
-      const context = text
-        .split("\n")
-        .slice(Math.max(0, line - 12), line)
-        .join("\n");
-      return !/<Primitive\.(Popup|Positioner|Item|ItemsEmpty|Backdrop|Viewport)\b/.test(context);
+      // ponytail: the element is taken to be the nearest `<Primitive.X` at or above the line,
+      // since a class string sits in its element's own props. The ceiling is a plain element
+      // nested inside a popup part, which would read as that part; none exists today. If one
+      // does, parse the enclosing JSX element instead.
+      const above = code.slice(0, line).join("\n");
+      const part = [...above.matchAll(/<Primitive\.(\w+)/g)].at(-1)?.[1];
+      return part === undefined || !containers.has(part);
     });
     expect(offenders).toEqual([]);
   });

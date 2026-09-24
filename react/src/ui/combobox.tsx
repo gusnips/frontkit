@@ -222,13 +222,17 @@ export function Combobox<T>({
             </Primitive.Empty>
             {/* `--available-height` is the room the positioner measured between the anchor
                 and the edge of the viewport. Without it the list is unbounded and a long
-                result set runs off the bottom of the screen with no way to reach the end. */}
+                result set runs off the bottom of the screen with no way to reach the end.
+                Focus stays in the input and the highlight follows the arrow keys, so an item
+                never matches `:focus-visible`. Forced colors paint no background, which takes
+                the highlight with it, so there the highlighted item draws an outline, inset
+                or the list's overflow clips it at both edges. */}
             <Primitive.List className="max-h-[var(--available-height)] overflow-y-auto">
               {(item: T) => (
                 <Primitive.Item
                   key={getKey(item)}
                   value={item}
-                  className="cursor-default px-3 py-2 outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+                  className="cursor-default px-3 py-2 data-highlighted:bg-accent data-highlighted:text-accent-foreground forced-colors:data-highlighted:outline-2 forced-colors:data-highlighted:-outline-offset-2"
                 >
                   {renderItem ? renderItem(item) : getLabel(item)}
                 </Primitive.Item>

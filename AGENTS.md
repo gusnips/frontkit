@@ -563,6 +563,17 @@ expressed as types, and the facts below — each of which cost somebody a debugg
     else it deletes the app's only keyboard-focus affordance. Worth enforcing structurally — one
     donor budgets one reset per `<Primitive.Popup>` in a file, which cannot rot the way a
     filename allowlist does.
+
+    **An item is not a container, even though its highlight shows focus.** Forced colors paint no
+    background, so the highlight is gone there, and a bare `outline-none` leaves the item with
+    nothing. The select's and the combobox's items both carried one, and `focus.test.ts` allowed
+    it, until a fleet audit counted 493 lines pairing `outline-none` with a `ring-*` across nine
+    products. An item hides the outline with `outline-hidden`, which Tailwind brings back in
+    forced colors, and pulls it inward with a negative offset, or the list's overflow clips it.
+    The combobox's item never takes focus at all — the input keeps it — so it draws its outline
+    off `data-highlighted` under `forced-colors:` instead. Both measured in Chromium with forced
+    colors emulated, on the real components.
+
 20. **Style off the accessibility attribute, never a parallel data attribute.** The primitive
     writes `aria-selected` and its own `data-*` from one state; styling the a11y contract is
     what keeps what a screen reader announces and what an eye sees from drifting apart.
