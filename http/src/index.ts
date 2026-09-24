@@ -4,9 +4,9 @@
  * Every route answers one of two shapes — `{data, meta?}` or `{error:{…}}` — so unwrapping
  * and error-shaping belong in one place rather than in every hook. This module is that
  * place, and it is deliberately types plus three tiny functions: the API server produces
- * the envelope, the browser client consumes it, the SDK re-exports it, and an agent reads
- * it. All four compile this file unchanged, which is why it carries no framework and no
- * platform (see `scripts/check-purity.ts`).
+ * the envelope, the browser client consumes it, and an agent reads it. A published SDK can
+ * compile it too, instead of hand-writing its own copy of the envelope. It carries no
+ * framework and no platform for that reason (see `scripts/check-purity.ts`).
  *
  * **The codes are yours, not ours.** Two donor repos had 30 codes and 16 codes respectively,
  * overlapping on nine; the list is an API's vocabulary and belongs to it. Everything here is
