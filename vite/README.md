@@ -203,14 +203,14 @@ process.exit(report.problems.some((p) => p.level === "error") ? 1 : 0);
 Your `canonical` language is typed, so a `t("key")` it lacks already fails to compile. The other
 languages are not, and neither is anything inside a string. This checks what the compiler can't:
 
-| It fails when                                                  | Because the reader gets                               |
-| -------------------------------------------------------------- | ----------------------------------------------------- |
-| a key is in one language and not another, or is blank          | the canonical language, in the middle of their own    |
-| a counted key lacks a form its language needs (pt `_many`)     | English for exactly 1,000,000 of something            |
-| `{{name}}` became `{{nome}}`, or `{{n, number}}` lost `number` | a gap, or 5000 where they write 5.000                 |
-| `<0>…</0>` is out of order or not closed                       | the wrong words bold, or the tag as text              |
-| a placeholder is named `lng`, `ns` or another `t()` option     | another language, not the value                       |
-| a language fails to load                                       | nothing — every other rule would have passed it empty |
+| It fails when                                                  | Because the reader gets                                    |
+| -------------------------------------------------------------- | ---------------------------------------------------------- |
+| a key is in one language and not another, or is blank          | the canonical language, in the middle of their own         |
+| a counted key lacks a form its language needs (pt `_many`)     | the fallback language at exactly 1,000,000, or the raw key |
+| `{{name}}` became `{{nome}}`, or `{{n, number}}` lost `number` | a gap, or 5000 where they write 5.000                      |
+| `<0>…</0>` is out of order or not closed                       | the wrong words bold, or the tag as text                   |
+| a placeholder is named `lng`, `ns` or another `t()` option     | another language, not the value                            |
+| a language fails to load                                       | nothing — every other rule would have passed it empty      |
 
 `load` returns one language's catalogs by namespace, so JSON files, TS modules and a runtime
 merge all fit. If it throws, the check fails with the error. It never skips.

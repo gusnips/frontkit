@@ -646,7 +646,9 @@ async function checkBundle(
               rule: "plural",
               locale,
               key: label(`${base}_${form}`),
-              message: `missing: ${locale} uses the ${form} form, and without it the reader gets another language`,
+              // Measured with i18next 26: a fallback language with the key prints its copy; a
+              // language that is its own fallback prints the raw key.
+              message: `missing: ${locale} uses the ${form} form. Without it the reader sees the fallback language, or the raw key if ${locale} is the fallback`,
             });
         }
         for (const key of leaves.keys()) {
