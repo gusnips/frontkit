@@ -18,6 +18,14 @@ describe("humanizeWait", () => {
     expect(humanizeWait(t, 2 * 3600, "errors.")).toBe('errors.waitHours({"count":2})');
   });
 
+  // A wait is a floor. "in 2 hours" for 2h24 sends the reader back 24 minutes early, into the
+  // same refusal; every other wait formatter in the fleet already rounds up.
+  it("rounds a wait up, never down", () => {
+    expect(humanizeWait(t, 2 * 3600 + 24 * 60, "errors.")).toBe('errors.waitHours({"count":3})');
+    expect(humanizeWait(t, 2 * 60 + 5, "errors.")).toBe('errors.waitMinutes({"count":3})');
+    expect(humanizeWait(t, 74.3, "errors.")).toBe('errors.waitSeconds({"count":75})');
+  });
+
   it("never says 'in 0 seconds'", () => {
     expect(humanizeWait(t, 0.2, "errors.")).toBe('errors.waitSeconds({"count":1})');
   });

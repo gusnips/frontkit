@@ -151,9 +151,11 @@ export function humanizeWait<Prefix extends string>(
   secs: number,
   prefix: Prefix,
 ): string {
-  if (secs < 90) return t(`${prefix}waitSeconds`, { count: Math.max(1, Math.round(secs)) });
-  if (secs < 90 * 60) return t(`${prefix}waitMinutes`, { count: Math.round(secs / 60) });
-  return t(`${prefix}waitHours`, { count: Math.round(secs / 3600) });
+  // Up, never to the nearest: a wait is a floor, and "in 2 hours" for 2h24 sends the reader back
+  // early into the same refusal.
+  if (secs < 90) return t(`${prefix}waitSeconds`, { count: Math.max(1, Math.ceil(secs)) });
+  if (secs < 90 * 60) return t(`${prefix}waitMinutes`, { count: Math.ceil(secs / 60) });
+  return t(`${prefix}waitHours`, { count: Math.ceil(secs / 3600) });
 }
 
 export interface ErrorContext {
