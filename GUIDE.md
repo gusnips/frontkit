@@ -17,12 +17,194 @@ You need:
 - Postgres, on your machine for now.
 - A Supabase project, for sign-in. You need its URL and its anon key.
 
-Part 1 covers [the layout](#the-layout), [the API](#the-api), [running the API](#running-the-api)
-and [the web app](#the-web-app). [What's next](#whats-next) lists part 2.
+Part 1 covers [how a project is laid out, and why](#how-a-project-is-laid-out-and-why),
+[setting up the repo](#set-up-the-repo), [the API](#the-api),
+[running the API](#running-the-api) and [the web app](#the-web-app).
+[What's next](#whats-next) lists part 2.
 
-## The layout
+## How a project is laid out, and why
 
-One repo, three workspaces: the API, the web app, and a package of types they share.
+These are the choices the apps built on these packages share. We read ten of them and wrote down
+what most of them do, with the reason for each. Where the apps differ, we took what the newest ones
+do.
+
+### One repo for each product
+
+A product's API, web app, public site and background worker live in one repo, as Bun workspaces.
+A change to the API and the page that reads it then lands in one commit, and one review covers
+both.
+
+- One lockfile, `bun.lock`, and the Bun version in `packageManager`, so every machine installs the
+  same versions.
+- One catalog of versions, so every workspace gets the same copy of each package.
+  [Set up the repo](#set-up-the-repo) shows it.
+- turbo runs a task in every workspace and skips the ones whose inputs did not change.
+- `bun run check` at the root runs lint, types, tests, the build, Prettier and knip. One command
+  answers "is this ready?"
+
+### The folders at the top
+
+```text
+notes/
+├── apps/
+│   ├── api/        the HTTP API
+│   ├── web/        the app people sign in to
+│   ├── site/       the public pages: home, pricing, terms
+│   └── worker/     jobs that run outside a request
+├── packages/
+│   ├── server/     code the API and the worker both use
+│   ├── shared/     types and constants the browser and the server both read
+│   ├── ui/         the look: theme, logo, styled components
+│   └── sdk/        a typed client for a public API
+├── infra/          how each app runs on a server
+├── scripts/        tasks for the whole repo: setup, checks
+├── docs/           decisions and how-tos
+├── AGENTS.md       what a new person, or a coding agent, reads first
+├── package.json
+├── turbo.json
+└── tsconfig.base.json
+```
+
+Start with `apps/api`, `apps/web` and `packages/shared`. Add the rest when you need it.
+
+- **`apps/`** holds what you deploy. **`packages/`** holds what the apps import. A package is never
+  deployed on its own.
+- **`packages/shared`** also runs in the browser, so it holds no secrets and imports nothing from
+  Node. The error codes and the shapes the API sends live here, so the API and the web cannot
+  disagree about them.
+- **`packages/server`** holds the product's rules: `config/` (the environment check), `infra/`
+  (Postgres, Redis, queues, email), `logger/`, and `modules/<name>/`, one folder for each part of
+  the product. The API and the worker stay thin: one turns requests into calls, the other turns
+  jobs into calls. The example in this guide has one table and no worker, so its few server files
+  stay in `apps/api/src`.
+- **Migrations** live in `apps/api/migrations/`, numbered: `001_notes.sql`, `002_…`. The API owns
+  the database, and the numbers show the order at a glance.
+- **`infra/<app>/`** holds what one app needs on a server: its pm2 file and its systemd override.
+  These files change how production runs, so they go through review like code. They sit outside
+  `apps/` because nothing in them is part of a build.
+
+### Inside the API
+
+```text
+apps/api/
+├── migrations/       001_notes.sql, …
+├── scripts/          run-migrations.ts
+└── src/
+    ├── index.ts      starts the server, and stops it cleanly
+    ├── app.ts        the Hono app: middleware first, then routes
+    ├── routes/       one file for each group of endpoints
+    ├── middleware/   auth, CORS, rate limits
+    ├── composition/  connects each module to the real database, queue and mailer
+    └── lib/          small helpers only the API uses
+```
+
+An API that other developers call also has `operations/`: one definition for each endpoint, and
+the routes, the OpenAPI file and the SDK are all built from it. Part 2 covers that.
+
+### Inside the web app
+
+```text
+apps/web/src/
+├── main.tsx        mounts the app
+├── App.tsx         the routes
+├── index.css       Tailwind and the theme
+├── pages/          one component for each route
+├── components/     parts the pages share
+├── services/       the API client and the Supabase client
+├── stores/         zustand stores, like who is signed in
+├── hooks/          React hooks the pages share
+├── lib/            small helpers: the query client, the error describer
+└── i18n/           the text in each language, and the type that checks its keys
+```
+
+### Tests
+
+A test sits next to the file it tests and shares its name: `api.ts` and `api.test.ts`. When you
+move or delete a file, its test is right there. Older apps kept tests in `__tests__/` folders; the
+newest put them next to the file. Tests run with Vitest.
+
+### Config and the environment
+
+- Each app has its own `.env.example`. It lists every variable the app reads, and it is committed.
+  Copy it to `.env`, which is never committed. Bun reads `.env` from the folder it runs in.
+- The API checks every variable when it starts, with `validateEnv`, and stops with a list of what
+  is wrong. A missing variable then fails at boot, where you see it, and not on the first request
+  that needs it.
+- The web app reads only `VITE_` variables. Vite copies them into the bundle, and anyone can read
+  the bundle, so a secret never goes in one.
+
+### The stack
+
+- **Bun** runs TypeScript as it is, so the API ships as source with no build step. It also
+  installs the packages.
+- **Hono** for the API: a small router built on the web's own `Request` and `Response`.
+  `@gusnips/server/hono` has its middleware.
+- **Postgres** for the data, through `pg` and plain SQL migrations anyone can read.
+- **Supabase Auth** for sign-in: passwords, email links and Google, which you should not write
+  yourself. It is open source and keeps its users in Postgres.
+- **Redis and BullMQ** for jobs that must outlive a request, like sending an email or an import.
+  A job survives a restart and retries on its own. A few apps queue jobs in Postgres instead; the
+  newest ones all use BullMQ.
+- **React 19.** Its `react-dom/static` renders a page with `lazy()` routes to finished HTML, which
+  prerendering needs (part 2).
+- **Vite** runs the dev server and the build. `webPreset` sets it up in one line.
+- **react-router 7** for routes. The guards in `@gusnips/react/guards` use it.
+- **Tailwind 4.** Styles sit in the markup, and the theme is CSS variables. That is how
+  `@gusnips/tokens` names the colours and swaps them for dark mode.
+- **TanStack Query** for every read from the API. It caches, retries, and tracks loading and
+  errors. `queryDefaults` gives it the retry rule.
+- **zustand** for the little state that is global, like who is signed in. A store is one function,
+  with no provider to wrap around the app.
+- **i18next** for text. Every string lives in a catalog, so a second language changes no
+  component. A `.d.ts` file types the keys, so a missing key is a compile error.
+- **zod** checks what comes in, and the same schema gives you its TypeScript type.
+- **pm2 on a plain server** (a VPS) runs the API and the worker. It restarts them when they crash,
+  and gives them time to finish when you deploy. **Caddy** sits in front for HTTPS.
+- **A static host** serves the web app and the site. After the build they are only files, so the
+  API is the only server you run. We use Cloudflare Pages. Its `_redirects` file sends every
+  address to `index.html`, so a reload on `/notes` still finds the app.
+- **ESLint, Prettier and knip.** knip finds files and exports nothing uses.
+
+### Rules for the code
+
+- **No `as any`, and no `as unknown as T`, outside tests.** Fix the type. A cast tells the
+  compiler to stop checking, so the bug it would have caught ships. ESLint's `no-explicit-any`
+  rule catches the `any`. In a test, a cast is fine with a comment that says why.
+- **Comments say why, not what.** The code already says what it does. The reason, often something
+  that broke once, is what the next person needs before they "simplify" it.
+- **Every error and every empty page tells the reader what to do next.** An error says what
+  failed, why, and how to fix it, with a retry when one can work. An empty page says what belongs
+  there and how to add the first one. `ErrorStateProps` does not compile without a fix and an
+  action, and `EmptyStateProps` does not compile without a description.
+- **Write copy a child and a junior developer can both read.** Short sentences, common words, and
+  numbers instead of adjectives: "That file is 12 MB. The limit is 10 MB." says more than "Upload
+  failed."
+- **One API client.** Every call to your API goes through it, so the token, the refresh, the
+  retries and the error shape live in one place. Nothing else calls `fetch` on your API.
+- **Conventional commits, scoped to the workspace:** `fix(web): …`, `feat(server): …`. The scope
+  says which part changed. The body says why.
+
+### What each app keeps for itself
+
+The packages share behaviour. They never share the look.
+
+- **The brand:** the logo, a mascot, illustrations. That is the product, and it lives in
+  `packages/ui/src/brand/`.
+- **Styled components,** like `Button`. A shared styled button that must fit every brand grows a
+  new option for each one, forever. Each app draws its own.
+- **Colours.** `@gusnips/tokens` fixes the names, like `--color-primary`, and how dark mode swaps
+  them. Each app sets the values.
+- **How an error or an empty page looks.** The packages ship the props a panel needs. Each app
+  draws the panel.
+- **The error codes.** `@gusnips/http` knows the shape of an error. The codes in it are your API's
+  own words, and they live in `packages/shared`.
+- **`main.tsx`, `App.tsx` and the folders.** You copy them once, from this guide. They are not a
+  package.
+
+## Set up the repo
+
+The example starts with the three workspaces every app has, plus the files the API needs on a
+server:
 
 ```text
 notes/
@@ -31,6 +213,8 @@ notes/
 │   └── web/        Vite and React
 ├── packages/
 │   └── shared/     types both apps import
+├── infra/
+│   └── api/        the pm2 file and the systemd override
 ├── package.json
 ├── turbo.json
 └── tsconfig.base.json
@@ -80,6 +264,7 @@ the repo uses.
     }
   },
   "scripts": {
+    "check": "turbo run typecheck test build",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test"
@@ -92,6 +277,8 @@ the repo uses.
 ```
 
 A workspace then asks the catalog instead of naming a range: `"@gusnips/react": "catalog:"`.
+`bun run check` runs the types, the tests and the build in every workspace. Add lint to it when you
+add ESLint.
 
 **Keep one range per package.** When two workspaces ask for two ranges, the install can put two
 copies of a package in the tree, and it says nothing. We tried it: one workspace on `0.9.14` next
@@ -667,12 +854,14 @@ export const HARD_EXIT_MS = 25_000;
 One in the pm2 file:
 
 ```js
-// apps/api/ecosystem.config.cjs
+// infra/api/ecosystem.config.cjs
+const path = require("node:path");
+
 module.exports = {
   apps: [
     {
       name: "notes-api",
-      cwd: __dirname,
+      cwd: path.join(__dirname, "../../apps/api"),
       script: "src/index.ts",
       interpreter: "bun",
       kill_timeout: 30_000,
@@ -684,14 +873,15 @@ module.exports = {
 And one in systemd, when pm2 runs under it:
 
 ```ini
-# apps/api/systemd/override.conf
+# infra/api/override.conf
 # Installed with `sudo systemctl edit pm2-<user>`. Must stay above kill_timeout.
 [Service]
 TimeoutStopSec=60s
 ```
 
-`pm2 start ecosystem.config.cjs` starts it, and `pm2 stop notes-api` sends SIGINT, which runs the
-same drain. `cwd` is the API's folder, so Bun finds its `.env` there.
+From the repo root, `pm2 start infra/api/ecosystem.config.cjs` starts it, and `pm2 stop notes-api`
+sends SIGINT, which runs the same drain. `cwd` points at the API's folder, so Bun finds
+`apps/api/.env` there.
 
 **Each number must be larger than the one before it:** the longest request, then `HARD_EXIT_MS`,
 then pm2's `kill_timeout`, then systemd's `TimeoutStopSec`. If one is too small, deploys cut
@@ -710,8 +900,9 @@ import { expect, test } from "vitest";
 import { HARD_EXIT_MS, REQUEST_GRACE_MS } from "./budget.ts";
 
 const require = createRequire(import.meta.url);
-const pm2: { apps: { kill_timeout: number }[] } = require("../ecosystem.config.cjs");
-const unit = readFileSync(new URL("../systemd/override.conf", import.meta.url), "utf8");
+const infra = "../../../infra/api";
+const pm2: { apps: { kill_timeout: number }[] } = require(`${infra}/ecosystem.config.cjs`);
+const unit = readFileSync(new URL(`${infra}/override.conf`, import.meta.url), "utf8");
 
 test("a deploy stops the API before anything kills it", () => {
   const killTimeoutMs = pm2.apps[0]?.kill_timeout ?? 0;
@@ -724,8 +915,8 @@ test("a deploy stops the API before anything kills it", () => {
 ```
 
 It doubles the grace because the server step can wait it out twice while a stream is open (seen
-on Bun 1.3.8). Set
-`kill_timeout` to `20_000` and the test fails with `expected 25000 to be less than 20000`.
+on Bun 1.3.8). Set `kill_timeout` to `20_000` and the test fails with
+`expected 25000 to be less than 20000`.
 [Stopping for a deploy](https://github.com/gusnips/serverkit/blob/main/server/README.md#stopping-for-a-deploy).
 
 ## The web app
@@ -797,11 +988,11 @@ interface ImportMetaEnv {
 }
 ```
 
-That is `apps/web/src/vite-env.d.ts`. Then one Supabase client, and one API client for everything
-else:
+That is `apps/web/src/vite-env.d.ts`. Then, in `services/`, one Supabase client, and one API client
+for everything else:
 
 ```ts
-// apps/web/src/supabase.ts
+// apps/web/src/services/supabase.ts
 import { createClient } from "@supabase/supabase-js";
 
 export const supabase = createClient(
@@ -811,7 +1002,7 @@ export const supabase = createClient(
 ```
 
 ```ts
-// apps/web/src/api.ts
+// apps/web/src/services/api.ts
 import { createApiClient, returnPathFromLocation } from "@gusnips/react";
 import { createSupabaseSessionAdapter } from "@gusnips/react/supabase";
 import { supabase } from "./supabase.ts";
@@ -840,7 +1031,7 @@ the sign-in address never carries a token. This test runs the real adapter throu
 refreshes:
 
 ```ts
-// apps/web/src/api.test.ts
+// apps/web/src/services/api.test.ts
 import { createApiClient } from "@gusnips/react";
 import { createSupabaseSessionAdapter } from "@gusnips/react/supabase";
 import { AuthApiError, AuthRetryableFetchError } from "@supabase/supabase-js";
@@ -890,7 +1081,7 @@ test.each([
 ### Retries
 
 ```ts
-// apps/web/src/queryClient.ts
+// apps/web/src/lib/queryClient.ts
 import { queryDefaults } from "@gusnips/react";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -906,11 +1097,11 @@ the error. A 429 that says it will not clear by waiting is not retried either.
 ### Who is signed in
 
 ```ts
-// apps/web/src/authStore.ts
+// apps/web/src/stores/authStore.ts
 import { createAuthStore } from "@gusnips/react/store";
 import type { User } from "@supabase/supabase-js";
-import { queryClient } from "./queryClient.ts";
-import { supabase } from "./supabase.ts";
+import { queryClient } from "../lib/queryClient.ts";
+import { supabase } from "../services/supabase.ts";
 
 export const useAuthStore = createAuthStore<User>();
 
@@ -925,9 +1116,9 @@ export function startSessionSync(): void {
 ```
 
 ```tsx
-// apps/web/src/guards.tsx
+// apps/web/src/components/guards.tsx
 import { createRequireAnonymous, createRequireAuth } from "@gusnips/react/guards";
-import { useAuthStore } from "./authStore.ts";
+import { useAuthStore } from "../stores/authStore.ts";
 
 const loading = <p className="p-8 text-muted-foreground">Loading…</p>;
 
@@ -939,11 +1130,13 @@ export const RequireAnonymous = createRequireAnonymous(useAuthStore, "/notes", {
 // apps/web/src/App.tsx
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { EmptyState } from "./EmptyState.tsx";
-import { RequireAnonymous, RequireAuth } from "./guards.tsx";
-import { SignInPage } from "./SignInPage.tsx";
+import { EmptyState } from "./components/EmptyState.tsx";
+import { RequireAnonymous, RequireAuth } from "./components/guards.tsx";
+import { SignInPage } from "./pages/SignInPage.tsx";
 
-const NotesPage = lazy(() => import("./NotesPage.tsx").then((m) => ({ default: m.NotesPage })));
+const NotesPage = lazy(() =>
+  import("./pages/NotesPage.tsx").then((m) => ({ default: m.NotesPage })),
+);
 
 export function App() {
   return (
@@ -993,11 +1186,11 @@ a signed-in person to the sign-in page. `isLoading` starts true only in a browse
 rendered at build time never gets saved as a spinner.
 
 ```tsx
-// apps/web/src/guards.test.tsx
+// apps/web/src/components/guards.test.tsx
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, expect, test } from "vitest";
-import { useAuthStore } from "./authStore.ts";
+import { useAuthStore } from "../stores/authStore.ts";
 import { RequireAuth } from "./guards.tsx";
 
 function Where() {
@@ -1040,10 +1233,10 @@ test("sends a signed-out reader to sign in, and remembers where they were going"
 The sign-in page makes the same outage-or-no call as the API:
 
 ```tsx
-// apps/web/src/SignInPage.tsx
+// apps/web/src/pages/SignInPage.tsx
 import { isAuthOutage } from "@gusnips/react/supabase";
 import { useState } from "react";
-import { supabase } from "./supabase.ts";
+import { supabase } from "../services/supabase.ts";
 
 export function SignInPage() {
   const [problem, setProblem] = useState<string | null>(null);
@@ -1078,7 +1271,7 @@ export function SignInPage() {
 The kit ships the props of an error panel and an empty panel, not the panels. You draw them.
 
 ```tsx
-// apps/web/src/ErrorState.tsx
+// apps/web/src/components/ErrorState.tsx
 import type { ErrorStateProps } from "@gusnips/react";
 
 export function ErrorState(props: ErrorStateProps) {
@@ -1097,7 +1290,7 @@ export function ErrorState(props: ErrorStateProps) {
 ```
 
 ```tsx
-// apps/web/src/EmptyState.tsx
+// apps/web/src/components/EmptyState.tsx
 import type { EmptyStateProps } from "@gusnips/react";
 
 export function EmptyState({ title, description, action, headingLevel = 3 }: EmptyStateProps) {
@@ -1123,7 +1316,7 @@ and a page with no `h1` gives a screen reader nothing to announce.
 The describer turns a thrown error into the words for that panel:
 
 ```ts
-// apps/web/src/describeError.ts
+// apps/web/src/lib/describeError.ts
 import { createErrorDescriber, type ErrorArm } from "@gusnips/react";
 import type { ErrorCode } from "@notes/shared";
 
@@ -1163,7 +1356,7 @@ It returns `recover`: `"retry"`, `"wait"`, `"signin"` or `"none"`. That comes fr
 on:
 
 ```tsx
-// apps/web/src/RecoverAction.tsx
+// apps/web/src/components/RecoverAction.tsx
 import type { RecoveryKind } from "@gusnips/react";
 
 // The control beside an error. `recover` comes from describeError, so the button only
@@ -1183,16 +1376,16 @@ The notes page puts it all together. `NewNote`, lower in the same file, is a for
 `api.post<Note>("/notes", { title })` and shows `describeError(add.error)` under it.
 
 ```tsx
-// apps/web/src/NotesPage.tsx
+// apps/web/src/pages/NotesPage.tsx
 import { queryView } from "@gusnips/react";
 import type { Note } from "@notes/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api } from "./api.ts";
-import { describeError } from "./describeError.ts";
-import { EmptyState } from "./EmptyState.tsx";
-import { ErrorState } from "./ErrorState.tsx";
-import { RecoverAction } from "./RecoverAction.tsx";
+import { api } from "../services/api.ts";
+import { describeError } from "../lib/describeError.ts";
+import { EmptyState } from "../components/EmptyState.tsx";
+import { ErrorState } from "../components/ErrorState.tsx";
+import { RecoverAction } from "../components/RecoverAction.tsx";
 
 export function NotesPage() {
   const notes = useQuery({ queryKey: ["notes"], queryFn: () => api.get<Note[]>("/notes") });
@@ -1270,9 +1463,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App.tsx";
-import { startSessionSync } from "./authStore.ts";
-import { CrashScreen } from "./CrashScreen.tsx";
-import { queryClient } from "./queryClient.ts";
+import { startSessionSync } from "./stores/authStore.ts";
+import { CrashScreen } from "./components/CrashScreen.tsx";
+import { queryClient } from "./lib/queryClient.ts";
 import "./index.css";
 
 installPreloadErrorHandler();
@@ -1300,7 +1493,7 @@ createRoot(root).render(
 ```
 
 ```tsx
-// apps/web/src/CrashScreen.tsx
+// apps/web/src/components/CrashScreen.tsx
 // Drawn by the ErrorBoundary in main.tsx, outside the router, so links here are plain <a>.
 export function CrashScreen({ onRetry }: { onRetry: () => void }) {
   return (
