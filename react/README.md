@@ -336,6 +336,26 @@ const { cause, fix, recover, reference } = describeError(error);
 // recover: "retry" | "signin" | "wait" | "none"
 ```
 
+Build it once. An app in one language writes its four sentences out:
+
+```ts
+const inTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+export const describeError = createErrorDescriber({
+  copy: {
+    network: "We could not reach the server.",
+    networkHint: "Check your connection, then try again.",
+    unexpected: "Something went wrong on our side.",
+    retrySoon: "Try again in a moment.",
+  },
+  formatWait: (secs) => inTime.format(secs, "second"),
+});
+```
+
+An app that translates passes `t`, `copyPrefix`, `messageKeyPrefix` and `knownMessageKeys`
+instead. Its catalog holds those four under `copyPrefix`, and when the server names a sentence
+the catalog has, the reader gets it in their own language.
+
 The field is `fix`, the same word as the prop above. It was `hint` until 0.6.0, which left every
 adopter writing `fix={hint}` at every error surface.
 
@@ -344,7 +364,7 @@ reader sees and the retry that actually happens cannot disagree. Give it the sam
 `durableLimitCodes` list you give `queryDefaults`, and a spent quota offers no button instead of
 one that cannot work.
 
-You also say how a stated wait becomes words:
+`formatWait` says how a stated wait becomes words:
 
 ```ts
 formatWait: (secs) => humanizeWait(t, secs, "errors."); // three ICU plural keys

@@ -386,3 +386,68 @@ describe("createErrorDescriber, when the code names the sentence", () => {
     expect(describeError(error).cause).toBe("errors.network");
   });
 });
+
+/**
+ * The form for an app in one language. It had to pass `copyPrefix`, `messageKeyPrefix` and an
+ * empty `knownMessageKeys` to say "I have no catalog", and typing `t`'s argument by hand broke the
+ * inference. It writes its four sentences out instead.
+ */
+describe("one language", () => {
+  const COPY = {
+    network: "We could not reach the server.",
+    networkHint: "Check your connection, then try again.",
+    unexpected: "Something went wrong on our side.",
+    retrySoon: "Try again in a moment.",
+  };
+  const describeError = createErrorDescriber({
+    copy: COPY,
+    formatWait: (secs) => `in ${secs}s`,
+    codes: {
+      RATE_LIMIT_EXCEEDED: ({ wait }) => ({ cause: "Too many at once.", fix: `Try ${wait}.` }),
+    },
+  });
+
+  it("takes its own sentences from `copy`", () => {
+    expect(describeError(new TypeError("Failed to fetch"))).toEqual({
+      cause: COPY.network,
+      fix: COPY.networkHint,
+      recover: "retry",
+    });
+    expect(describeError(new ApiError(502, null))).toMatchObject({
+      cause: COPY.unexpected,
+      fix: COPY.retrySoon,
+    });
+  });
+
+  // No catalog, so nothing the server names can reach the screen as a key. The server writes in
+  // the app's one language, so its own sentence is what an unmapped refusal shows.
+  it("shows the server's sentence and never a key the server named", () => {
+    const error = new ApiError(409, {
+      code: "SLUG_TAKEN",
+      message: "That address is taken.",
+      messageKey: "serverErrors.slugTaken",
+    });
+    expect(describeError(error).cause).toBe("That address is taken.");
+  });
+
+  it("still runs the arms and the stated wait", () => {
+    const error = new ApiError(
+      429,
+      { code: "RATE_LIMIT_EXCEEDED", message: "slow down" },
+      { retryAfterSecs: 30 },
+    );
+    expect(describeError(error)).toMatchObject({
+      cause: "Too many at once.",
+      fix: "Try in 30s.",
+      recover: "wait",
+    });
+  });
+
+  it("refuses `copy` with a sentence missing", () => {
+    // @ts-expect-error -- `retrySoon` is missing, and a 5xx would show `undefined` without it.
+    createErrorDescriber({
+      copy: { network: "", networkHint: "", unexpected: "" },
+      formatWait: String,
+    });
+  });
+});

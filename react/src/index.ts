@@ -68,6 +68,7 @@ export {
   type ErrorContext,
   type ErrorCopy,
   type ErrorDescriberOptions,
+  type OneLanguageDescriberOptions,
   type RecoveryKind,
   type Translate,
 } from "./describe-error.ts";

@@ -175,14 +175,8 @@ export interface ErrorContext {
   recover: RecoveryKind;
 }
 
-export interface ErrorDescriberOptions<
-  Prefix extends string,
-  ServerPrefix extends string,
-  ServerName extends string,
-> {
-  t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName | PluralBase<ServerName>}`>;
-  /** Catalog namespace for this module's own copy, e.g. `"errors."`. */
-  copyPrefix: Prefix;
+/** What both forms share: everything but where the words come from. */
+interface DescriberRules {
   /**
    * How a stated wait becomes words, for the `wait` an arm reads off its context.
    *
@@ -193,6 +187,49 @@ export interface ErrorDescriberOptions<
    * `(secs) => formatIn(secs, locale)` — and the catalog you need is the one you can see.
    */
   formatWait: (secs: number) => string;
+  /**
+   * Per-code copy. Everything not listed falls through to the default arm.
+   *
+   * The arms look up the app's own keys, so they close over the app's `t` rather than being
+   * handed one — this module has no names for that copy and no business typing it.
+   *
+   * Annotate your object `Partial<Record<YourErrorCode, ErrorArm>>` where you write it, and a
+   * code that does not exist is a compile error at the arm rather than a branch that never runs.
+   */
+  codes?: Partial<Record<string, ErrorArm>>;
+  /**
+   * What to say when nothing in `codes` matches: a code this build has no arm for, or an answer
+   * with no envelope at all.
+   *
+   * The built-in arm hands the reader the server's own `message`, and for one API in the fleet
+   * that is right — its message IS the sentence a person should read. For another it is exactly
+   * wrong: that repo's own i18n rules say `message` is "the English fallback for logs", and it
+   * ships three languages, so the built-in would put developer English in front of a reader who
+   * does not speak it. One default cannot be right for both, and the one baked in here was
+   * simply the first adopter's convention, mistaken for a fact.
+   *
+   * An arm here is also handed the stated wait, which the built-in spends on nothing: a refusal
+   * with no arm of its own could state its expiry and have that go unsaid.
+   */
+  fallback?: ErrorArm;
+  /**
+   * The codes that mean "this limit does not clear by waiting" — **the same list you hand
+   * `queryDefaults`**, because it answers the same question and a second copy is a second
+   * chance to disagree with the retry rule. Declare it once in the app and pass it twice.
+   */
+  durableLimitCodes?: readonly string[];
+  /** Longest stated wait still worth a retry rather than a countdown. Matches `queryDefaults`. */
+  maxRetryWaitSecs?: number;
+}
+
+export interface ErrorDescriberOptions<
+  Prefix extends string,
+  ServerPrefix extends string,
+  ServerName extends string,
+> extends DescriberRules {
+  t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName | PluralBase<ServerName>}`>;
+  /** Catalog namespace for this module's own copy, e.g. `"errors."`. */
+  copyPrefix: Prefix;
   /**
    * The server's own catalog namespace, e.g. `"serverErrors."`. A `messageKey` outside it is
    * ignored — the server names a sentence, it does not get to name any key in the app.
@@ -234,60 +271,39 @@ export interface ErrorDescriberOptions<
   localizeParams?: (
     params: Record<string, string | number> | undefined,
   ) => Record<string, unknown> | undefined;
-  /**
-   * Per-code copy. Everything not listed falls through to the default arm.
-   *
-   * The arms look up the app's own keys, so they close over the app's `t` rather than being
-   * handed one — this module has no names for that copy and no business typing it.
-   *
-   * Annotate your object `Partial<Record<YourErrorCode, ErrorArm>>` where you write it, and a
-   * code that does not exist is a compile error at the arm rather than a branch that never runs.
-   */
-  codes?: Partial<Record<string, ErrorArm>>;
-  /**
-   * What to say when nothing in `codes` matches: a code this build has no arm for, or an answer
-   * with no envelope at all.
-   *
-   * The built-in arm hands the reader the server's own `message`, and for one API in the fleet
-   * that is right — its message IS the sentence a person should read. For another it is exactly
-   * wrong: that repo's own i18n rules say `message` is "the English fallback for logs", and it
-   * ships three languages, so the built-in would put developer English in front of a reader who
-   * does not speak it. One default cannot be right for both, and the one baked in here was
-   * simply the first adopter's convention, mistaken for a fact.
-   *
-   * An arm here is also handed the stated wait, which the built-in spends on nothing: a refusal
-   * with no arm of its own could state its expiry and have that go unsaid.
-   */
-  fallback?: ErrorArm;
-  /**
-   * The codes that mean "this limit does not clear by waiting" — **the same list you hand
-   * `queryDefaults`**, because it answers the same question and a second copy is a second
-   * chance to disagree with the retry rule. Declare it once in the app and pass it twice.
-   */
-  durableLimitCodes?: readonly string[];
-  /** Longest stated wait still worth a retry rather than a countdown. Matches `queryDefaults`. */
-  maxRetryWaitSecs?: number;
+}
+
+/**
+ * An app in one language writes its four sentences out, and needs no `t`, no prefixes and no
+ * catalog.
+ *
+ * With no catalog, the server cannot name a sentence the app carries, so a refusal with no arm of
+ * its own shows the server's `message`. In a one-language product that is the right sentence: the
+ * server writes in the same language the app does.
+ */
+export interface OneLanguageDescriberOptions extends DescriberRules {
+  copy: Record<CopyName, string>;
 }
 
 export type ErrorArm = (ctx: ErrorContext) => ErrorCopy;
 
-/** Build the describer. */
-export function createErrorDescriber<
+/** Where the describer's words come from: its own four, and the server's when it named one. */
+interface Words {
+  copyOf: (name: CopyName) => string;
+  serverSentence: (error: ApiError) => string | null;
+}
+
+function translatedWords<
   Prefix extends string,
   ServerPrefix extends string,
   ServerName extends string,
 >({
   t,
   copyPrefix,
-  formatWait,
   messageKeyPrefix,
   knownMessageKeys,
   localizeParams = (params) => params,
-  codes = {},
-  fallback,
-  durableLimitCodes = [],
-  maxRetryWaitSecs,
-}: ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>): (error: unknown) => DescribedError {
+}: ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>): Words {
   // Both spellings of every name: the one the catalog stores, and — for a plural — the one the
   // server sends. `Object.keys` and not `in`, which would have accepted "toString".
   const known = new Set<string>();
@@ -300,20 +316,49 @@ export function createErrorDescriber<
   // keys and their plural bases, which is exactly what the predicate claims.
   const has = (name: string): name is ServerName | PluralBase<ServerName> => known.has(name);
 
-  function serverSentence(error: ApiError): string | null {
-    const lookup = (named: string | undefined): string | null => {
-      if (named === undefined || !named.startsWith(messageKeyPrefix)) return null;
-      const name = named.slice(messageKeyPrefix.length);
-      return has(name) ? t(`${messageKeyPrefix}${name}`, localizeParams(error.params)) : null;
-    };
-    // `messageKey` first: an API that sends both means the key, and the code is what the UI
-    // switches on. The code is only consulted when there is no key to prefer, and it is spelled
-    // under the same prefix so the gate is identical.
-    return (
-      lookup(error.messageKey) ??
-      (error.code === undefined ? null : lookup(`${messageKeyPrefix}${error.code}`))
-    );
-  }
+  return {
+    copyOf: (name) => t(`${copyPrefix}${name}`),
+    serverSentence(error) {
+      const lookup = (named: string | undefined): string | null => {
+        if (named === undefined || !named.startsWith(messageKeyPrefix)) return null;
+        const name = named.slice(messageKeyPrefix.length);
+        return has(name) ? t(`${messageKeyPrefix}${name}`, localizeParams(error.params)) : null;
+      };
+      // `messageKey` first: an API that sends both means the key, and the code is what the UI
+      // switches on. The code is only consulted when there is no key to prefer, and it is spelled
+      // under the same prefix so the gate is identical.
+      return (
+        lookup(error.messageKey) ??
+        (error.code === undefined ? null : lookup(`${messageKeyPrefix}${error.code}`))
+      );
+    },
+  };
+}
+
+/** Build the describer for an app in one language. */
+export function createErrorDescriber(
+  options: OneLanguageDescriberOptions,
+): (error: unknown) => DescribedError;
+/** Build the describer for an app that translates. */
+export function createErrorDescriber<
+  Prefix extends string,
+  ServerPrefix extends string,
+  ServerName extends string,
+>(
+  options: ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>,
+): (error: unknown) => DescribedError;
+export function createErrorDescriber<
+  Prefix extends string,
+  ServerPrefix extends string,
+  ServerName extends string,
+>(
+  options: OneLanguageDescriberOptions | ErrorDescriberOptions<Prefix, ServerPrefix, ServerName>,
+): (error: unknown) => DescribedError {
+  const { formatWait, codes = {}, fallback, durableLimitCodes = [], maxRetryWaitSecs } = options;
+  const { copyOf, serverSentence }: Words =
+    "copy" in options
+      ? { copyOf: (name) => options.copy[name], serverSentence: () => null }
+      : translatedWords(options);
 
   /**
    * Which control to offer, decided once and never switched on separately.
@@ -351,9 +396,8 @@ export function createErrorDescriber<
   const unmapped: ErrorArm =
     fallback ??
     (({ error, says }) => ({
-      cause:
-        says ?? ((error.code === undefined ? "" : error.message) || t(`${copyPrefix}unexpected`)),
-      fix: error.status >= 500 ? t(`${copyPrefix}retrySoon`) : undefined,
+      cause: says ?? ((error.code === undefined ? "" : error.message) || copyOf("unexpected")),
+      fix: error.status >= 500 ? copyOf("retrySoon") : undefined,
     }));
 
   return function describeError(error: unknown): DescribedError {
@@ -362,10 +406,10 @@ export function createErrorDescriber<
       // never worth showing a stack trace for. `shouldRetry` answers a non-response the same way,
       // so these two agree here without either being told about the other.
       return {
-        cause: t(`${copyPrefix}network`),
+        cause: copyOf("network"),
         // The catalog KEY keeps its name while the field becomes `fix`: renaming it would cost
         // every adopter a JSON edit in every language, for a string no caller ever types.
-        fix: t(`${copyPrefix}networkHint`),
+        fix: copyOf("networkHint"),
         recover: "retry",
       };
     }

@@ -1319,14 +1319,6 @@ The describer turns a thrown error into the words for that panel:
 import { createErrorDescriber, type ErrorArm } from "@gusnips/react";
 import type { ErrorCode } from "@notes/shared";
 
-// The words the describer needs for failures that have no server sentence.
-const COPY = {
-  "errors.network": "We could not reach the server.",
-  "errors.networkHint": "Check your connection, then try again.",
-  "errors.unexpected": "Something went wrong on our side.",
-  "errors.retrySoon": "Try again in a moment.",
-};
-
 const codes: Partial<Record<ErrorCode, ErrorArm>> = {
   VALIDATION_ERROR: () => ({
     cause: "That can't be saved as it is.",
@@ -1337,18 +1329,21 @@ const codes: Partial<Record<ErrorCode, ErrorArm>> = {
 const inTime = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
 export const describeError = createErrorDescriber({
-  t: (key) => COPY[key],
-  copyPrefix: "errors.",
-  messageKeyPrefix: "serverErrors.",
-  knownMessageKeys: {},
+  // The words for failures that come with no sentence from the server.
+  copy: {
+    network: "We could not reach the server.",
+    networkHint: "Check your connection, then try again.",
+    unexpected: "Something went wrong on our side.",
+    retrySoon: "Try again in a moment.",
+  },
   formatWait: (secs) => inTime.format(secs, "second"),
   codes,
 });
 ```
 
-It asks for its words by key, because most apps translate them. An app in one language passes an
-object, as here. Leave `t`'s argument untyped, and TypeScript checks that `COPY` has every key the
-describer needs.
+This app is in one language, so it writes those four sentences out. An app that translates
+passes its `t` and its catalog instead; see
+[the error describer](react/README.md#never-dead-end-anyone).
 
 It returns `recover`: `"retry"`, `"wait"`, `"signin"` or `"none"`. That comes from the same rule
 `queryDefaults` retries with, so the button never offers a retry the client has already given up
