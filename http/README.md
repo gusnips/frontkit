@@ -120,17 +120,22 @@ for (let attempt = 0; ; attempt++) {
 }
 ```
 
-| The failure   | `repeatable: true` | `repeatable: false` |
-| ------------- | ------------------ | ------------------- |
-| No answer     | retry              | stop                |
-| 5xx           | retry              | stop                |
-| 408, 425, 429 | retry              | retry               |
-| Any other 4xx | stop               | stop                |
+| The failure            | `repeatable: true` | `repeatable: false` |
+| ---------------------- | ------------------ | ------------------- |
+| No answer              | retry              | stop                |
+| 5xx                    | retry              | stop                |
+| 408, 425, 429          | retry              | retry               |
+| 409 with a stated wait | retry              | stop                |
+| Any other 4xx          | stop               | stop                |
 
 `repeatable` has no default, because either default is wrong for half your calls. Pass `true` for a
 read, or for a write that sends an idempotency key the server honours. A write that got no answer,
 or a 5xx, may already have run, and sending it again can charge a card twice. A 408, 425 or 429
 says the server did not run it, so those are safe to send again either way.
+
+A 409 that states a wait is an idempotency key whose first call is still running. Sent again
+with the same key, it gets that first call's answer once it's done. A 409 with no wait, like a
+name already taken, is an answer.
 
 Whatever the status, it stops when:
 

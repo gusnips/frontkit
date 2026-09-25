@@ -47,6 +47,15 @@ describe("shouldRetry", () => {
     }
   });
 
+  // `@gusnips/server`'s createIdempotency answers a key whose first call is still running with a
+  // 409 and a wait. Given up on, the caller had to send the whole request again by hand.
+  it("waits out a 409 that says when it clears, if the request may run twice", () => {
+    expect(shouldRetry(waited(409, 2), read)).toBe(true);
+    expect(shouldRetry(answer(409, { details: { retryAfterSecs: 10 } }), read)).toBe(true);
+    expect(shouldRetry(waited(409, 2), write)).toBe(false);
+    expect(shouldRetry(waited(409, 60), read)).toBe(false);
+  });
+
   it("does not retry a code the caller says does not clear by waiting", () => {
     const options = { ...read, durableCodes: ["QUOTA_EXCEEDED"] };
     expect(shouldRetry(answer(429, { code: "QUOTA_EXCEEDED" }), options)).toBe(false);

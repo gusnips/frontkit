@@ -65,6 +65,10 @@ export function shouldRetry(error: unknown, options: RetryOptions): boolean {
   if (wait !== null && wait > maxWaitSecs) return false;
 
   if (status >= 500) return repeatable;
+  // A 409 is an answer, except the one that says when it clears: an idempotency key whose first
+  // call is still running. Only a request that carries the key can get that answer, and waiting
+  // is what fixes it. A 409 with no wait (a name already taken) stays final.
+  if (status === 409) return repeatable && wait !== null;
   return NOT_NOW.has(status);
 }
 
