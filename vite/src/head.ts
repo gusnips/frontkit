@@ -371,7 +371,13 @@ export function assertRendered(
   // Everything this file has over the shell it was baked from is the page.
   const floor = checks.minGrowth ?? 500;
   const grew = html.length - template.length;
-  if (grew < floor) fail(`is only ${String(grew)} bytes bigger than the shell — nothing rendered`);
+  // The floor goes in the message, because the other reading is a page that is short on purpose:
+  // a guide's reader built a 396-byte pricing page and was told nothing rendered.
+  if (grew < floor)
+    fail(
+      `is only ${String(grew)} bytes bigger than the shell, under the ${String(floor)}-byte floor. ` +
+        "Either nothing rendered, or the page is short on purpose: pass `{ minGrowth }` to lower it.",
+    );
   if (/<title>\s*<\/title>/.test(html)) fail("has an empty <title>");
   if (checks.lang !== undefined && !html.includes(`<html lang="${checks.lang}"`))
     fail(`is not marked as ${checks.lang}`);
@@ -393,7 +399,8 @@ export function assertRendered(
     fail(
       "carries React's renderToString error where its page should be. The entry is still on " +
         "`renderToString`, which cannot render a Suspense boundary and writes the failure into " +
-        "the file instead — use `renderTree` (invariant 1).",
+        "the file instead. Render with `renderTree` from @gusnips/vite/render, which waits for " +
+        "every `lazy()` page.",
     );
 
   // What the root ACTUALLY opens with. Sliced rather than matched in one pattern, because a

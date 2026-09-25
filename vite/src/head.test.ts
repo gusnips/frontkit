@@ -342,6 +342,17 @@ describe("assertRendered", () => {
     expect(() => assertRendered("pricing.html", shell, shell)).toThrow(/nothing rendered/);
   });
 
+  // A short page is the other reading of the same number, so the refusal names the floor and the
+  // way past it. A guide's reader hit this with a real 396-byte page and a message that said
+  // nothing rendered.
+  it("names the floor, and lets a short page lower it", () => {
+    const short = page(`<div id="root"><main>${"x".repeat(396)}</main></div>`);
+    expect(() => assertRendered("pricing.html", short, shell)).toThrow(
+      /under the 500-byte floor.*minGrowth/,
+    );
+    expect(() => assertRendered("pricing.html", short, shell, { minGrowth: 200 })).not.toThrow();
+  });
+
   // The size floor is not enough, and a donor proved it: a route rendered its LoadingScreen at
   // 1,174 bytes, comfortably over the floor, with an element inside the root and a good title.
   it("catches a file whose body is the loading screen", () => {
@@ -399,7 +410,9 @@ describe("assertRendered", () => {
       `server consider throwing an Error somewhere within the Suspense boundary. at Lazy ` +
       `(&lt;anonymous&gt;) at RenderedRoute (/Users/someone/repo/node_modules/react-router/x.js:1:1)` +
       `${"x".repeat(400)}</main></div>`;
-    expect(() => assertRendered("api.html", page(leaked), shell)).toThrow(/renderToString error/);
+    expect(() => assertRendered("api.html", page(leaked), shell)).toThrow(
+      /renderToString error.*renderTree` from @gusnips\/vite\/render/,
+    );
   });
 
   // The page that exposed this was a DOCUMENTATION site, which is why the pattern is React's whole

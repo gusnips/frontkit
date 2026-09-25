@@ -116,6 +116,11 @@ opens the link in a new tab without firing `click`, so that tab never sees the c
 `remember` writes the locale under `storageKey`, inside a `try`, because storage can be blocked. A
 right click and "Open in new tab" fires no event a page can see, so that one path still guesses.
 
+When storage is blocked, nothing is saved, and the gate decides every bare address from the browser.
+A reader whose browser prefers Portuguese then cannot stay on the English pages: each click on
+"English" lands back in Portuguese. The gate has nowhere else to keep a choice, so this is a known
+limit.
+
 Three options, for sites that need them:
 
 - `base: "/docs"` when the pages live under a path.

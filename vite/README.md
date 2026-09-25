@@ -72,6 +72,10 @@ import { renderTree } from "@gusnips/vite/render";
 Behind its own subpath, because it is the one thing here that loads React. A repo that only wants
 a sitemap installs no renderer.
 
+Your SSR entry exports a function named `renderPage` that calls it. The prerender script loads it
+with `loadRenderer("dist-ssr/entry-server.js")`, which looks for that name and stops the build if
+it is not there.
+
 It uses `prerender` from `react-dom/static`, never `renderToString`. With `lazy()` routes behind
 a `<Suspense>`, **`renderToString` renders the fallback** — it will write a loading screen into
 every file and pass any gate that only asks whether the root has children. It also answers `""`
@@ -88,6 +92,17 @@ browser shows it, because the bundle replaces the body on load — so the only r
 it were the ones who run no JavaScript, which is every crawler the page was built for. It was in
 one of its two languages, too: the first render bails but resolves the `lazy()` promise, so the
 next locale rendered the real component and looked perfect. `assertRendered` refuses that text now.
+
+Call `assertRendered(file, html, template)` on every page before you write it. It stops the build
+when:
+
+- the page is less than 500 bytes bigger than `index.html`. A page that is short on purpose
+  passes a lower floor: `{ minGrowth: 200 }`.
+- the `<title>` is empty, or, when you pass `{ lang }`, `<html lang>` names another language.
+- a `%NAME%` placeholder was never filled in.
+- React's `renderToString` error is in the page.
+- the page is the loading screen. It knows one only by `role="status"`, so give your Suspense
+  fallback that role, which a screen reader needs anyway. A plain `<p>Loading…</p>` passes.
 
 End your prerender script with `process.exit(0)`. Under bun, importing this renderer leaves the
 process alive after the last file is written: `react-dom/server` exits, `react-dom/static.browser`
@@ -235,6 +250,10 @@ await checkI18n([
   { ...web, serverCode: ["apps/api/src/**/*.ts"], serverKeyPrefixes: ["serverErrors."] },
 ]);
 ```
+
+The scan reads text, not syntax, so a `t("key")` inside a comment counts too, and fails the check
+if the key is gone. Fix the comment. Skipping comments safely would take a full parser: a pattern
+that cuts a line at `//` also cuts it at `https://`, and would quietly miss a real `t()` after it.
 
 `report.unused` lists canonical keys no code seems to reach. It is a hint, not a failure: a key
 built at runtime from a variable can't be seen by a scan.
