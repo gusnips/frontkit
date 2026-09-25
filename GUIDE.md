@@ -17,16 +17,14 @@ You need:
 - Postgres, on your machine for now.
 - A Supabase project, for sign-in. You need its URL and its anon key.
 
-Part 1 covers [how a project is laid out, and why](#how-a-project-is-laid-out-and-why),
+Part 1 covers [how we lay out a project, and why](#how-we-lay-out-a-project-and-why),
 [setting up the repo](#set-up-the-repo), [the API](#the-api),
 [running the API](#running-the-api) and [the web app](#the-web-app).
 [What's next](#whats-next) lists part 2.
 
-## How a project is laid out, and why
+## How we lay out a project, and why
 
-These are the choices the apps built on these packages share. We read ten of them and wrote down
-what most of them do, with the reason for each. Where the apps differ, we took what the newest ones
-do.
+This is how most of our apps are built, and why. Where they differ, this follows the newest ones.
 
 ### One repo for each product
 
@@ -79,9 +77,13 @@ Start with `apps/api`, `apps/web` and `packages/shared`. Add the rest when you n
   stay in `apps/api/src`.
 - **Migrations** live in `apps/api/migrations/`, numbered: `001_notes.sql`, `002_…`. The API owns
   the database, and the numbers show the order at a glance.
-- **`infra/<app>/`** holds what one app needs on a server: its pm2 file and its systemd override.
-  These files change how production runs, so they go through review like code. They sit outside
-  `apps/` because nothing in them is part of a build.
+- **`infra/`** holds what an app needs on a server: its pm2 file, its systemd drop-in, and the
+  scripts that install them, in one folder per app. These files change how production runs, so
+  they go through review like code. They sit outside `apps/` because nothing in them is part of a
+  build.
+
+An app imports packages. A package never imports an app, and an app never imports another app.
+That keeps each package usable by every app, and lets each app deploy on its own.
 
 ### Inside the API
 
@@ -137,8 +139,9 @@ newest put them next to the file. Tests run with Vitest.
 
 - **Bun** runs TypeScript as it is, so the API ships as source with no build step. It also
   installs the packages.
-- **Hono** for the API: a small router built on the web's own `Request` and `Response`.
-  `@gusnips/server/hono` has its middleware.
+- **Hono** for the API: a small router built on the web's own `Request` and `Response`, so a test
+  calls `app.request("/notes")` with no server running. `@gusnips/server/hono` has its middleware.
+  A few older apps use Express; the newest all use Hono.
 - **Postgres** for the data, through `pg` and plain SQL migrations anyone can read.
 - **Supabase Auth** for sign-in: passwords, email links and Google, which you should not write
   yourself. It is open source and keeps its users in Postgres.
@@ -161,8 +164,8 @@ newest put them next to the file. Tests run with Vitest.
 - **pm2 on a plain server** (a VPS) runs the API and the worker. It restarts them when they crash,
   and gives them time to finish when you deploy. **Caddy** sits in front for HTTPS.
 - **A static host** serves the web app and the site. After the build they are only files, so the
-  API is the only server you run. We use Cloudflare Pages. Its `_redirects` file sends every
-  address to `index.html`, so a reload on `/notes` still finds the app.
+  API is the only server you run. Most of our apps use Cloudflare Pages. Its `_redirects` file
+  sends every address to `index.html`, so a reload on `/notes` still finds the app.
 - **ESLint, Prettier and knip.** knip finds files and exports nothing uses.
 
 ### Rules for the code
@@ -186,20 +189,10 @@ newest put them next to the file. Tests run with Vitest.
 
 ### What each app keeps for itself
 
-The packages share behaviour. They never share the look.
-
-- **The brand:** the logo, a mascot, illustrations. That is the product, and it lives in
-  `packages/ui/src/brand/`.
-- **Styled components,** like `Button`. A shared styled button that must fit every brand grows a
-  new option for each one, forever. Each app draws its own.
-- **Colours.** `@gusnips/tokens` fixes the names, like `--color-primary`, and how dark mode swaps
-  them. Each app sets the values.
-- **How an error or an empty page looks.** The packages ship the props a panel needs. Each app
-  draws the panel.
-- **The error codes.** `@gusnips/http` knows the shape of an error. The codes in it are your API's
-  own words, and they live in `packages/shared`.
-- **`main.tsx`, `App.tsx` and the folders.** You copy them once, from this guide. They are not a
-  package.
+The brand, the styled components like `Button`, and the colours stay in each app. The packages
+share behaviour. The look is the product, and a shared styled `Button` that has to fit every brand
+grows a new option for each one, forever.
+[What must not be shared](AGENTS.md#what-must-not-be-shared) has the full list and the reasons.
 
 ## Set up the repo
 
@@ -214,7 +207,7 @@ notes/
 ├── packages/
 │   └── shared/     types both apps import
 ├── infra/
-│   └── api/        the pm2 file and the systemd override
+│   └── api/        the pm2 file and the systemd drop-in
 ├── package.json
 ├── turbo.json
 └── tsconfig.base.json
