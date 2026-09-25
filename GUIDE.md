@@ -1553,8 +1553,8 @@ covers it:
 
 - [Pages a search engine can read](GUIDE-2.md#pages-a-search-engine-can-read): prerendering, the
   sitemap and share cards.
-- More than one language: [@gusnips/locale](locale/README.md), and
-  [checking your translations](vite/README.md#check-your-translations).
+- [More than one language](GUIDE-2.md#more-than-one-language): addresses per language, the
+  language gate, and checking your translations.
 - Redis and background jobs:
   [Redis](https://github.com/gusnips/serverkit/blob/main/server/README.md#redis),
   [background jobs](https://github.com/gusnips/serverkit/blob/main/server/README.md#background-jobs).
