@@ -876,6 +876,12 @@ From the repo root, `pm2 start infra/api/ecosystem.config.cjs` starts it, and `p
 sends SIGINT, which runs the same drain. `cwd` points at the API's folder, so Bun finds
 `apps/api/.env` there.
 
+pm2 loads the entry with `require()`. So the entry, and every file it imports, must not `await` an
+import or a file outside a function. If one does, the API can print its start line and still die:
+pm2's error log shows `require() async module … is unsupported`, and pm2 restarts it over and over.
+Load the module with `createRequire`, read the file with `readFileSync`, or move the `await` into a
+function.
+
 **Each number must be larger than the one before it:** the longest request, then `HARD_EXIT_MS`,
 then pm2's `kill_timeout`, then systemd's `TimeoutStopSec`. If one is too small, deploys cut
 requests off halfway, and nothing reports it. pm2's `kill_timeout` is 1.6 seconds unless you set
