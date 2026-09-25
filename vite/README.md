@@ -258,10 +258,13 @@ top-level key, so that is refused.
 
 ```ts
 import { webPreset } from "@gusnips/vite/preset";
+import { defineConfig } from "vite";
 
-export default defineConfig(webPreset({/* … */}));
+export default defineConfig(webPreset({ root: import.meta.dirname, port: 5173 }));
 ```
 
-Its own subpath too, since it pulls in the React and Tailwind plugins.
+It adds the React and Tailwind plugins, points `@` at `src`, and runs `vite preview` on the port
+minus 1000. `root` is required: it is the folder that holds `index.html`. Its own subpath too,
+since it pulls in those two plugins.
 
 MIT · part of [frontkit](https://github.com/gusnips/frontkit)

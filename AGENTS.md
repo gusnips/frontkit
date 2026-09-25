@@ -117,7 +117,7 @@ Folder names state their ROLE, not an npm scope — the same rule as providerkit
 ```bash
 bun install                  # workspace root
 
-bun run check                # lint → typecheck → purity → test, all four packages
+bun run check                # lint → typecheck → purity → test, every package
 bun run purity               # the platform guard on its own
 bun run release:check        # what the REGISTRY would get — run before every publish
 bun run build
@@ -132,8 +132,8 @@ Per package: `cd react && bun run test`, etc.
   though that org is free: "providerkit" means LLM-provider abstraction, so `@providerkit/tokens`
   would inherit the wrong noun. providerkit stays narrow and keeps `@providerkit/react` for real
   React bindings to its agent loop.
-- Scoped packages publish restricted by default; `publishConfig.access` is `public` on all four
-  so a release cannot silently go private.
+- Scoped packages publish restricted by default; `publishConfig.access` is `public` on every
+  package so a release cannot silently go private.
 - **Adopters resolve from the registry** — never `link:` or `file:`. providerkit's lesson: a
   `file:` dependency resolves on exactly one machine, and it drags the package's own
   devDependencies into the adopter's lockfile.
@@ -551,10 +551,11 @@ pin them; if one fails, a lesson is being un-learned.
     optional; it is a required peer whose error has been moved from install time, where a package
     manager explains it, to the adopter's first build, where a bundler blames one of OUR files for
     a package THEY never installed. `createAuthStore` and the guards moved to
-    `@gusnips/react/store` and `@gusnips/react/guards`, and the main barrel now imports `react`,
-    `react-dom` and `@gusnips/http` and nothing else. The three peers that stayed optional AND
-    stayed in the barrel — `@tanstack/react-query`, `i18next`, `react-i18next` — are safe for the
-    reason above: only their types are used, and types erase.
+    `@gusnips/react/store` and `@gusnips/react/guards`, and the main barrel now imports `react`
+    and `@gusnips/http` and nothing else (`react-dom` left for `/hydrate` in the second
+    migration). The three peers that stayed optional AND stayed in the barrel —
+    `@tanstack/react-query`, `i18next`, `react-i18next` — are safe for the reason above: only
+    their types are used, and types erase.
 
 ### …and six more for anything under `react/src/ui/`
 
@@ -730,8 +731,11 @@ siblings in one tree and only one of them ever got the fix.
   production pass different values. A build right after a staging build is a cache hit, so
   production ships pointing at `stg.` on every address and talking to the staging API, and nothing
   about it looks wrong. `"env": ["VITE_*"]` as a wildcard, because every variable with that prefix
-  goes into the bundle by definition. **Every repo on this stack had the same file — all eleven
-  carry the fix now (2026-09-11).** Check it only when a new repo joins the stack.
+  goes into the bundle by definition. turbo 2.11 now adds `VITE_*` by itself for a workspace
+  that depends on vite, and the line stays anyway: with that inference off and the line gone, a
+  build came out with no API address at all, and the next build replayed it from the cache.
+  **Every repo on this stack had the same file — all eleven carry the fix now (2026-09-11).**
+  Check it only when a new repo joins the stack.
 - **The sibling app is the finding.** Three times over, in one tree: the admin's own
   `isChunkLoadError` matched Chrome's phrasing and not Firefox's, so a stale deploy read as a hard
   crash on Firefox; the admin's `vite:preloadError` handler reloaded the whole page for a CSS

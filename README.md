@@ -17,24 +17,28 @@ import { cn } from "@gusnips/react";
 cn("p-2", "p-4"); // → "p-4"
 ```
 
-## Four packages
+## Six packages
 
-| Package                               | What it is                              | Needs            |
-| ------------------------------------- | --------------------------------------- | ---------------- |
-| [`@gusnips/tokens`](tokens/README.md) | one Tailwind 4 `@theme` file            | nothing          |
-| [`@gusnips/http`](http/README.md)     | the request/response envelope, as types | nothing          |
-| [`@gusnips/react`](react/README.md)   | the headless runtime                    | react, react-dom |
-| [`@gusnips/vite`](vite/README.md)     | the prerender rig and the vite preset   | node             |
+| Package                               | What it is                              | Needs   |
+| ------------------------------------- | --------------------------------------- | ------- |
+| [`@gusnips/tokens`](tokens/README.md) | one Tailwind 4 `@theme` file            | nothing |
+| [`@gusnips/http`](http/README.md)     | the request/response envelope, as types | nothing |
+| [`@gusnips/locale`](locale/README.md) | where a language lives in a URL         | nothing |
+| [`@gusnips/br`](br/README.md)         | CPF, CNPJ, Brazilian phones and CEP     | nothing |
+| [`@gusnips/react`](react/README.md)   | the headless runtime                    | react   |
+| [`@gusnips/vite`](vite/README.md)     | the prerender rig and the vite preset   | node    |
 
-They are four and not one because of what each consumer can afford to install. An Astro
-marketing site wants the tokens and no JavaScript. An API server wants the envelope and no
-React. A browser bundle wants the runtime and no `node:fs`. The build script is the only thing
-that needs the filesystem, so it is the only thing that gets it.
+They are six and not one because of what each consumer can afford to install. An Astro
+marketing site wants the tokens and no JavaScript. An API server wants the envelope and the
+CNPJ check, and no React. A browser bundle wants the runtime and no
+`node:fs`. The build script is the only thing that needs the filesystem, so it is the only thing
+that gets it.
 
 That column is a promise, and the build checks it. Anything a package needs beyond what is
 listed there lives behind a subpath, so you install it only by importing it: the Base UI
-wrappers at `@gusnips/react/ui`, the auth store at `/store`, the route guards at `/guards`, the
-renderer at `@gusnips/vite/render`. A package that generates your sitemap installs no React.
+wrappers at `@gusnips/react/ui`, the auth store at `/store`, the route guards at `/guards`,
+`react-dom` at `/hydrate`, the renderer at `@gusnips/vite/render`. A package that generates your
+sitemap installs no React, and a React Native app installs no `react-dom`.
 
 ## What it does
 

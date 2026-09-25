@@ -284,8 +284,10 @@ operator arriving while `/auth/me` is down gets told the page does not exist: th
 retry, and no request id to quote. A guard has three answers — wait, fail, refuse — and only a
 real `false` reaches the refusal.
 
-`createRequireAuth` sends an anonymous visitor to `?next=`, carrying path, query and hash. The URL
-survives reloads, OAuth and email links; router state does not. Read it through the main entry's
+`createRequireAuth` sends an anonymous visitor to `?next=`, carrying path, query and hash. A hash
+that carries a sign-in token (`#access_token=…`, as an OAuth callback does) is left off, so the
+token never lands in the address, the logs or the history. The URL survives reloads, OAuth and
+email links; router state does not. Read it through the main entry's
 validator before navigating yourself:
 
 ```ts
