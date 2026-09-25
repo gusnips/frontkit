@@ -1548,11 +1548,11 @@ It runs six tasks: the three typechecks, the two test suites, and the web build.
 
 ## What's next
 
-Part 2 covers these. Until then, each one is in a package README:
+[Part 2](GUIDE-2.md) covers these, one chapter each. Until a chapter is written, its package README
+covers it:
 
-- Pages a search engine can read: prerendering, the sitemap and share cards.
-  [Rendering](vite/README.md#rendering),
-  [sitemap, robots, OG cards](vite/README.md#sitemap-robots-og-cards).
+- [Pages a search engine can read](GUIDE-2.md#pages-a-search-engine-can-read): prerendering, the
+  sitemap and share cards.
 - More than one language: [@gusnips/locale](locale/README.md), and
   [checking your translations](vite/README.md#check-your-translations).
 - Redis and background jobs:
