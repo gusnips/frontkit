@@ -35,6 +35,11 @@ export interface EmptyStateProps {
    *
    * Only one donor had this, and it is the difference between a screen reader announcing a
    * page and announcing nothing.
+   *
+   * **The type cannot make your panel read it.** A panel that always renders an `<h3>` accepts
+   * `headingLevel={1}` and ignores it, and the page ships with no `h1`. The guide's own example
+   * app did exactly that on its 404 until a browser check found it. Render the heading from the
+   * prop: `` const Heading = `h${headingLevel}` as const ``.
    */
   headingLevel?: 1 | 2 | 3;
   className?: string;
