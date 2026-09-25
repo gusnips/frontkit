@@ -163,7 +163,8 @@ Writes `assets/theme-<hash>.js` and one `<script src>` at the end of `<head>`, s
 painted in the reader's theme before anything else runs. The file is the source of `startTheme`
 from `@gusnips/react/theme`, so the script before paint and the controller the app uses are
 the same function. It is a file rather than an inline script so a `script-src 'self'` policy
-lets it run. Pass it the same options you pass `createTheme`; see that package's README.
+lets it run. Pass it the same options you pass `createTheme`; see that package's README. On
+[the preset](#the-vite-preset), put it in `plugins`.
 
 `themeScript` is built on `prePaintScript`, which takes any script that has to run before the
 page shows. `@gusnips/locale`'s `localeGateScript` is the other one:
@@ -266,5 +267,13 @@ export default defineConfig(webPreset({ root: import.meta.dirname, port: 5173 })
 It adds the React and Tailwind plugins, points `@` at `src`, and runs `vite preview` on the port
 minus 1000. `root` is required: it is the folder that holds `index.html`. Its own subpath too,
 since it pulls in those two plugins.
+
+Pass more plugins in `plugins`. They run after the preset's own:
+
+```ts
+export default defineConfig(
+  webPreset({ root: import.meta.dirname, port: 5173, plugins: [themeScript(THEME)] }),
+);
+```
 
 MIT · part of [frontkit](https://github.com/gusnips/frontkit)

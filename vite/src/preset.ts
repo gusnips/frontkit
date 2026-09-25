@@ -8,7 +8,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
-import type { Plugin, UserConfig } from "vite";
+import type { Plugin, PluginOption, UserConfig } from "vite";
 
 /**
  * Substitute `%NAME%` placeholders in `index.html`.
@@ -55,6 +55,8 @@ export interface WebPresetOptions {
    * Vite-only semantics in them (aliases, `?raw`, `define`) if that behaviour ever changed.
    */
   ssrScope?: string;
+  /** More plugins, after the preset's own: `[themeScript(THEME)]`. */
+  plugins?: PluginOption[];
 }
 
 export function webPreset({
@@ -63,10 +65,16 @@ export function webPreset({
   previewPort,
   placeholders,
   ssrScope,
+  plugins = [],
 }: WebPresetOptions): UserConfig {
   const preview = previewPort ?? (port === undefined ? undefined : port - 1000);
   return {
-    plugins: [react(), tailwindcss(), ...(placeholders ? [htmlPlaceholders(placeholders)] : [])],
+    plugins: [
+      react(),
+      tailwindcss(),
+      ...(placeholders ? [htmlPlaceholders(placeholders)] : []),
+      ...plugins,
+    ],
     resolve: {
       alias: { "@": path.resolve(root, "src") },
     },
