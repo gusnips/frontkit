@@ -2139,6 +2139,10 @@ limit drift apart. One copy cannot.
 
 ### The reference
 
+Move `@gusnips/server` to `^0.8.22` in the catalog, and run `bun install`. On 0.8.22 the reference
+documents the delete's 204 with no body, which matches what `noContent` sends. On 0.8.21 it
+described a JSON `{ data }` body that the route never sent.
+
 ```ts
 // apps/api/src/openapi.ts
 import {
@@ -2294,9 +2298,6 @@ Error: GET /notes/all and GET /notes share the operation id "list_notes". Give o
 and the type makes sure of it, so `Object.keys(ERROR_STATUS)` is the whole list. The reference's
 `ApiError` then names all six, so a client built from it can check a code by name.
 
-**One mismatch is the kit's.** With `status: 204`, the reference still describes the delete's answer
-as a JSON `{ data }` body. `noContent` sends no body at all, and no content type.
-
 The API's tests read the same env check, so `vitest.config.ts` gets `API_URL` too. With
 `REDIS_URL` left out of it, the tests stopped with `These are not set: REDIS_URL`. The whole list
 now reads:
@@ -2358,10 +2359,10 @@ script cannot sign in that way. This chapter gives it an API key to send instead
 requests each user sends in a minute, and opens an MCP door. MCP (Model Context Protocol) is how an
 AI agent calls tools on a server.
 
-Move `@gusnips/server` to `^0.8.21` in the catalog, and run `bun install`. We made the limiter's
-Redis connection and counted two requests right away, as the first requests after a boot would be.
-On 0.8.19 both counts failed, so the limiter let both requests through uncounted. On 0.8.21 both
-were counted.
+The last chapter moved `@gusnips/server` to `^0.8.22`, which already has a fix this chapter needs.
+We made the limiter's Redis connection and counted two requests right away, as the first requests
+after a boot would be. On 0.8.19 both counts failed, so the limiter let both requests through
+uncounted. On 0.8.21 and 0.8.22 both were counted.
 
 ### API keys
 
