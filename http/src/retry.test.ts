@@ -180,8 +180,29 @@ describe("parseRetryAfter", () => {
     expect(parseRetryAfter(null)).toBeUndefined();
     expect(parseRetryAfter("")).toBeUndefined();
     expect(parseRetryAfter("soon")).toBeUndefined();
-    // `Date.parse` reads some integers as years; "-5" must not become a date long past.
-    expect(parseRetryAfter("-5")).toBeUndefined();
     expect(parseRetryAfter("9007199254740993")).toBeUndefined();
+  });
+
+  it("never reads a value with no letters as a date", () => {
+    // `Date.parse` reads each of these as 5 January 2001, which would invent a wait of 0.
+    for (const junk of ["-5", "-0.5", "1/5", "1-5", "1,5", "1 5", "2026-09-24"])
+      expect(parseRetryAfter(junk), junk).toBeUndefined();
+    expect(parseRetryAfter("1.5")).toBe(2);
+    expect(parseRetryAfter("+5")).toBe(5);
+  });
+
+  it("reads asctime, the date form with no zone, as GMT", () => {
+    // Off UTC on purpose: read as local time, this is three hours out, and in UTC it would pass.
+    const zone = process.env.TZ;
+    process.env.TZ = "America/Sao_Paulo";
+    vi.useFakeTimers({ now: Date.parse("2026-09-24T12:00:00Z") });
+    try {
+      expect(parseRetryAfter("Thu Sep 24 12:02:00 2026")).toBe(120);
+      expect(parseRetryAfter("Thursday, 24-Sep-26 12:02:00 GMT")).toBe(120);
+    } finally {
+      vi.useRealTimers();
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    }
   });
 });

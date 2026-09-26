@@ -108,23 +108,27 @@ export function retryAfterSecs(error: unknown): number | null {
  * `Retry-After` in either form RFC 9110 allows: seconds, or an HTTP date. The date form is the
  * one that gets skipped, which turns a stated wait into none. A date already past is 0.
  *
- * The date form rounds UP. It names a whole second and the clock is somewhere inside the one
+ * Both forms round UP. A date names a whole second and the clock is somewhere inside the one
  * before, so rounding to nearest sends a retry up to half a second early, into the limiter that
  * refused it, about half the time. A wait until you are allowed rounds up; the server kit's
- * webhook sender has always read it that way.
+ * webhook sender has always read it that way. "1.5" is not the RFC's seconds form, but what it
+ * asks for is plain, so it reads as 2.
  */
 export function parseRetryAfter(value: string | null | undefined): number | undefined {
   const raw = value?.trim();
   if (!raw) return undefined;
 
-  // A bare integer is the seconds form, malformed included: `Date.parse` reads some integers as
-  // years, so "-5" would fall through as a date long past and invent a wait of 0.
-  if (/^[+-]?\d+$/.test(raw)) {
-    const secs = Number(raw);
-    return Number.isSafeInteger(secs) && secs >= 0 ? secs : undefined;
+  // Every HTTP date names a weekday and a month, so a value with no letters is the seconds form
+  // or nothing. It must never reach `Date.parse`, which reads "-5", "1.5", "1/5" and "1 5" alike
+  // as 5 January 2001, a date long past, and invents a wait of 0.
+  if (!/[a-z]/i.test(raw)) {
+    const secs = Math.ceil(Number(raw));
+    return /^\+?\d+(\.\d+)?$/.test(raw) && Number.isSafeInteger(secs) ? secs : undefined;
   }
 
-  const at = Date.parse(raw);
+  // The third date form, asctime, carries no zone and means GMT. `Date.parse` reads a date with
+  // no zone as local time, so outside UTC the wait comes out hours wrong.
+  const at = Date.parse(/GMT|UTC|[+-]\d{4}$/i.test(raw) ? raw : `${raw} GMT`);
   if (Number.isNaN(at)) return undefined;
   return Math.max(0, Math.ceil((at - Date.now()) / 1000));
 }
