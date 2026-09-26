@@ -104,6 +104,47 @@ export function supabaseStorageKey(supabaseUrl: string): string {
 }
 
 /**
+ * The `{ storage, storageKey }` supabase-js builds for itself when you pass neither: localStorage
+ * if it takes a write, a store in memory if not, under {@link supabaseStorageKey}. Pass it to
+ * `createClient`'s `auth` and to {@link signOutEvenOffline}. Nobody signed in today is signed out
+ * by the change.
+ *
+ * A function, not `{ storage: localStorage, … }`, because that object is built at module scope,
+ * and reading `localStorage` there throws in two places. A prerender under bun has none, so the
+ * build fails. A browser that blocks storage raises a SecurityError, so the page is blank.
+ * supabase-js keeps the session in memory in both, and so does this. On React Native, build the
+ * object yourself with your `AsyncStorage`.
+ */
+export function supabaseAuthStorage(supabaseUrl: string): SupabaseSessionStorage {
+  return { storage: localStorageOrMemory(), storageKey: supabaseStorageKey(supabaseUrl) };
+}
+
+function localStorageOrMemory(): SupportedStorage {
+  // auth-js's own two questions: is this a browser, and does a write succeed. A Node with a
+  // `localStorage` of its own is not a browser, and auth-js keeps that session in memory too.
+  if (typeof window !== "undefined" && typeof document !== "undefined") {
+    try {
+      const { localStorage } = globalThis;
+      localStorage.setItem("sb-storage-probe", "1");
+      localStorage.removeItem("sb-storage-probe");
+      return localStorage;
+    } catch {
+      // Blocked: memory, below.
+    }
+  }
+  const items = new Map<string, string>();
+  return {
+    getItem: (key) => items.get(key) ?? null,
+    setItem: (key, value) => {
+      items.set(key, value);
+    },
+    removeItem: (key) => {
+      items.delete(key);
+    },
+  };
+}
+
+/**
  * Signs out, and makes sure the session leaves this device even when auth cannot be reached.
  *
  * `auth.signOut()` alone does not. In two cases it resolves `{ error }` and keeps the stored

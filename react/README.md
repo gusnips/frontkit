@@ -87,9 +87,9 @@ token. A reload then signs them back in, and on a shared computer that is the ne
 more than 3 seconds:
 
 ```ts
-import { signOutEvenOffline, supabaseStorageKey } from "@gusnips/react/supabase";
+import { signOutEvenOffline, supabaseAuthStorage } from "@gusnips/react/supabase";
 
-export const authStorage = { storage: localStorage, storageKey: supabaseStorageKey(supabaseUrl) };
+export const authStorage = supabaseAuthStorage(supabaseUrl);
 export const supabase = createClient(supabaseUrl, supabaseKey, { auth: authStorage });
 
 await signOutEvenOffline(supabase.auth, authStorage);
@@ -99,8 +99,10 @@ Two rules come with it:
 
 - **Build one `{ storage, storageKey }` object and pass it to both `createClient` and the helper.**
   The helper clears the key it is given, so a second copy that drifts leaves the session where it
-  was. `supabaseStorageKey` returns the key supabase-js already uses, so setting it signs nobody
-  out. On React Native, `storage` is your `AsyncStorage`.
+  was. `supabaseAuthStorage` returns the storage and key supabase-js already picks, so switching
+  signs nobody out. Where `localStorage` is missing or blocked, such as a prerender, it keeps the
+  session in memory, as supabase-js does, instead of throwing. On React Native, build the object
+  yourself: `{ storage: AsyncStorage, storageKey: supabaseStorageKey(supabaseUrl) }`.
 - **If your screen does not reload after signing out, clear your own store when the helper
   resolves.** The session is out of storage by then, but auth-js sends `SIGNED_OUT` only once it
   has finished the first call: a moment later, or up to 22 seconds on auth-js 2.106.

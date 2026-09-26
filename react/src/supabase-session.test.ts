@@ -12,6 +12,7 @@ import {
   isAuthOutage,
   parseAuthCallback,
   signOutEvenOffline,
+  supabaseAuthStorage,
   supabaseStorageKey,
   type SupabaseSessionAuth,
   type SupabaseSessionStorage,
@@ -93,11 +94,14 @@ function authClient(stored: SupabaseSessionStorage, fetch: typeof fetch) {
   }).auth;
 }
 
-async function signedIn(expiresAt: number, fetch = unreachable) {
-  const stored: SupabaseSessionStorage = {
+async function signedIn(
+  expiresAt: number,
+  fetch = unreachable,
+  stored: SupabaseSessionStorage = {
     storage: memoryStorage(),
     storageKey: supabaseStorageKey(PROJECT_URL),
-  };
+  },
+) {
   await stored.storage.setItem(stored.storageKey, JSON.stringify(storedSession(expiresAt)));
   const auth = authClient(stored, fetch);
   const events: string[] = [];
@@ -297,6 +301,66 @@ describe("supabaseStorageKey", () => {
     const { data } = await auth.getSession();
 
     expect(data.session).not.toBeNull();
+  });
+});
+
+describe("supabaseAuthStorage", () => {
+  // Stubs for a browser's globals. The tests run in Node, which has none of them; the real
+  // browser is in supabase-session.browser.test.ts.
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(globalThis, "localStorage");
+  });
+
+  function inBrowser(localStorage: PropertyDescriptor) {
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("document", {});
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, ...localStorage });
+  }
+
+  it("keeps the session in memory in a prerender, instead of throwing", async () => {
+    const { storage } = supabaseAuthStorage(PROJECT_URL);
+
+    await storage.setItem("key", "value");
+    expect(await storage.getItem("key")).toBe("value");
+    await storage.removeItem("key");
+    expect(await storage.getItem("key")).toBeNull();
+  });
+
+  it("keeps it in memory when a browser blocks storage, instead of a blank page", () => {
+    inBrowser({
+      get: () => {
+        throw new DOMException("Access is denied for this document.", "SecurityError");
+      },
+    });
+
+    expect(() => supabaseAuthStorage(PROJECT_URL)).not.toThrow();
+  });
+
+  it("signs out of the store in memory too, when auth cannot be reached", async () => {
+    vi.useFakeTimers();
+    const { stored, auth } = await signedIn(
+      now() - 60,
+      unreachable,
+      supabaseAuthStorage(PROJECT_URL),
+    );
+    expect(await stored.storage.getItem(stored.storageKey)).not.toBeNull();
+
+    const signingOut = signOutEvenOffline(auth, stored);
+    await vi.advanceTimersByTimeAsync(SIGN_OUT_TIMEOUT_MS);
+    await signingOut;
+
+    expect(await stored.storage.getItem(stored.storageKey)).toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
+    vi.useRealTimers();
+    expect(await sessionAfterReload(stored)).toBeNull();
+  });
+
+  it("does not take a localStorage that is not a browser's, as supabase-js does not", () => {
+    const local = memoryStorage();
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: local });
+
+    expect(supabaseAuthStorage(PROJECT_URL).storage).not.toBe(local);
   });
 });
 
