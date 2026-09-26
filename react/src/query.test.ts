@@ -1,5 +1,5 @@
 import { QueryClient, QueryObserver, type QueryObserverResult } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "./api-error.ts";
 import { queryView, retryDelayMs, shouldRetry } from "./query.ts";
 
@@ -32,9 +32,10 @@ describe("shouldRetry", () => {
   it("reads only its own ApiError as an answer", () => {
     const vendor = Object.assign(new Error("Invalid login credentials"), { status: 400 });
     expect(shouldRetry(vendor)).toBe(true);
-    expect(retryDelayMs(0, Object.assign(new Error("x"), { status: 429, retryAfterSecs: 5 }))).toBe(
-      1000,
-    );
+    // The first backoff is at most 1.5 s, so 5 s would be the vendor's wait read as the server's.
+    expect(
+      retryDelayMs(0, Object.assign(new Error("x"), { status: 429, retryAfterSecs: 5 })),
+    ).toBeLessThan(5000);
   });
 
   it("retries 5xx", () => {
@@ -135,6 +136,14 @@ describe("shouldRetry", () => {
 });
 
 describe("retryDelayMs", () => {
+  // The middle of the jitter, so the numbers below are the backoff itself.
+  beforeEach(() => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("backs off exponentially when nothing said how long", () => {
     expect(retryDelayMs(0, refusal(500))).toBe(1000);
     expect(retryDelayMs(1, refusal(500))).toBe(2000);

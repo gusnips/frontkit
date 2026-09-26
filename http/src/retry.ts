@@ -4,7 +4,7 @@
  * This is frontkit's invariant 8, one layer down from `@gusnips/react`, so a zero-dependency SDK
  * can follow the same rule as the app: it imports nothing, and a generator can copy the file
  * into an SDK whole. Five SDKs in one fleet each wrote their own, and each missed part of it:
- * none retried a 408, none read an explicit `retryAfterSecs: null`, four read the body's wait
+ * none retried a 408, none read an explicit `retryAfterSecs: null`, three read the body's wait
  * before the header, and the one that sent an idempotency key retried writes that had none.
  *
  * Every function reads an error by its fields, not its class: `status`, `code`, `details` (the
@@ -76,9 +76,15 @@ export function shouldRetry(error: unknown, options: RetryOptions): boolean {
  * How long before retry number `attemptIndex` (0 for the first): the server's stated wait when
  * there is one, an exponential backoff otherwise, and never less than the backoff. A
  * `Retry-After: 0` says "now", which is still too soon for a client that was just refused.
+ *
+ * The backoff lands at random between half and one and a half times 1 s·2ⁿ (capped at 30 s
+ * first, so the spread survives the cap). Clients cut off by one outage all fail at the same
+ * moment, and an exact backoff brings them all back at the same moment too, into a server that
+ * is still coming up. A stated wait is not moved: the server picked that time, and earlier is
+ * refused again.
  */
 export function retryDelayMs(attemptIndex: number, error: unknown): number {
-  const backoff = Math.min(1000 * 2 ** attemptIndex, 30_000);
+  const backoff = Math.min(1000 * 2 ** attemptIndex, 30_000) * (0.5 + Math.random());
   const wait = statusOf(error) === null ? null : retryAfterSecs(error);
   return wait === null ? backoff : Math.max(backoff, wait * 1000);
 }

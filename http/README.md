@@ -145,8 +145,10 @@ Whatever the status, it stops when:
 - the stated wait is longer than `maxWaitSecs`, 10 seconds by default. Show the wait to the person
   instead of holding a spinner for a minute.
 
-`retryDelayMs` waits as long as the server asked, and never less than a backoff of 1, 2, 4
-seconds and so on, up to 30.
+`retryDelayMs` waits as long as the server asked, and never less than a backoff of about 1, 2, 4
+seconds and so on, up to 30. Each backoff is picked at random between half and one and a half times
+that, so clients cut off by the same outage do not all come back in the same second. A wait the
+server stated is never moved.
 
 `@gusnips/react` retries react-query on this same rule, so an SDK and the app that uses it make
 the same call.

@@ -83,8 +83,8 @@ export function shouldRetry(
 }
 
 /**
- * How long before the next attempt: the server's stated wait when there is one, react-query's
- * exponential backoff otherwise, and never less than the backoff — a `Retry-After: 0` is a
+ * How long before the next attempt: the server's stated wait when there is one, an exponential
+ * backoff with jitter otherwise, and never less than the backoff — a `Retry-After: 0` is a
  * server saying "immediately", which for a client that just got refused is still too soon.
  */
 export function retryDelayMs(attemptIndex: number, error: unknown): number {

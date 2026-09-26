@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseRetryAfter, retryAfterSecs, retryDelayMs, shouldRetry } from "./retry.ts";
 
 // Plain objects on purpose: the rule reads fields, never a class, so an SDK's own error type and
@@ -89,6 +89,14 @@ describe("shouldRetry", () => {
 });
 
 describe("retryDelayMs", () => {
+  // The middle of the jitter, so the numbers below are the backoff itself.
+  beforeEach(() => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("backs off exponentially, capped, when nothing said how long", () => {
     expect(retryDelayMs(0, answer(500))).toBe(1000);
     expect(retryDelayMs(1, answer(500))).toBe(2000);
@@ -98,6 +106,24 @@ describe("retryDelayMs", () => {
   it("waits what the server asked for, never less than the backoff", () => {
     expect(retryDelayMs(0, waited(429, 5))).toBe(5000);
     expect(retryDelayMs(2, waited(429, 0))).toBe(4000);
+  });
+
+  // Clients cut off by the same outage fail at the same moment. Without the spread they all come
+  // back at 1 s, then 2 s, into a server that is still coming up.
+  it("spreads the backoff from half to one and a half times, after the cap", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    expect(retryDelayMs(1, answer(500))).toBe(1000);
+    expect(retryDelayMs(20, answer(500))).toBe(15_000);
+    vi.spyOn(Math, "random").mockReturnValue(0.75);
+    expect(retryDelayMs(1, answer(500))).toBe(2500);
+    expect(retryDelayMs(20, answer(500))).toBe(37_500);
+  });
+
+  it("never moves a stated wait, and never goes under it", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0.99);
+    expect(retryDelayMs(0, waited(429, 5))).toBe(5000);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    expect(retryDelayMs(2, waited(429, 3))).toBe(3000);
   });
 
   // A thrown fetch carries no answer, so any field on it is not the server speaking.

@@ -435,7 +435,7 @@ pin them; if one fails, a lesson is being un-learned.
    425, a transient 429, 5xx, and no-response-at-all — nothing else.
 
    **The rule lives in `@gusnips/http/retry`, because five SDKs each wrote their own and each
-   missed part of it.** None retried a 408, none read an explicit `retryAfterSecs: null`, four read
+   missed part of it.** None retried a 408, none read an explicit `retryAfterSecs: null`, three read
    the body's wait before the header, and the one that sent an idempotency key retried writes that
    had none. The rule reads an error by its fields, never its class, so an SDK's own error type
    works unchanged. `@gusnips/react` hands it only its own `ApiError` and passes anything else as
