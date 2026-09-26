@@ -786,10 +786,18 @@ once, and a second app, the worker, does the work. The queue lives in Redis, and
 The example is an import. `POST /notes/import` takes up to 1,000 titles, and the worker writes them
 as notes.
 
-Add `"bullmq": "^5.81.5"` and `"ioredis": "^5.11.1"` to the catalog.
+Add `"bullmq": "^5.81.5"` and `"ioredis": "^5.11.1"` to the catalog. This example runs on version 5
+of each.
 
-**Keep both on version 5.** `@gusnips/server` supports version 5 of each. When we wrote this,
-`bun add ioredis bullmq` installed 6.0.0 and 6.3.9, with no warning.
+**Move the two together.** `bun add ioredis bullmq` installs version 6 of each: 6.0.0 and 6.3.9 when
+we wrote this. `@gusnips/server` accepts either version since 0.8.21. A mix does not work. With
+BullMQ 5 and ioredis 6, the typecheck stopped at this:
+
+```text
+Type 'Redis<"legacy">' is not assignable to type 'ConnectionOptions'.
+```
+
+BullMQ 5 brings its own ioredis 5, and its types refuse a version 6 connection.
 
 The API and the worker each get `REDIS_URL` in their `.env`. On your machine, `redis-server`
 starts one at `redis://127.0.0.1:6379`. The API's tests need one too: add
