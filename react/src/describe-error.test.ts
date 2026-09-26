@@ -442,12 +442,4 @@ describe("one language", () => {
       recover: "wait",
     });
   });
-
-  it("refuses `copy` with a sentence missing", () => {
-    // @ts-expect-error -- `retrySoon` is missing, and a 5xx would show `undefined` without it.
-    createErrorDescriber({
-      copy: { network: "", networkHint: "", unexpected: "" },
-      formatWait: String,
-    });
-  });
 });

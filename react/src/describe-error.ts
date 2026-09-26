@@ -227,7 +227,17 @@ export interface ErrorDescriberOptions<
   ServerPrefix extends string,
   ServerName extends string,
 > extends DescriberRules {
-  t: Translate<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName | PluralBase<ServerName>}`>;
+  /**
+   * Checked against the keys, never used to find them: the three type parameters come from
+   * `copyPrefix`, `messageKeyPrefix` and `knownMessageKeys`. With `t` as a source too, the call
+   * every adopter writes — an inline `(key, params) => i18n.t(key, params)` beside an inline arm —
+   * failed overload resolution (TS2769, measured on TypeScript 5.9.3) once the one-language
+   * overload existed, although this signature alone accepted it. A typed `t` missing a key is
+   * still refused.
+   */
+  t: Translate<
+    NoInfer<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName | PluralBase<ServerName>}`>
+  >;
   /** Catalog namespace for this module's own copy, e.g. `"errors."`. */
   copyPrefix: Prefix;
   /**
