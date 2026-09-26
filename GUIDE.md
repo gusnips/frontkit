@@ -1559,8 +1559,8 @@ covers it:
   worker empties, and jobs that are safe to run twice.
 - [Sending mail](GUIDE-2.md#sending-mail): a mail that goes out once, in the reader's language,
   with a link that stops it.
-- [Webhooks](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-webhook), in and
-  out.
+- [Webhooks, in and out](GUIDE-2.md#webhooks-in-and-out): calling a user's server when an import
+  is done, trying again, and checking one you receive.
 - An OpenAPI reference for your API, and an SDK built from it:
   [a reference for your API](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-reference-for-your-api),
   [@gusnips/sdkgen](https://github.com/gusnips/serverkit/blob/main/sdkgen/README.md).

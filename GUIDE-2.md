@@ -15,6 +15,7 @@ Part 2 covers:
 2. [More than one language](#more-than-one-language)
 3. [Redis and background jobs](#redis-and-background-jobs)
 4. [Sending mail](#sending-mail)
+5. [Webhooks, in and out](#webhooks-in-and-out)
 
 ## Pages a search engine can read
 
@@ -1534,4 +1535,546 @@ Sua importação terminou
 Adicionamos 3 notas à sua lista.
 
 Não quer mais receber esses e-mails? http://localhost:3000/unsubscribe?token=…&lang=pt-BR
+```
+
+## Webhooks, in and out
+
+A webhook is a request one server sends another when something happens. Here, a user gives the API
+an address, and the worker calls it each time one of their imports is done. At the end, a small
+server receives one, the way the user's server would, and the way yours would when a service sends
+you webhooks.
+
+### Where they are kept
+
+A new migration in the API adds two tables:
+
+```sql
+-- apps/api/migrations/004_webhooks.sql
+-- The addresses a user asked us to call when an import is done, and each call we owe them.
+CREATE TABLE app.webhook_endpoints (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  url text NOT NULL,
+  -- Signs every delivery. The user sees it once, when they add the address.
+  secret text NOT NULL,
+  -- Turned off after too many deliveries in a row failed for good.
+  enabled boolean NOT NULL DEFAULT true,
+  consecutive_failures integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX webhook_endpoints_user_id_idx ON app.webhook_endpoints (user_id);
+
+-- One row for each event and each address. The import writes it in the same transaction as the
+-- notes, so an event is never lost between the commit and the queue.
+CREATE TABLE app.webhook_deliveries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  endpoint_id uuid NOT NULL REFERENCES app.webhook_endpoints (id) ON DELETE CASCADE,
+  event_id uuid NOT NULL,
+  -- The exact text we send, so every attempt sends the same bytes.
+  body text NOT NULL,
+  -- pending, delivered or failed.
+  status text NOT NULL DEFAULT 'pending',
+  -- BullMQ does not count an attempt it was told to delay, so the count lives here.
+  attempts integer NOT NULL DEFAULT 0,
+  -- The last answer: an HTTP status, or why nothing came back.
+  last_answer text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX webhook_deliveries_event_id_idx ON app.webhook_deliveries (event_id);
+```
+
+### Adding an address
+
+The API and the worker both check an address, so the rule for where a webhook may go lives in
+`packages/server`. That package now depends on `@gusnips/server`, and `QUEUES` gets
+`webhooks: "webhooks"`:
+
+```ts
+// packages/server/src/index.ts, added at the end
+// One webhook to send: a row in app.webhook_deliveries, which is also the job's id.
+export interface WebhookJob {
+  deliveryId: string;
+}
+
+// Where a webhook may go: a public address, over https. `bun run dev` also lets it go to
+// localhost, so you can receive one on your machine. Never on a server: there, localhost is your
+// own API, Redis and Postgres.
+export function webhookPolicy(toLocalhost: boolean): UrlPolicy {
+  return toLocalhost ? { schemes: ["http:", "https:"], allowLoopback: true } : {};
+}
+```
+
+Both apps read the switch in `env.ts`, with
+`webhooksToLocalhost: process.env.WEBHOOKS_TO_LOCALHOST === "true"`, and both `dev` scripts turn it
+on: `"dev": "WEBHOOKS_TO_LOCALHOST=true bun --watch src/index.ts"`.
+
+**Only your machine sends webhooks to localhost.** A webhook is a request your server sends
+wherever a user says, and on a server, localhost is your own API, Redis and Postgres. pm2 runs
+`src/index.ts` and never the dev script, so the switch stays off there. Keep it out of `.env`.
+Started without it, the API answered `http://localhost:4000/` with
+`The address must start with https://.`
+
+The routes:
+
+```ts
+// apps/api/src/webhooks.ts
+import { newWebhookSecret, type UrlRefusalReason } from "@gusnips/server";
+import { created, ok } from "@gusnips/server/hono";
+import { resolvePublic } from "@gusnips/server/node";
+import { webhookPolicy } from "@notes/server";
+import { Hono } from "hono";
+import { z } from "zod";
+import type { AppEnv } from "./app.ts";
+import { pool } from "./db.ts";
+import { env } from "./env.ts";
+import { errors } from "./errors.ts";
+import { logger } from "./logger.ts";
+
+// Why an address was refused, in words the user can act on.
+const REFUSED: Record<UrlRefusalReason, string> = {
+  invalid: "That is not a web address.",
+  scheme: "The address must start with https://.",
+  credentials: "Take the user name and password out of the address.",
+  port: "That port is not allowed.",
+  "internal-name": "That name only works inside a private network. Use a public address.",
+  "private-address": "That address is on a private network. Use a public address.",
+  unresolvable: "No server has that name. Check the spelling.",
+  "too-many-redirects": "That address redirects too many times.",
+};
+
+type Endpoint = { id: string; url: string; enabled: boolean; consecutiveFailures: number };
+
+export const webhooks = new Hono<AppEnv>();
+
+webhooks.get("/", async (c) => {
+  const { rows } = await pool.query<Endpoint>(
+    `SELECT id, url, enabled, consecutive_failures AS "consecutiveFailures"
+     FROM app.webhook_endpoints WHERE user_id = $1 ORDER BY created_at`,
+    [c.get("userId")],
+  );
+  return ok(c, rows);
+});
+
+const NewEndpoint = z.object({ url: z.string().trim().max(2_000) }).strict();
+
+// An address to call when an import is done. The answer holds the signing secret, this once.
+webhooks.post("/", async (c) => {
+  const { url } = NewEndpoint.parse(await c.req.json().catch(() => null));
+  // Check it now, so a bad address gets a 400 here instead of failing at every delivery. The
+  // worker checks it again when it sends, because DNS can change in between.
+  const checked = await resolvePublic(url, {
+    signal: AbortSignal.timeout(5_000),
+    policy: webhookPolicy(env.webhooksToLocalhost),
+  }).catch((error: unknown) => {
+    // Our DNS failed, not their address. Saying the name does not exist would be wrong.
+    logger.error("[webhooks] could not look up an address", { error });
+    throw errors.unavailable("We could not look up that address just now. Try again in a minute.");
+  });
+  if (!checked.ok) throw errors.invalid(REFUSED[checked.reason]);
+
+  const { rows } = await pool.query<{ id: string; url: string; secret: string }>(
+    `INSERT INTO app.webhook_endpoints (user_id, url, secret) VALUES ($1, $2, $3)
+     RETURNING id, url, secret`,
+    [c.get("userId"), checked.url.href, newWebhookSecret()],
+  );
+  return created(c, rows[0]);
+});
+
+webhooks.delete("/:id", async (c) => {
+  const id = z.uuid().parse(c.req.param("id"));
+  const { rowCount } = await pool.query(
+    "DELETE FROM app.webhook_endpoints WHERE id = $1 AND user_id = $2",
+    [id, c.get("userId")],
+  );
+  if (!rowCount) throw errors.notFound("Webhook");
+  return c.body(null, 204);
+});
+```
+
+`errors.ts` gets `invalid: (message: string) => appError("VALIDATION_ERROR", message)`, and the API
+mounts the routes at the end of `app.ts`:
+
+```ts
+// apps/api/src/app.ts, at the end
+// Where a user's own server hears that an import is done.
+app.use("/webhooks/*", requireUser);
+app.route("/webhooks", webhooks);
+```
+
+**Check the address when it is saved.** `resolvePublic` looks the name up, and refuses it if any
+address it has is private. A bad address then gets a 400 right away, instead of failing at every
+delivery. We tried these:
+
+```text
+https://169.254.169.254/latest/meta-data/  That address is on a private network. Use a public address.
+https://localhost:4000/                    That name only works inside a private network. Use a public address.
+https://no-such-host.invalid/              No server has that name. Check the spelling.
+https://user:pw@example.com/               Take the user name and password out of the address.
+not a url                                  That is not a web address.
+```
+
+The first is the cloud metadata service. `REFUSED` needs a sentence for every reason, so a reason
+the kit adds later is a type error, not a blank message.
+
+**The secret is shown once.** The answer to the POST carries it, and `GET /webhooks` never does. A
+user who lost it deletes the address and adds it again.
+
+**`"/webhooks/*"` also guards `/webhooks`.** With that line removed, the guard test from part 1
+failed and named all three routes:
+
+```text
+Error: 3 endpoint(s) answer with no guard running in front of them:
+  DELETE /webhooks/:id
+  GET /webhooks
+  POST /webhooks
+```
+
+[A URL somebody else gave you](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-url-somebody-else-gave-you).
+
+### Sending one
+
+The import writes a delivery row for each of the user's webhooks, in the same transaction as the
+notes. Then it queues them:
+
+```ts
+// apps/worker/src/importNotes.ts
+import type { ImportDoneMail, ImportJob, WebhookJob } from "@notes/server";
+import type { Job, Queue } from "bullmq";
+import { pool } from "./db.ts";
+
+// A job can run twice: if the worker dies before BullMQ hears the job finished, it runs again.
+// So the notes and a row naming the import commit together. A second run finds the row and
+// writes nothing.
+export async function importNotes(
+  job: Job<ImportJob>,
+  queues: { mail: Queue<ImportDoneMail>; webhooks: Queue<WebhookJob> },
+): Promise<{ added: number }> {
+  const { importId, userId, email, locale, titles } = job.data;
+  // What the user's webhooks receive. The import's id names the event, so a receiver that gets it
+  // twice can tell.
+  const event = JSON.stringify({
+    id: importId,
+    type: "import.done",
+    data: { added: titles.length },
+  });
+  let added = 0;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const marked = await client.query(
+      "INSERT INTO app.imports (id, user_id) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+      [importId, userId],
+    );
+    if (marked.rowCount === 1) {
+      await client.query("INSERT INTO app.notes (user_id, title) SELECT $1, unnest($2::text[])", [
+        userId,
+        titles,
+      ]);
+      // One delivery for each of the user's webhooks, committed with the notes.
+      await client.query(
+        `INSERT INTO app.webhook_deliveries (endpoint_id, event_id, body)
+         SELECT id, $2, $3 FROM app.webhook_endpoints WHERE user_id = $1 AND enabled`,
+        [userId, importId, event],
+      );
+      added = titles.length;
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    // Report the first error. A failed ROLLBACK after it would only hide the cause.
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  // On a second run too, because the first may have stopped right before this line. A job's id is
+  // its delivery's id, and BullMQ skips a job id it already has, so nothing is queued twice.
+  const pending = await pool.query<{ id: string }>(
+    "SELECT id FROM app.webhook_deliveries WHERE event_id = $1 AND status = 'pending'",
+    [importId],
+  );
+  await queues.webhooks.addBulk(
+    pending.rows.map(({ id }) => ({
+      name: "deliver",
+      data: { deliveryId: id },
+      opts: { jobId: id },
+    })),
+  );
+
+  // After the commit, so no mail announces notes that were never written. A second run added
+  // nothing, so the mail is queued once.
+  if (added > 0 && email) await queues.mail.add("import-done", { userId, email, locale, added });
+  return { added };
+}
+```
+
+**Write the delivery with the notes, and queue it on every run.** If the worker dies right after
+the commit, the row is still there, and the import's second run queues it. A job's id is its
+delivery's id, so a delivery already queued is not queued again. We added a finished import again
+while its delivery was waiting to retry: the receiver got no extra request, and no note was written
+twice.
+
+The worker gets a queue for deliveries:
+
+```ts
+// apps/worker/src/index.ts, inside start()
+// A retry here is for a failure on our side, such as Postgres down. The receiver's answers are
+// counted on the delivery row.
+const webhooks = createQueue<WebhookJob>(QUEUES.webhooks, {
+  connection: redis,
+  onError,
+  defaultJobOptions: { attempts: 3, backoff: { type: CAPPED_EXPONENTIAL } },
+});
+```
+
+And a worker that empties it:
+
+```ts
+// apps/worker/src/index.ts, inside start()
+const deliverer = createWorker<WebhookJob>(QUEUES.webhooks, deliverWebhook, {
+  connection: redis,
+  onError,
+  // A slow receiver holds its slot for up to 10 seconds. With one slot, everyone else waits.
+  concurrency: 10,
+});
+```
+
+The import's worker now calls `importNotes(job, { mail, webhooks })`. The deliverer joins `flushes`
+and `workers`, and `retryStalledFailures` runs on its queue too. That is safe, because a receiver
+skips an event it has seen.
+
+Each delivery:
+
+```ts
+// apps/worker/src/deliverWebhook.ts
+import { nextDeliveryStep, signWebhook } from "@gusnips/server";
+import { fetchPublic } from "@gusnips/server/node";
+import { type WebhookJob, webhookPolicy } from "@notes/server";
+import { DelayedError, type Job } from "bullmq";
+import { pool } from "./db.ts";
+import { env } from "./env.ts";
+import { logger } from "./logger.ts";
+
+// After this many deliveries in a row fail for good, the address is turned off.
+const TURN_OFF_AFTER = 10;
+
+type Delivery = { endpointId: string; url: string; secret: string; body: string; attempts: number };
+
+export async function deliverWebhook(job: Job<WebhookJob>, token?: string) {
+  const { deliveryId } = job.data;
+  const { rows } = await pool.query<Delivery>(
+    `SELECT e.id AS "endpointId", e.url, e.secret, d.body, d.attempts
+     FROM app.webhook_deliveries d JOIN app.webhook_endpoints e ON e.id = d.endpoint_id
+     WHERE d.id = $1 AND d.status = 'pending' AND e.enabled`,
+    [deliveryId],
+  );
+  const delivery = rows[0];
+  // Already sent or given up on, or the address was turned off or deleted.
+  if (!delivery) return { outcome: "skipped" };
+
+  const attempt = delivery.attempts + 1;
+  const { answer, lastAnswer } = await send(delivery);
+  const step = nextDeliveryStep(answer, attempt);
+  await pool.query(
+    "UPDATE app.webhook_deliveries SET attempts = $2, status = $3, last_answer = $4 WHERE id = $1",
+    [deliveryId, attempt, step.outcome === "retry" ? "pending" : step.outcome, lastAnswer],
+  );
+
+  if (step.outcome === "retry") {
+    // Wait as long as the step says. The queue's own backoff would disagree with it.
+    await job.moveToDelayed(Date.now() + step.afterSecs * 1000, token);
+    throw new DelayedError();
+  }
+  if (step.outcome === "delivered") {
+    await pool.query(
+      `UPDATE app.webhook_endpoints SET consecutive_failures = 0
+       WHERE id = $1 AND consecutive_failures > 0`,
+      [delivery.endpointId],
+    );
+  } else {
+    // Count a delivery that failed for good, never an attempt. One statement, so two failures at
+    // the same moment cannot both read the old count.
+    const { rows: trip } = await pool.query<{ tripped: boolean }>(
+      `UPDATE app.webhook_endpoints
+       SET consecutive_failures = consecutive_failures + 1,
+           enabled = consecutive_failures + 1 < $2
+       WHERE id = $1 AND enabled
+       RETURNING NOT enabled AS tripped`,
+      [delivery.endpointId, TURN_OFF_AFTER],
+    );
+    // True for exactly one failure, so this is where a mail to the owner would go.
+    if (trip[0]?.tripped) logger.warn("turned a webhook off", { endpointId: delivery.endpointId });
+  }
+  return { outcome: step.outcome };
+}
+
+// One attempt. `answer` is null when nothing came back.
+async function send({ url, secret, body }: Delivery) {
+  // Sign each attempt, not each event: a receiver refuses a signature over five minutes old.
+  const signature = await signWebhook({ secret, body });
+  try {
+    const result = await fetchPublic(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "notes-signature": signature },
+      body,
+      policy: webhookPolicy(env.webhooksToLocalhost),
+      maxRedirects: 0,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!result.ok) return { answer: null, lastAnswer: result.reason };
+    // Nobody reads the answer's body. Cancel it, so the connection is freed.
+    await result.response.body?.cancel();
+    return { answer: result.response, lastAnswer: String(result.response.status) };
+  } catch (error) {
+    // Refused, timed out, or DNS failed. With no answer, the step is a retry.
+    return { answer: null, lastAnswer: error instanceof Error ? error.message : String(error) };
+  }
+}
+```
+
+**Sign each attempt, not each event.** A receiver refuses a signature more than five minutes old,
+and the last attempt goes out 450 seconds after the first.
+
+**Follow no redirect.** The address was checked when it was saved, and the one a redirect points to
+was not. `maxRedirects: 0` hands the redirect back as the answer. A receiver that answered 302 got
+one request, and the delivery failed. Ask the user to add the final address.
+
+**Give a slow receiver its own slot.** Each attempt waits up to 10 seconds. We added two receivers
+for one user, one that answered at once and one that took 12 seconds, and sent 3 imports. With one
+slot, the fast receiver's deliveries arrived about 0, 10 and 20 seconds after the imports. With
+`concurrency: 10`, all three arrived in under half a second.
+
+### Trying again
+
+`nextDeliveryStep` reads the answer, or `null` when none came back, and says what happens next:
+`delivered`, `retry` after `afterSecs`, or `failed`. What we measured:
+
+| The receiver                        | What happened                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------- |
+| answered 500 every time             | the first attempt, then 4 more at 30, 90, 210 and 450 seconds after it, then `failed` |
+| answered 410                        | `failed` after 1 attempt                                                              |
+| answered 302                        | `failed` after 1 attempt                                                              |
+| answered 429 with `Retry-After: 45` | the next attempt 45 seconds later                                                     |
+| was not running yet                 | `connect ECONNREFUSED`, then delivered on the next attempt                            |
+
+**Wait as long as the step says.** `moveToDelayed` puts the job back on the queue until then, and
+`DelayedError` tells BullMQ the job did not fail. The queue's own backoff is only for a failure on
+our side, such as Postgres down.
+
+**Count attempts on the delivery row.** BullMQ does not count an attempt you delayed this way.
+After two attempts, the job still said `attemptsMade: 0`, and the row said 2. Counted on the job,
+every attempt would be the first, and the delivery would never stop.
+
+**Turn off an address that keeps failing.** Count deliveries that failed for good, never attempts:
+the delivery that took 5 attempts added 1. We sent 12 imports at once to a receiver answering 410.
+The count stopped at 10, the address was off, and the log said `turned a webhook off` once. It is
+one SQL statement, so two failures at the same moment cannot both read the old count. A delivery
+that goes through sets the count back to 0.
+
+The owner sees `"enabled": false` in `GET /webhooks`, and adds the address again to turn it back
+on. The log line is where a mail to them would go.
+[Sending one, and trying again](https://github.com/gusnips/serverkit/blob/main/server/README.md#sending-one-and-trying-again).
+
+### Receiving one
+
+A webhook address is public, so anyone can send to it. The signature is how the receiver knows the
+request came from you. This small server stands in for the user's:
+
+```ts
+// apps/api/scripts/webhook-receiver.ts
+// Stands in for a user's server, and receives the webhooks the worker sends. Run it with
+// `WEBHOOK_SECRET=whsec_… bun scripts/webhook-receiver.ts`.
+import { verifyWebhook } from "@gusnips/server";
+import { Hono } from "hono";
+
+// ponytail: in memory, so a restart forgets. A real receiver keeps the ids in its database.
+const seen = new Set<string>();
+
+const app = new Hono();
+
+app.post("/", async (c) => {
+  // The raw text. JSON parsed and written out again is a different string, and never matches.
+  const body = await c.req.text();
+  const verdict = await verifyWebhook({
+    secrets: [process.env.WEBHOOK_SECRET],
+    header: c.req.header("notes-signature"),
+    body,
+  });
+  if (!verdict.ok) {
+    // One answer for every refusal. The reason goes in your log, never back to the sender.
+    console.warn(`refused a webhook: ${verdict.reason}`);
+    return c.body(null, 400);
+  }
+
+  const event: { id: string; type: string; data: { added: number } } = JSON.parse(body);
+  // The same event can arrive twice. Answer 2xx again, and do nothing.
+  if (seen.has(event.id)) return c.body(null, 204);
+  seen.add(event.id);
+  console.log(`received ${event.type} ${event.id}`);
+  return c.body(null, 204);
+});
+
+export default { port: 4000, fetch: app.fetch };
+```
+
+**Check the raw text.** We sent a signed event with its JSON laid out again, and it was refused:
+`bad-signature`. Parse the body only after it passes.
+
+**Refuse a signature over five minutes old,** so a request someone recorded cannot be sent again
+later. One signed 301 seconds ago was refused as `stale`, and one signed 299 seconds ago went
+through.
+
+**Answer every refusal the same way.** With no header, a wrong secret, a changed body or an old
+signature, the answer was a bare 400. Only the log said why: `missing-header`, `bad-signature` or
+`stale`. Telling the sender which check failed helps only somebody guessing.
+
+**The same event can arrive twice.** We made a receiver take 12 seconds to answer. The worker gave
+up at 10 seconds, then sent the event again 30 seconds later. It arrived twice, 40 seconds apart,
+with the same `id`. So the receiver answers 2xx again and does nothing.
+
+**Write the port in the file.** Bun loads the `.env` of the folder it runs in, and `PORT` in
+`apps/api/.env` is the API's. Reading `PORT`, the receiver tried the API's port and stopped with
+`EADDRINUSE`.
+
+Supabase Auth's hooks use a second format, Standard Webhooks. `verifyStandardWebhook` checks it.
+[A webhook](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-webhook).
+
+### Run it
+
+Run the new migration from `apps/api` with `bun run migrate`. Start the API and the worker with
+`bun run dev`, then add an address:
+
+```bash
+curl -X POST http://localhost:3000/webhooks \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"url":"http://localhost:4000/"}'
+```
+
+The answer holds the secret:
+
+```text
+{"data":{"id":"…","url":"http://localhost:4000/","secret":"whsec_…"}}
+```
+
+Start the receiver from `apps/api` with that secret:
+
+```bash
+WEBHOOK_SECRET=whsec_… bun scripts/webhook-receiver.ts
+```
+
+Then send an import:
+
+```bash
+curl -X POST http://localhost:3000/notes/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"titles":["Water the plants","Pay the rent","Call grandma"]}'
+```
+
+The receiver prints:
+
+```text
+Started development server: http://localhost:4000
+received import.done 79ae1594-1cc8-4c4e-a4ce-46241832b828
 ```
