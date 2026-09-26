@@ -442,7 +442,9 @@ export const PAGES: readonly SitePage[] = [
 ];
 ```
 
-The script loops over the languages, and over the pages inside that:
+The script loops over the languages, and over the pages inside that. It now also imports
+`sitemapXml` and the `Alternate` type from `@gusnips/vite`, `SUPPORTED_LOCALES`, `DEFAULT_LOCALE`,
+`localePath` and `localeUrl` from `@notes/shared`, and `createI18n` from `../src/i18n/index.ts`:
 
 ```ts
 // apps/site/scripts/prerender.ts, after the template is read
@@ -1175,7 +1177,8 @@ export const env = {
   apiUrl: process.env.API_URL ?? "",
   unsubscribeSecret: process.env.UNSUBSCRIBE_SECRET ?? "",
   smtpHost: process.env.SMTP_HOST,
-  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  // `||`, not `??`: an empty `SMTP_PORT=` is "", and Number("") is 0.
+  smtpPort: Number(process.env.SMTP_PORT || 587),
   smtpUser: process.env.SMTP_USER,
   smtpPass: process.env.SMTP_PASS,
   smtpFrom: process.env.SMTP_FROM ?? "",
@@ -2000,7 +2003,7 @@ request came from you. This small server stands in for the user's:
 import { verifyWebhook } from "@gusnips/server";
 import { Hono } from "hono";
 
-// ponytail: in memory, so a restart forgets. A real receiver keeps the ids in its database.
+// In memory, so a restart forgets. A real receiver keeps the ids in its database.
 const seen = new Set<string>();
 
 const app = new Hono();
