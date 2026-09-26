@@ -315,9 +315,9 @@ pin them; if one fails, a lesson is being un-learned.
    2.106; 500 through 530 at 2.108 — so a copy leaning on it alone is correct at whichever
    version happens to be installed, which is not the same as being correct. Nor is "newer is
    wider" a fact to lean on: a fleet installs several versions at once, so the version is read
-   off the tree the app builds against, per repo, and never off a changelog. Twelve repos, five
-   versions — and 2.106, the one line where the status clause is the only thing catching
-   GoTrue's own 500, is what four of them resolve today.
+   off the tree the app builds against, per repo, and never off a changelog. 2.106 is the line
+   where the status clause is the only thing catching GoTrue's own 500. Which repos resolve it is
+   a question for `bun why @supabase/auth-js` in each one, not for this file.
 
    **And it is a LIST, not a range, so it has holes at every version — drift is not the only
    argument.** At 2.112.4 it reads 500-504 and 520-530: nothing covers 505 through 519, nothing
