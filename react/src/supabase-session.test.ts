@@ -85,7 +85,7 @@ function reachable(paths: string[] = []): typeof fetch {
   };
 }
 
-function authClient(stored: SupabaseSessionStorage, fetch: typeof fetch) {
+function authClient(stored: SupabaseSessionStorage, fetch: typeof globalThis.fetch) {
   return createClient(PROJECT_URL, "anon-key", {
     // Off so that starting the client does not refresh an expired session by itself: the refresh
     // under test is the one `signOut()` makes.

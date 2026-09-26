@@ -58,7 +58,7 @@
   ],
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint src",

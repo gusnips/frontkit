@@ -1,0 +1,8 @@
+{
+  // The tests, which the build excludes. They run in Node under vitest, so they get Node's types
+  // here; `tsconfig.json` still checks the source without them, which is what keeps it portable.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"] },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

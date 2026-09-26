@@ -1,0 +1,9 @@
+{
+  // The tests, which the build excludes, and `typecheck/`: calls that must compile, or must not,
+  // and are never run. The tests run in Node under vitest, so they get Node's types here;
+  // `tsconfig.json` still checks the source without them, which is what keeps it browser-safe.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"], "rootDir": "." },
+  "include": ["src/**/*", "typecheck/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
