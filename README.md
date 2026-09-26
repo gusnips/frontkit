@@ -93,7 +93,9 @@ Reading them against each other found nine live bugs, in repos that were not eve
 ## Docs
 
 [`GUIDE.md`](GUIDE.md) shows how we lay out a project and why, then builds one small app on these
-packages from an empty folder: its API and its web app.
+packages from an empty folder: its API and its web app. [`GUIDE-2.md`](GUIDE-2.md) grows the same
+app: pages a search engine can read, a second language, background jobs, mail, webhooks, an
+OpenAPI reference, and a public API with keys and an MCP door.
 
 `AGENTS.md` in this repo is the real document: the twenty-one invariants, each with the incident
 behind it, and the rule for migrating a repo onto this.
