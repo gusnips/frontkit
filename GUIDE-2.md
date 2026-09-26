@@ -16,6 +16,7 @@ Part 2 covers:
 3. [Redis and background jobs](#redis-and-background-jobs)
 4. [Sending mail](#sending-mail)
 5. [Webhooks, in and out](#webhooks-in-and-out)
+6. [An OpenAPI reference](#an-openapi-reference)
 
 ## Pages a search engine can read
 
@@ -790,7 +791,9 @@ Add `"bullmq": "^5.81.5"` and `"ioredis": "^5.11.1"` to the catalog.
 `bun add ioredis bullmq` installed 6.0.0 and 6.3.9, with no warning.
 
 The API and the worker each get `REDIS_URL` in their `.env`. On your machine, `redis-server`
-starts one at `redis://127.0.0.1:6379`.
+starts one at `redis://127.0.0.1:6379`. The API's tests need one too: add
+`REDIS_URL: "redis://127.0.0.1:1"` to the `env` in `apps/api/vitest.config.ts`. Nothing listens on
+port 1, so no test reaches a Redis you are using.
 
 ### What the API and the worker share
 
@@ -1483,6 +1486,7 @@ The API mounts it with `app.route("/unsubscribe", unsubscribe)`, and gets `UNSUB
 its env check, with `secrets: { UNSUBSCRIBE_SECRET: 32 }`. Both apps hold the same value. Left as
 the `.env.example` placeholder, the boot stops:
 `UNSUBSCRIBE_SECRET looks like a placeholder from .env.example. Put the real secret there.`
+The tests get a made-up one in `vitest.config.ts`, at least 32 characters long.
 
 **A GET never unsubscribes anyone.** Mail scanners open every link in a message. The GET shows a
 button, and the POST does the work. In a browser, the button worked under the API's
@@ -2078,3 +2082,259 @@ The receiver prints:
 Started development server: http://localhost:4000
 received import.done 79ae1594-1cc8-4c4e-a4ce-46241832b828
 ```
+
+## An OpenAPI reference
+
+An OpenAPI reference is one file that lists every route: what it reads, what it answers, and how it
+fails. Docs sites, client generators and AI agents read it. `@gusnips/server/openapi` builds it
+from the same zod schemas the routes check requests with.
+
+### One file of schemas
+
+The schemas move out of the routes into one file:
+
+```ts
+// apps/api/src/schemas.ts
+// What the routes read and answer. The routes check each request with these, and openapi.ts
+// builds the reference from the same ones, so the two cannot disagree.
+import { z } from "zod";
+
+const Title = z.string().trim().min(1).max(200);
+
+export const Note = z.object({ id: z.uuid(), title: z.string(), createdAt: z.iso.datetime() });
+export const NewNote = z.object({ title: Title }).strict();
+export const NewImport = z.object({ titles: z.array(Title).min(1).max(1_000) }).strict();
+export const ImportStarted = z.object({ importId: z.uuid() });
+
+export const Webhook = z.object({
+  id: z.uuid(),
+  url: z.url(),
+  enabled: z.boolean(),
+  consecutiveFailures: z.int(),
+});
+export const NewWebhook = z.object({ url: z.string().trim().max(2_000) }).strict();
+export const WebhookAdded = z.object({ id: z.uuid(), url: z.url(), secret: z.string() });
+export const WebhookId = z.object({ id: z.uuid() }).strict();
+```
+
+`app.ts` imports `NewNote` and `NewImport` from it, and `webhooks.ts` imports `NewWebhook` and
+`WebhookId`. The delete now reads its id with `WebhookId.parse({ id: c.req.param("id") })`, and
+answers with the kit's `noContent(c)`.
+
+**Build the reference from the schemas the routes use.** A title of 201 characters got a 400 from
+the route, and the reference says `maxLength: 200`, because both read `Title`. Two copies of a
+limit drift apart. One copy cannot.
+
+### The reference
+
+```ts
+// apps/api/src/openapi.ts
+import {
+  buildOpenApi,
+  createOpenApiResponder,
+  type OpenApiOperation,
+} from "@gusnips/server/openapi";
+import { z } from "zod";
+import { env } from "./env.ts";
+import { ERROR_STATUS } from "./errors.ts";
+import {
+  ImportStarted,
+  NewImport,
+  NewNote,
+  NewWebhook,
+  Note,
+  Webhook,
+  WebhookAdded,
+  WebhookId,
+} from "./schemas.ts";
+
+// Every route a signed-in user can call, as the router spells it.
+const OPERATIONS: OpenApiOperation[] = [
+  {
+    name: "list_notes",
+    method: "get",
+    path: "/notes",
+    tag: "Notes",
+    summary: "List your notes",
+    description: "Newest first.",
+    response: z.array(Note),
+  },
+  {
+    name: "add_note",
+    method: "post",
+    path: "/notes",
+    tag: "Notes",
+    summary: "Add a note",
+    input: NewNote,
+    response: Note,
+    status: 201,
+  },
+  {
+    name: "import_notes",
+    method: "post",
+    path: "/notes/import",
+    tag: "Notes",
+    summary: "Add many notes at once",
+    description:
+      "Answers before the notes are written. They show up in your list a moment later, and your " +
+      "webhooks hear about it.",
+    input: NewImport,
+    headers: [
+      {
+        name: "Accept-Language",
+        description: "The language of the email that says the import is done: en or pt-BR.",
+      },
+    ],
+    response: ImportStarted,
+    status: 202,
+    errors: { 503: "Imports are paused. Try again in a minute." },
+  },
+  {
+    name: "list_webhooks",
+    method: "get",
+    path: "/webhooks",
+    tag: "Webhooks",
+    summary: "List your webhooks",
+    description: "An address that kept failing shows `enabled: false`. Add it again to turn it on.",
+    response: z.array(Webhook),
+  },
+  {
+    name: "add_webhook",
+    method: "post",
+    path: "/webhooks",
+    tag: "Webhooks",
+    summary: "Add a webhook",
+    description: "The answer holds the secret that signs each delivery. It is shown this once.",
+    input: NewWebhook,
+    response: WebhookAdded,
+    status: 201,
+    errors: { 503: "We could not look up the address just now. Try again in a minute." },
+  },
+  {
+    name: "delete_webhook",
+    method: "delete",
+    path: "/webhooks/:id",
+    tag: "Webhooks",
+    summary: "Delete a webhook",
+    input: WebhookId,
+    status: 204,
+    errors: { 404: "You have no webhook with that id." },
+  },
+];
+
+// GET /openapi.json. The document is built on the first request, then kept.
+export const reference = createOpenApiResponder(() =>
+  buildOpenApi(OPERATIONS, {
+    info: { title: "Notes API", version: "1.0.0" },
+    // From config. Behind a proxy, every request reaches the API on 127.0.0.1, so a reference
+    // built from the request would send every reader there.
+    origin: env.apiUrl,
+    basePath: "",
+    tags: [
+      { name: "Notes", description: "Your notes." },
+      { name: "Webhooks", description: "Addresses we call when one of your imports is done." },
+    ],
+    securitySchemes: {
+      bearerAuth: {
+        type: "http",
+        scheme: "bearer",
+        description: "The access token you sign in for.",
+      },
+    },
+    errors: {
+      400: "The input is wrong. The message says what.",
+      401: "The token is missing or has expired. Sign in again.",
+      500: "Something on our side failed. Quote the request id when you write to us.",
+    },
+    errorCodes: Object.keys(ERROR_STATUS),
+  }),
+);
+```
+
+`app.ts` serves it before the guards, and the guard test adds `/openapi.json` to `isPublic`:
+
+```ts
+// apps/api/src/app.ts, before the guards
+// Every route, for docs sites, client generators and agents. Public, like the docs.
+app.get("/openapi.json", (c) => reference(c.req.query("lang")));
+```
+
+**`origin` comes from config.** The API gets `API_URL` in its `.env`, as the worker did in
+[Sending mail](#sending-mail). Left out, the API stopped at boot:
+
+```text
+The environment has 1 problem:
+- These are not set: API_URL
+Copy apps/api/.env.example to apps/api/.env and fill it in.
+```
+
+**`basePath` is required, even when it is `""`.** The server's address and the path together make
+each route's address. These routes sit at the root, so it is empty.
+
+**An operation id is used once.** It is the operation's `name` unless you pass `operationId`. We
+listed one operation twice, on two paths, and the build threw:
+
+```text
+Error: GET /notes/all and GET /notes share the operation id "list_notes". Give one an `operationId`.
+```
+
+**`errorCodes` lists every code the API answers with.** `ERROR_STATUS` has one entry for each code,
+and the type makes sure of it, so `Object.keys(ERROR_STATUS)` is the whole list. The reference's
+`ApiError` then names all six, so a client built from it can check a code by name.
+
+**One mismatch is the kit's.** With `status: 204`, the reference still describes the delete's answer
+as a JSON `{ data }` body. `noContent` sends no body at all, and no content type.
+
+The API's tests read the same env check, so `vitest.config.ts` gets `API_URL` too. With
+`REDIS_URL` left out of it, the tests stopped with `These are not set: REDIS_URL`. The whole list
+now reads:
+
+```ts
+// apps/api/vitest.config.ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    env: {
+      DATABASE_URL: "postgresql://postgres@127.0.0.1:5432/notes_test",
+      // Nothing listens on port 1, so no test reaches a Redis you are using.
+      REDIS_URL: "redis://127.0.0.1:1",
+      SUPABASE_URL: "http://127.0.0.1:54321",
+      SUPABASE_ANON_KEY: "test",
+      APP_URL: "http://localhost:5173",
+      API_URL: "http://localhost:3000",
+      UNSUBSCRIBE_SECRET: "a-test-secret-that-is-long-enough-000",
+      LOG_LEVEL: "silent",
+    },
+  },
+});
+```
+
+To serve the reference in Portuguese too, pass `createOpenApiResponder` one function for each
+language.
+[A reference for your API](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-reference-for-your-api).
+
+A typed client built from this file, with `@gusnips/sdkgen`, comes in a later part.
+
+### Run it
+
+```bash
+curl http://localhost:3000/openapi.json
+```
+
+The answer is an OpenAPI 3.1 document with the six operations above. Check it with Redocly's
+linter:
+
+```bash
+bunx @redocly/cli lint http://localhost:3000/openapi.json
+```
+
+Version 2.54.3 found it valid, with two warnings: it names no license, and its server is
+localhost. To read it as a web page:
+
+```bash
+bunx @redocly/cli build-docs http://localhost:3000/openapi.json
+```
+
+That writes `redoc-static.html`, a single page with every route, grouped under `Notes` and
+`Webhooks`.

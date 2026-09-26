@@ -1561,8 +1561,8 @@ covers it:
   with a link that stops it.
 - [Webhooks, in and out](GUIDE-2.md#webhooks-in-and-out): calling a user's server when an import
   is done, trying again, and checking one you receive.
-- An OpenAPI reference for your API, and an SDK built from it:
-  [a reference for your API](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-reference-for-your-api),
+- [An OpenAPI reference](GUIDE-2.md#an-openapi-reference): one file that lists every route, built
+  from the schemas the routes check. An SDK built from it comes later:
   [@gusnips/sdkgen](https://github.com/gusnips/serverkit/blob/main/sdkgen/README.md).
 - A public API with keys and an MCP door for AI agents:
   [an MCP door](https://github.com/gusnips/serverkit/blob/main/server/README.md#an-mcp-door),
