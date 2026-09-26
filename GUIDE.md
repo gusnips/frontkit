@@ -1557,7 +1557,8 @@ covers it:
   language gate, and checking your translations.
 - [Redis and background jobs](GUIDE-2.md#redis-and-background-jobs): a queue the API fills and a
   worker empties, and jobs that are safe to run twice.
-- [Sending mail](https://github.com/gusnips/serverkit/blob/main/server/README.md#sending-mail).
+- [Sending mail](GUIDE-2.md#sending-mail): a mail that goes out once, in the reader's language,
+  with a link that stops it.
 - [Webhooks](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-webhook), in and
   out.
 - An OpenAPI reference for your API, and an SDK built from it:

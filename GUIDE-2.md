@@ -14,6 +14,7 @@ Part 2 covers:
 1. [Pages a search engine can read](#pages-a-search-engine-can-read)
 2. [More than one language](#more-than-one-language)
 3. [Redis and background jobs](#redis-and-background-jobs)
+4. [Sending mail](#sending-mail)
 
 ## Pages a search engine can read
 
@@ -1113,3 +1114,424 @@ curl -X POST http://localhost:3000/notes/import \
 
 The API answers 202 with `{"data":{"importId":"…"}}`, and the three notes are in the list a moment
 later.
+
+## Sending mail
+
+`@gusnips/server/mail` sends mail over SMTP. Here the worker uses it to tell the reader an import
+is done, in the language they picked, with a link that stops these mails.
+
+### A mail catcher on your machine
+
+[Mailpit](https://mailpit.axllent.org) takes every mail sent to port 1025 and shows it at
+`http://localhost:8025`. Nothing reaches a real inbox. Install it with your package manager, or
+download it from its releases page, then run `mailpit`.
+
+### The mailer
+
+Add `"nodemailer": "^10.0.10"` to the catalog and to the worker. The worker's `.env` gets the mail
+settings:
+
+```text
+# Where the unsubscribe link in a mail points: the API's public address.
+API_URL=http://localhost:3000
+# The API's value, so the API can check the links the worker signs.
+UNSUBSCRIBE_SECRET=generate-with-openssl-rand-hex-32
+# Leave SMTP_HOST empty to turn mail off. Mailpit takes mail on port 1025, with no login.
+SMTP_HOST=127.0.0.1
+SMTP_PORT=1025
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=Notes <no-reply@example.com>
+```
+
+```ts
+// apps/worker/src/env.ts
+import { validateEnv } from "@gusnips/server";
+
+validateEnv(process.env, {
+  required: ["DATABASE_URL", "REDIS_URL", "API_URL", "UNSUBSCRIBE_SECRET"],
+  // Mail is off until SMTP_HOST is set. Once it is, a mail needs a From address.
+  groups: { SMTP_HOST: ["SMTP_FROM"] },
+  secrets: { UNSUBSCRIBE_SECRET: 32 },
+  fix: "Copy apps/worker/.env.example to apps/worker/.env and fill it in.",
+});
+
+export const env = {
+  databaseUrl: process.env.DATABASE_URL ?? "",
+  redisUrl: process.env.REDIS_URL ?? "",
+  apiUrl: process.env.API_URL ?? "",
+  unsubscribeSecret: process.env.UNSUBSCRIBE_SECRET ?? "",
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: Number(process.env.SMTP_PORT ?? 587),
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
+  smtpFrom: process.env.SMTP_FROM ?? "",
+};
+```
+
+```ts
+// apps/worker/src/mailer.ts
+import { createMailer } from "@gusnips/server/mail";
+import { env } from "./env.ts";
+
+// With no SMTP_HOST, mail is off: `mailer.enabled` is false and the worker skips the send.
+export const mailer = createMailer({
+  host: env.smtpHost,
+  port: env.smtpPort,
+  user: env.smtpUser,
+  pass: env.smtpPass,
+  from: env.smtpFrom,
+});
+```
+
+**Mail stays off until `SMTP_HOST` is set.** `mailer.enabled` is then false, and the worker skips
+the send. A laptop with no mail catcher still runs imports.
+
+**Check the From address at boot.** `createMailer` throws when it has a host and no From address.
+The `groups` line in the env check catches that first, and names the key. With `SMTP_FROM` empty,
+the worker stopped with:
+
+```text
+The environment has 1 problem:
+- SMTP_HOST is set, so these must be set too: SMTP_FROM
+Copy apps/worker/.env.example to apps/worker/.env and fill it in.
+```
+
+That works because `mailer.ts` imports `env.ts`, so the check runs before the mailer is built.
+
+### A mail goes out once
+
+A mail gets its own queue. The job carries what the mail needs, so `packages/server` grows:
+
+```ts
+// packages/server/src/index.ts
+import type { Locale } from "@notes/shared";
+
+// The queues the API fills and the worker empties. Both import the name and the data type from
+// here, so a job the API adds is always a job the worker can read.
+export const QUEUES = {
+  imports: "imports",
+  mail: "mail",
+  deadLetters: "dead-letters",
+} as const;
+
+// Notes to add for one user. The API has already checked every title, and `importId` is also the
+// job's id.
+export interface ImportJob {
+  importId: string;
+  userId: string;
+  // Where "your import is done" goes, and in which language. With no address, no mail.
+  email: string | null;
+  locale: Locale;
+  titles: string[];
+}
+
+// One "your import is done" mail.
+export interface ImportDoneMail {
+  userId: string;
+  email: string;
+  locale: Locale;
+  added: number;
+}
+
+// Part of the unsubscribe link's signature. The worker signs the link and the API checks it, and
+// a token signed for any other purpose never passes.
+export const UNSUBSCRIBE_PURPOSE = "unsubscribe:v1";
+```
+
+In the worker, `importNotes` gets the mail queue, and a second worker sends the mail:
+
+```ts
+// apps/worker/src/index.ts, inside start()
+// One try, and never a second run: a mail sent twice is worse than one that failed.
+const mail = createQueue<ImportDoneMail>(QUEUES.mail, {
+  connection: redis,
+  onError,
+  defaultJobOptions: { attempts: 1 },
+});
+const deadLetters = createQueue<DeadLetter>(QUEUES.deadLetters, { connection: redis, onError });
+const maintenance = createQueue(MAINTENANCE, { connection: redis, onError });
+
+const importer = createWorker<ImportJob>(QUEUES.imports, (job) => importNotes(job, mail), {
+  connection: redis,
+  onError,
+});
+const sender = createWorker<ImportDoneMail>(QUEUES.mail, sendImportDone, {
+  connection: redis,
+  onError,
+  maxStalledCount: 0,
+});
+const flushes = [importer, sender].map((worker) =>
+  wireDeadLetter(worker, deadLetters, { onError }),
+);
+```
+
+`importNotes` queues the mail at its very end:
+
+```ts
+// apps/worker/src/importNotes.ts, after the transaction
+  // After the commit, so no mail announces notes that were never written. A second run returns
+  // early, above, so the mail is queued once.
+  if (email) await mail.add("import-done", { userId, email, locale, added: titles.length });
+  return { added: titles.length };
+}
+```
+
+**One try, and never a second run.** A mail sent twice is worse than one that failed. So the queue
+gives each job `attempts: 1`, and the worker's `maxStalledCount: 0` fails a job whose worker died,
+instead of running it again. Do not call `retryStalledFailures` on this queue. We stopped Mailpit
+and ran an import: the mail job failed once, and the dead letter was in the log right away, with
+`connect ECONNREFUSED`.
+
+**Queue the mail after the commit.** No mail then announces notes that were never written. A
+second run of the import returns before it reaches that line, so the mail is queued once.
+
+In the drain, the `dead letters` step now flushes both workers:
+`run: () => Promise.all(flushes.map((flush) => flush()))`.
+
+### In the reader's language
+
+The mail should be in the language the reader picked in the web app. The browser's own
+`Accept-Language` header lists the browser's languages, which is a different thing. So the web
+app's client sends the picked one on every request:
+
+```ts
+// apps/web/src/services/api.ts
+import { createApiClient, returnPathFromLocation } from "@gusnips/react";
+import { createSupabaseSessionAdapter } from "@gusnips/react/supabase";
+import { i18n } from "../i18n/index.ts";
+import { supabase } from "./supabase.ts";
+
+export const api = createApiClient({
+  baseUrl: import.meta.env.VITE_API_URL,
+  session: createSupabaseSessionAdapter(supabase.auth),
+  // The language the reader picked, which the browser's own header does not know. The API writes
+  // mail in it.
+  headers: () => ({ "Accept-Language": i18n.language }),
+  onSessionDead: () => {
+    const next = encodeURIComponent(returnPathFromLocation(window.location));
+    window.location.replace(`/sign-in?next=${next}`);
+  },
+});
+```
+
+The API reads it in the import route with `localeFromAcceptLanguage`, which `packages/shared` now
+exports from `createLocales`. `requireUser` also keeps the reader's address, with
+`c.set("email", data.user.email ?? null)`, and `AppEnv` gets `email: string | null` beside
+`userId`:
+
+```ts
+// apps/api/src/app.ts, in the import route
+// For the mail. The web app sends the language the reader picked in this header.
+const locale = localeFromAcceptLanguage(c.req.header("Accept-Language")) ?? DEFAULT_LOCALE;
+const job = { importId, userId: c.get("userId"), email: c.get("email"), locale, titles };
+```
+
+And the worker writes the mail:
+
+```ts
+// apps/worker/src/sendImportDone.ts
+import { signToken } from "@gusnips/server";
+import { type ImportDoneMail, UNSUBSCRIBE_PURPOSE } from "@notes/server";
+import type { Locale } from "@notes/shared";
+import type { Job } from "bullmq";
+import { pool } from "./db.ts";
+import { env } from "./env.ts";
+import { mailer } from "./mailer.ts";
+
+const COPY: Record<Locale, (added: number) => { subject: string; body: string; stop: string }> = {
+  en: (added) => ({
+    subject: "Your import is done",
+    body: added === 1 ? "We added 1 note to your list." : `We added ${added} notes to your list.`,
+    stop: "Don't want these emails?",
+  }),
+  "pt-BR": (added) => ({
+    subject: "Sua importação terminou",
+    body:
+      added === 1 ? "Adicionamos 1 nota à sua lista." : `Adicionamos ${added} notas à sua lista.`,
+    stop: "Não quer mais receber esses e-mails?",
+  }),
+};
+
+export async function sendImportDone(job: Job<ImportDoneMail>): Promise<{ sent: boolean }> {
+  const { userId, email, locale, added } = job.data;
+  if (!mailer.enabled) return { sent: false };
+
+  const optedOut = await pool.query("SELECT 1 FROM app.mail_optouts WHERE user_id = $1", [userId]);
+  if (optedOut.rowCount) return { sent: false };
+
+  // No expiry: the link sits in old mail, and old mail is where people look for it.
+  const token = await signToken({
+    secret: env.unsubscribeSecret,
+    purpose: UNSUBSCRIBE_PURPOSE,
+    payload: userId,
+  });
+  const unsubscribeUrl = new URL("/unsubscribe", env.apiUrl);
+  unsubscribeUrl.search = new URLSearchParams({ token, lang: locale }).toString();
+
+  const copy = COPY[locale](added);
+  await mailer.send({
+    to: email,
+    subject: copy.subject,
+    text: `${copy.body}\n\n${copy.stop} ${unsubscribeUrl.href}`,
+    // Also puts the link in the headers, where a mail app shows its own unsubscribe button.
+    unsubscribeUrl: unsubscribeUrl.href,
+  });
+  return { sent: true };
+}
+```
+
+**The picked language wins over the browser's.** From a browser set to `en-US`, a request with
+`Accept-Language: pt-BR` came back 202, and the mail said `Sua importação terminou`. It needs no
+CORS change, because a browser may always send that header. A request with no header, like a
+plain `curl`, gets English.
+[Read the language a request asks for](locale/README.md#read-the-language-a-request-asks-for).
+
+### A link that stops these mails
+
+The link in the mail opens a page on the API. It needs a table:
+
+```sql
+-- apps/api/migrations/003_mail_optouts.sql
+-- One row for each person who asked for no more import emails. The unsubscribe link writes it,
+-- and the worker reads it before every send.
+CREATE TABLE app.mail_optouts (
+  user_id uuid PRIMARY KEY,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+```ts
+// apps/api/src/unsubscribe.ts
+import { verifyToken } from "@gusnips/server";
+import { UNSUBSCRIBE_PURPOSE } from "@notes/server";
+import { asLocale, DEFAULT_LOCALE, type Locale } from "@notes/shared";
+import { Hono } from "hono";
+import { html } from "hono/html";
+import { pool } from "./db.ts";
+import { env } from "./env.ts";
+import { logger } from "./logger.ts";
+
+const COPY: Record<Locale, Record<"ask" | "button" | "done" | "broken" | "failed", string>> = {
+  en: {
+    ask: "Notes emails you when an import finishes.",
+    button: "Stop these emails",
+    done: "Done. Notes will not email you about imports again.",
+    broken: "This link is broken. Open the latest import email from Notes and use the link there.",
+    failed: "We could not save that just now. Try again in a minute.",
+  },
+  "pt-BR": {
+    ask: "O Notes manda um e-mail quando uma importação termina.",
+    button: "Parar de receber esses e-mails",
+    done: "Pronto. O Notes não vai mais mandar e-mails sobre importações.",
+    broken:
+      "Este link está quebrado. Abra o último e-mail de importação do Notes e use o link dele.",
+    failed: "Não conseguimos salvar agora. Tente de novo em um minuto.",
+  },
+};
+
+// One sentence, and the button when there is something to press. A form with no action posts to
+// the address it is on, so the token comes along.
+function page(locale: Locale, text: string, button?: string) {
+  return html`<!doctype html>
+    <html lang="${locale}">
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Notes</title>
+      <body>
+        <p>${text}</p>
+        ${button ? html`<form method="post"><button>${button}</button></form>` : ""}
+      </body>
+    </html>`;
+}
+
+export const unsubscribe = new Hono();
+
+// Mail scanners open every link in a message, so a GET only shows the button.
+unsubscribe.get("/", (c) => {
+  const locale = asLocale(c.req.query("lang")) ?? DEFAULT_LOCALE;
+  return c.html(page(locale, COPY[locale].ask, COPY[locale].button));
+});
+
+// The button, and the one-click POST a mail app sends with no cookie.
+unsubscribe.post("/", async (c) => {
+  const locale = asLocale(c.req.query("lang")) ?? DEFAULT_LOCALE;
+  const copy = COPY[locale];
+  const verdict = await verifyToken({
+    secret: env.unsubscribeSecret,
+    purpose: UNSUBSCRIBE_PURPOSE,
+    token: c.req.query("token") ?? "",
+  });
+  if (!verdict.ok) return c.html(page(locale, copy.broken), 400);
+
+  try {
+    await pool.query(
+      "INSERT INTO app.mail_optouts (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING",
+      [verdict.payload],
+    );
+  } catch (error) {
+    // Our database failed, not the link. Calling the link broken would lose the unsubscribe.
+    logger.error("[unsubscribe] could not save", { error });
+    return c.html(page(locale, copy.failed, copy.button), 503);
+  }
+  return c.html(page(locale, copy.done));
+});
+```
+
+The API mounts it with `app.route("/unsubscribe", unsubscribe)`, and gets `UNSUBSCRIBE_SECRET` in
+its env check, with `secrets: { UNSUBSCRIBE_SECRET: 32 }`. Both apps hold the same value. Left as
+the `.env.example` placeholder, the boot stops:
+`UNSUBSCRIBE_SECRET looks like a placeholder from .env.example. Put the real secret there.`
+
+**A GET never unsubscribes anyone.** Mail scanners open every link in a message. The GET shows a
+button, and the POST does the work. In a browser, the button worked under the API's
+`default-src 'none'` security policy: a plain form needs no script and no style.
+
+**The POST is also the one-click button.** `unsubscribeUrl` puts the link in the mail's
+`List-Unsubscribe` header, and a mail app shows its own unsubscribe button for it. That button
+sends a POST with `List-Unsubscribe=One-Click` and no cookie. We sent the same POST with curl, and
+it answered 200. The second header a mail app needs, `List-Unsubscribe-Post`, is only written for
+an `https` link, so the mail from your machine carries the first one only.
+
+**A failure on your side is not a broken link.** With Postgres stopped, the POST answered 503 with
+`We could not save that just now. Try again in a minute.`, and the button again. Only a token that
+does not verify gets `This link is broken…`, with a 400. Calling a database outage a broken link
+would lose the unsubscribe.
+
+**The token never expires.** The link sits in old mail, and old mail is where people look for it.
+So `signToken` gets no `ttlSecs`.
+
+**Name the new public route in the guard test.** The test from part 1 failed on it:
+
+```text
+Error: 2 endpoint(s) answer with no guard running in front of them:
+  GET /unsubscribe
+  POST /unsubscribe
+```
+
+It passes once `isPublic` is `underAny(["/health", "/unsubscribe"])`.
+[Sending mail](https://github.com/gusnips/serverkit/blob/main/server/README.md#sending-mail),
+[the unsubscribe headers](https://github.com/gusnips/serverkit/blob/main/server/README.md#the-unsubscribe-headers).
+
+### Run it
+
+Run the new migration from `apps/api` with `bun run migrate`. Start `mailpit`, the API and the
+worker, then send an import in Portuguese:
+
+```bash
+curl -X POST http://localhost:3000/notes/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -H "Accept-Language: pt-BR" \
+  -d '{"titles":["Regar as plantas","Pagar o aluguel","Ligar para a vó"]}'
+```
+
+`http://localhost:8025` shows the mail:
+
+```text
+Sua importação terminou
+
+Adicionamos 3 notas à sua lista.
+
+Não quer mais receber esses e-mails? http://localhost:3000/unsubscribe?token=…&lang=pt-BR
+```
