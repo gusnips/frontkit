@@ -1555,9 +1555,8 @@ covers it:
   sitemap and share cards.
 - [More than one language](GUIDE-2.md#more-than-one-language): addresses per language, the
   language gate, and checking your translations.
-- Redis and background jobs:
-  [Redis](https://github.com/gusnips/serverkit/blob/main/server/README.md#redis),
-  [background jobs](https://github.com/gusnips/serverkit/blob/main/server/README.md#background-jobs).
+- [Redis and background jobs](GUIDE-2.md#redis-and-background-jobs): a queue the API fills and a
+  worker empties, and jobs that are safe to run twice.
 - [Sending mail](https://github.com/gusnips/serverkit/blob/main/server/README.md#sending-mail).
 - [Webhooks](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-webhook), in and
   out.

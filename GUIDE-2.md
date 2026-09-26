@@ -13,6 +13,7 @@ Part 2 covers:
 
 1. [Pages a search engine can read](#pages-a-search-engine-can-read)
 2. [More than one language](#more-than-one-language)
+3. [Redis and background jobs](#redis-and-background-jobs)
 
 ## Pages a search engine can read
 
@@ -772,3 +773,343 @@ apps/web
 Those 4 keys are the describer's four sentences. It reads them by prefix, which a scan cannot see,
 so that line is a hint, not a failure. `code` also checks that every `t("key")` in the source is in
 the English catalog. [Check your translations](vite/README.md#check-your-translations).
+
+## Redis and background jobs
+
+Some work takes longer than a reader should wait for. The API puts it on a queue and answers at
+once, and a second app, the worker, does the work. The queue lives in Redis, and BullMQ runs it.
+
+The example is an import. `POST /notes/import` takes up to 1,000 titles, and the worker writes them
+as notes.
+
+Add `"bullmq": "^5.81.5"` and `"ioredis": "^5.11.1"` to the catalog.
+
+**Keep both on version 5.** `@gusnips/server` supports version 5 of each. When we wrote this,
+`bun add ioredis bullmq` installed 6.0.0 and 6.3.9, with no warning.
+
+The API and the worker each get `REDIS_URL` in their `.env`. On your machine, `redis-server`
+starts one at `redis://127.0.0.1:6379`.
+
+### What the API and the worker share
+
+The API adds a job and the worker reads it, so the queue's name and the job's shape live in
+`packages/server`, a new package named `@notes/server`:
+
+```ts
+// packages/server/src/index.ts
+// The queues the API fills and the worker empties. Both import the name and the data type from
+// here, so a job the API adds is always a job the worker can read.
+export const QUEUES = {
+  imports: "imports",
+  deadLetters: "dead-letters",
+} as const;
+
+// Notes to add for one user. The API has already checked every title, and `importId` is also the
+// job's id.
+export interface ImportJob {
+  importId: string;
+  userId: string;
+  titles: string[];
+}
+```
+
+### The API adds the job
+
+The API depends on `@notes/server`, `bullmq` and `ioredis`, and opens one connection:
+
+```ts
+// apps/api/src/redis.ts
+import { CAPPED_EXPONENTIAL, createQueue } from "@gusnips/server/bullmq";
+import { createRedis } from "@gusnips/server/redis";
+import { type ImportJob, QUEUES } from "@notes/server";
+import { env } from "./env.ts";
+import { logger } from "./logger.ts";
+
+export const redis = createRedis({
+  url: env.redisUrl,
+  onError: (error) => logger.error("[redis] connection error", { error }),
+  // The API only adds jobs. With Redis down, fail the request after 3 tries instead of waiting.
+  maxRetriesPerRequest: 3,
+});
+
+export const imports = createQueue<ImportJob>(QUEUES.imports, {
+  connection: redis,
+  onError: (error) => logger.error("[bullmq] queue error", { error }),
+  defaultJobOptions: { attempts: 3, backoff: { type: CAPPED_EXPONENTIAL } },
+});
+```
+
+**Give the API's connection a retry limit.** By default, `createRedis` waits for Redis with no
+limit, because a worker needs that. In the API, that wait is a request that never answers. We
+stopped Redis: without `maxRetriesPerRequest`, the import was still waiting when curl gave up at
+30 seconds. With `maxRetriesPerRequest: 3`, it answered 503 in about a second.
+
+The route:
+
+```ts
+// apps/api/src/app.ts, the new route
+const NewImport = z
+  .object({ titles: z.array(z.string().trim().min(1).max(200)).min(1).max(1_000) })
+  .strict();
+
+// Adds many notes at once. The worker writes them, so the request only waits for Redis.
+app.post("/notes/import", async (c) => {
+  const { titles } = NewImport.parse(await c.req.json().catch(() => null));
+  const importId = crypto.randomUUID();
+  try {
+    // If Redis has been down since the API started, add() waits until it comes back, and then adds
+    // the job. By then the reader has given up, and trying again would import the notes twice.
+    if (redis.status !== "ready") throw new Error(`Redis is ${redis.status}`);
+    await imports.add("import", { importId, userId: c.get("userId"), titles }, { jobId: importId });
+  } catch (error) {
+    logger.error("[bullmq] could not add the import", { error });
+    throw errors.unavailable("Imports are paused. Try again in a minute.");
+  }
+  return ok(c, { importId }, 202);
+});
+```
+
+**Check the connection before you add a job.** If Redis is down when the API starts, `add()`
+waits for it, whatever the retry limit says. We started the API with Redis stopped, and the import
+was still waiting at 30 seconds. When Redis came back, the job went on the queue anyway, for a
+request that had already failed. With the check, the same request answered 503 in 17 ms, and the
+first import after Redis came back went through.
+
+**Answer 202, not 201.** The notes do not exist yet. The id in the answer names the import.
+
+`/health` asks Redis too, with `pingRedis`, and the API closes its connection with `quitRedis`
+before Postgres when it stops. With Redis stopped, `/health` answered 503 `Redis is not answering`.
+[Redis](https://github.com/gusnips/serverkit/blob/main/server/README.md#redis).
+
+### A job can run twice
+
+If the worker dies halfway through a job, BullMQ runs the job again. We killed the worker with
+`kill -9` during an import, twice: the job ran again 61 seconds later the first time, and 35
+seconds later the second. So a job must be safe to run twice.
+
+The import writes a row naming itself, in the same transaction as the notes. The table is a new
+migration in the API, which owns the database:
+
+```sql
+-- apps/api/migrations/002_imports.sql
+-- One row for each import the worker has written. The worker adds it in the same transaction as
+-- the notes, so a job that runs twice finds it and writes nothing.
+CREATE TABLE app.imports (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX imports_created_at_idx ON app.imports (created_at);
+```
+
+```ts
+// apps/worker/src/importNotes.ts
+import type { ImportJob } from "@notes/server";
+import type { Job } from "bullmq";
+import { pool } from "./db.ts";
+
+// A job can run twice: if the worker dies before BullMQ hears the job finished, it runs again.
+// So the notes and a row naming the import commit together. A second run finds the row and
+// writes nothing.
+export async function importNotes(job: Job<ImportJob>): Promise<{ added: number }> {
+  const { importId, userId, titles } = job.data;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const marked = await client.query(
+      "INSERT INTO app.imports (id, user_id) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+      [importId, userId],
+    );
+    if (marked.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return { added: 0 };
+    }
+    await client.query("INSERT INTO app.notes (user_id, title) SELECT $1, unnest($2::text[])", [
+      userId,
+      titles,
+    ]);
+    await client.query("COMMIT");
+    return { added: titles.length };
+  } catch (error) {
+    // Report the first error. A failed ROLLBACK after it would only hide the cause.
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+```
+
+**Commit the work and a record of it together.** A second run finds the record and writes nothing.
+We ran a finished import again: it returned `{ added: 0 }`, and the list of notes did not change.
+
+### The worker
+
+The worker is a new app, `apps/worker`. It copies `logger.ts`, `db.ts` and `env.ts` from the API,
+with `DATABASE_URL` and `REDIS_URL` as its only variables. Its crash handlers pass
+`rejections: "exit"` where the API survives one: a job that stopped halfway may have left bad
+state behind.
+
+```ts
+// apps/worker/src/index.ts
+import { drainWith } from "./crash-handlers.ts"; // the first import
+import {
+  createQueue,
+  createWorker,
+  type DeadLetter,
+  retryStalledFailures,
+  syncJobSchedulers,
+  wireDeadLetter,
+} from "@gusnips/server/bullmq";
+import { createShutdown } from "@gusnips/server/node";
+import { assertRedisReachable, createRedis, quitRedis } from "@gusnips/server/redis";
+import { type ImportJob, QUEUES } from "@notes/server";
+import { HARD_EXIT_MS } from "./budget.ts";
+import { pool } from "./db.ts";
+import { env } from "./env.ts";
+import { importNotes } from "./importNotes.ts";
+import { logger } from "./logger.ts";
+import { pruneImports } from "./pruneImports.ts";
+
+// Recurring jobs get a queue of their own: syncJobSchedulers removes every schedule on its
+// queue that the table below does not name.
+const MAINTENANCE = "maintenance";
+
+const redis = createRedis({
+  url: env.redisUrl,
+  onError: (error) => logger.error("[redis] connection error", { error }),
+});
+const onError = (error: Error) => logger.error("[bullmq] connection error", { error });
+
+// pm2 loads this file with require(), which cannot wait at the top of a file. So every await
+// sits inside start().
+async function start() {
+  // A worker that cannot reach Redis looks exactly like one with no work. Stop at boot instead.
+  await assertRedisReachable(redis, {
+    url: env.redisUrl,
+    hint: "Start Redis with `redis-server`, or fix REDIS_URL in apps/worker/.env.",
+  });
+
+  const imports = createQueue<ImportJob>(QUEUES.imports, { connection: redis, onError });
+  const deadLetters = createQueue<DeadLetter>(QUEUES.deadLetters, { connection: redis, onError });
+  const maintenance = createQueue(MAINTENANCE, { connection: redis, onError });
+
+  const importer = createWorker<ImportJob>(QUEUES.imports, importNotes, {
+    connection: redis,
+    onError,
+  });
+  const flushDeadLetters = wireDeadLetter(importer, deadLetters, { onError });
+  const workers = [
+    importer,
+    // Every job that failed for good ends up here. Log it, so a person can look.
+    createWorker<DeadLetter>(
+      QUEUES.deadLetters,
+      async (job) => logger.error("a job failed for good", { ...job.data }),
+      { connection: redis, onError },
+    ),
+    createWorker(MAINTENANCE, pruneImports, { connection: redis, onError }),
+  ];
+
+  drainWith(
+    createShutdown(
+      [
+        // Stop taking jobs, and let the running ones finish.
+        { name: "workers", run: () => Promise.all(workers.map((worker) => worker.close())) },
+        { name: "dead letters", run: flushDeadLetters },
+        { name: "redis", run: () => quitRedis(redis) },
+        { name: "postgres", run: () => pool.end() },
+      ],
+      { hardExitMs: HARD_EXIT_MS, logger },
+    ),
+  );
+
+  // An import a deploy cut off is safe to run again, because importNotes writes it once.
+  const retried = await retryStalledFailures(imports);
+  await syncJobSchedulers(maintenance, { "prune-imports": { pattern: "0 4 * * *", tz: "UTC" } });
+  logger.info("worker started", { retried });
+}
+
+void start();
+```
+
+**Stop at boot when Redis is not there.** A worker that cannot reach Redis looks exactly like one
+with nothing to do. With Redis stopped, the worker exited with code 1 after 6 seconds, and logged:
+
+```text
+Redis at 127.0.0.1:50149 did not answer PING within 5000 ms. It is down, or the URL is wrong. Start Redis with `redis-server`, or fix REDIS_URL in apps/worker/.env.
+```
+
+The last sentence is the `hint`, the part only you can write.
+
+**Every `await` goes inside `start()`.** pm2 loads the file with `require()`, as
+[part 1 explains](GUIDE.md#stopping-for-a-deploy).
+
+**A job that fails for good gets logged.** `redis.ts` gives each import 3 tries, a few seconds
+apart. `wireDeadLetter` puts a job that used them all on the `dead-letters` queue, and the worker
+logs it. We added an import with a `null` title: it failed 3 times, and `a job failed for good` was
+in the log 9 seconds after we added it.
+
+**`retryStalledFailures` runs again the jobs a deploy cut off.** Call it only on a queue whose jobs
+are safe to run twice, as imports are.
+
+**Recurring jobs get a queue of their own.** `syncJobSchedulers` removes every schedule on its
+queue that its list does not name. Leave out `tz` and the typecheck fails, because a cron pattern
+with no time zone runs on the server's clock.
+[Background jobs](https://github.com/gusnips/serverkit/blob/main/server/README.md#background-jobs).
+
+### Stopping the worker
+
+The worker gets a pm2 file beside the API's:
+
+```js
+// infra/worker/ecosystem.config.cjs
+const path = require("node:path");
+
+module.exports = {
+  apps: [
+    {
+      name: "notes-worker",
+      cwd: path.join(__dirname, "../../apps/worker"),
+      script: "src/index.ts",
+      interpreter: "bun",
+      kill_timeout: 30_000,
+    },
+  ],
+};
+```
+
+```ts
+// apps/worker/src/budget.ts
+// How long a deploy waits. The longest job < HARD_EXIT_MS < pm2's kill_timeout.
+// An import of 1,000 notes is one INSERT, so 25 seconds is room to spare.
+export const HARD_EXIT_MS = 25_000;
+```
+
+`pm2 stop notes-worker` ran each step in order: `workers`, `dead letters`, `redis`, `postgres`.
+`worker.close()` waits for the jobs running, so the longest job has to fit inside `HARD_EXIT_MS`.
+An import of 1,000 notes took 118 ms here.
+
+**The drain needs its time limit.** We stopped the worker while Redis was down, and
+`worker.close()` did not return. The drain logged `shutdown did not finish in time` and exited
+when `HARD_EXIT_MS` ran out, 25 seconds after the signal.
+
+### Run it
+
+Start Redis, then the worker from `apps/worker`:
+
+```bash
+redis-server
+bun run dev
+```
+
+Then send an import, with a signed-in user's access token in `$TOKEN`:
+
+```bash
+curl -X POST http://localhost:3000/notes/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"titles":["Water the plants","Pay the rent","Call grandma"]}'
+```
+
+The API answers 202 with `{"data":{"importId":"…"}}`, and the three notes are in the list a moment
+later.
