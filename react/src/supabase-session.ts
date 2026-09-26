@@ -34,8 +34,13 @@ type _SupabaseAuthFitsAdapter = Satisfied<
  * whichever version happens to be installed, which is not the same as being right, and a fleet
  * installs several versions at once. It is also a LIST rather than a range, so it has holes at
  * every version, drift or no drift: at 2.112 nothing covers 505 through 519 or 531 up, and a
- * 507 or a 599 out of a proxy in front of GoTrue arrives as a plain `AuthApiError`. Pinning a
- * recent SDK does not make the status clause redundant.
+ * 507 or a 599 with a JSON body arrives as a plain `AuthApiError`. Pinning a recent SDK does not
+ * make the status clause redundant.
+ *
+ * The same statuses with a body that is NOT JSON — a proxy's HTML page — arrive as an
+ * `AuthUnknownError`, which carries no status at any status, so nothing here can tell that 507
+ * from a malformed 400. It answers false for both, on purpose: reading an unreadable 4xx as an
+ * outage would leave a dead session retrying forever, which is the other half of the same bug.
  *
  * Read the version a tree really serves with `bun why @supabase/auth-js`, which prints one
  * heading per RESOLVED version; `node_modules` keeps copies the resolver does not serve.

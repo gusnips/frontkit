@@ -312,8 +312,12 @@ pin them; if one fails, a lesson is being un-learned.
 
    **And it is a LIST, not a range, so it has holes at every version — drift is not the only
    argument.** At 2.112.4 it reads 500-504 and 520-530: nothing covers 505 through 519, nothing
-   covers 531 up. A 507 or a 599 out of a proxy in front of GoTrue arrives as a plain
-   `AuthApiError`, and the vendor's predicate answers false for it at every version ever shipped.
+   covers 531 up. A 507 or a 599 with a JSON body arrives as a plain `AuthApiError`, and the
+   vendor's predicate answers false for it at every version ever shipped. (With a body that is
+   not JSON, which is what a proxy usually sends, it arrives as an `AuthUnknownError` with no
+   status at all. `isAuthOutage` answers false for that on purpose, because nothing separates it
+   from a malformed 400; its test says why. This sentence said "a proxy" without the body until
+   2026-09-26, and an adopter read it as a kit bug.)
    That matters because the drift argument invites exactly one reply — "then pin a recent SDK and
    drop the redundant clause" — and this closes it. `isAuthRetryableFetchError` is a NAME check;
    the statuses that earn the name are chosen where auth-js CONSTRUCTS the error, which is the

@@ -127,8 +127,9 @@ describe("isAuthOutage", () => {
     // A gateway between us and GoTrue, which auth-js wraps by name.
     expect(isAuthOutage(new AuthRetryableFetchError("Bad Gateway", 502))).toBe(true);
     // And the reason the status clause is not redundant: the statuses earning that name are a
-    // LIST, so it has holes at every version. 507 and 599 are on no version of it, and arrive
-    // as ordinary AuthApiErrors that `isAuthRetryableFetchError` answers false for.
+    // LIST, so it has holes at every version. 507 and 599 are on no version of it, and with a
+    // JSON body arrive as ordinary AuthApiErrors that `isAuthRetryableFetchError` answers false
+    // for. (With a body that is not JSON they arrive with no status at all: see below.)
     expect(isAuthOutage(new AuthApiError("Insufficient Storage", 507, undefined))).toBe(true);
     expect(isAuthOutage(new AuthApiError("Network Connect Timeout", 599, undefined))).toBe(true);
   });
