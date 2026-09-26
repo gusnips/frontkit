@@ -17,6 +17,7 @@ Part 2 covers:
 4. [Sending mail](#sending-mail)
 5. [Webhooks, in and out](#webhooks-in-and-out)
 6. [An OpenAPI reference](#an-openapi-reference)
+7. [A public API](#a-public-api)
 
 ## Pages a search engine can read
 
@@ -2338,3 +2339,468 @@ bunx @redocly/cli build-docs http://localhost:3000/openapi.json
 
 That writes `redoc-static.html`, a single page with every route, grouped under `Notes` and
 `Webhooks`.
+
+## A public API
+
+So far only the web app calls the API, with the token a person gets when they sign in. A user's own
+script cannot sign in that way. This chapter gives it an API key to send instead, limits how many
+requests each user sends in a minute, and opens an MCP door. MCP (Model Context Protocol) is how an
+AI agent calls tools on a server.
+
+Move `@gusnips/server` to `^0.8.21` in the catalog, and run `bun install`. We made the limiter's
+Redis connection and counted two requests right away, as the first requests after a boot would be.
+On 0.8.19 both counts failed, so the limiter let both requests through uncounted. On 0.8.21 both
+were counted.
+
+### API keys
+
+An API key is a long random string that a user's code sends in place of a sign-in token. A new
+migration keeps them:
+
+```sql
+-- apps/api/migrations/005_api_keys.sql
+-- Keys a user's own code sends instead of signing in. We keep a hash of each key, never the key.
+CREATE TABLE app.api_keys (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  -- So the user can tell their keys apart: "Laptop", "Backup script".
+  name text NOT NULL,
+  key_hash text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX api_keys_user_id_idx ON app.api_keys (user_id);
+```
+
+`schemas.ts` gets their shapes:
+
+```ts
+// apps/api/src/schemas.ts, added at the end
+export const ApiKey = z.object({ id: z.uuid(), name: z.string(), createdAt: z.iso.datetime() });
+export const NewApiKey = z.object({ name: z.string().trim().min(1).max(100) }).strict();
+export const ApiKeyAdded = z.object({ id: z.uuid(), name: z.string(), key: z.string() });
+export const ApiKeyId = z.object({ id: z.uuid() }).strict();
+```
+
+`"FORBIDDEN"` joins `ErrorCode` in `packages/shared`, `ERROR_STATUS` gets `FORBIDDEN: 403`, and
+`errors` gets two more:
+
+```ts
+// apps/api/src/errors.ts, in errors
+  badKey: () => appError("UNAUTHORIZED", "That API key does not work. It may have been deleted."),
+  forbidden: (message: string) => appError("FORBIDDEN", message),
+```
+
+`AppEnv` says how a request came in:
+
+```ts
+// apps/api/src/app.ts, near the top
+export type AppEnv = {
+  Variables: RequestVariables<ErrorCode> & {
+    userId: string;
+    email: string | null;
+    // Set when the request came with an API key instead of a sign-in.
+    apiKeyId: string | null;
+  };
+};
+```
+
+`auth.ts` makes keys and checks them, and `requireUser` now takes either kind:
+
+```ts
+// apps/api/src/auth.ts
+import { createHash, randomBytes } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
+import { guard } from "@gusnips/server/hono";
+import { isAuthOutage } from "@gusnips/server/supabase";
+import { createMiddleware } from "hono/factory";
+import type { AppEnv } from "./app.ts";
+import { pool } from "./db.ts";
+import { env } from "./env.ts";
+import { errors } from "./errors.ts";
+
+const supabase = createClient(env.supabaseUrl, env.supabaseAnonKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+// Every key starts with this, so requireUser can tell a key from a sign-in token.
+const API_KEY_PREFIX = "notes_";
+
+export const newApiKey = () => API_KEY_PREFIX + randomBytes(32).toString("base64url");
+
+// We store this hash, never the key. A key is 32 random bytes, so nobody can work it out from the
+// hash, and a fast hash lets Postgres find the key's row by its index.
+export const hashApiKey = (key: string) => createHash("sha256").update(key).digest("hex");
+
+// A signed-in user from the web app, or a user's own code with one of their API keys.
+export const requireUser = guard(
+  createMiddleware<AppEnv>(async (c, next) => {
+    const token = c.req.header("Authorization")?.replace(/^Bearer /i, "");
+    if (!token) throw errors.unauthorized();
+
+    if (token.startsWith(API_KEY_PREFIX)) {
+      const { rows } = await pool.query<{ id: string; userId: string }>(
+        `SELECT id, user_id AS "userId" FROM app.api_keys WHERE key_hash = $1`,
+        [hashApiKey(token)],
+      );
+      if (!rows[0]) throw errors.badKey();
+      c.set("userId", rows[0].userId);
+      // A key has no mail address, so an import it starts sends no mail. Its webhooks still fire.
+      c.set("email", null);
+      c.set("apiKeyId", rows[0].id);
+      return next();
+    }
+
+    const { data, error } = await supabase.auth.getUser(token);
+    if (isAuthOutage(error)) throw errors.unavailable("Sign-in is not answering right now");
+    if (error || !data.user) throw errors.unauthorized();
+
+    c.set("userId", data.user.id);
+    c.set("email", data.user.email ?? null);
+    c.set("apiKeyId", null);
+    await next();
+  }),
+);
+```
+
+**Keep the hash, never the key.** The table holds a 64-character SHA-256 hash of each key. Someone
+who reads the table, or a backup of it, gets nothing that works: sent as a key, a hash from the
+table got a 401. A slow hash such as bcrypt is for passwords people choose. A key is 32 random
+bytes, so a fast hash is enough, and Postgres finds it by its index.
+
+**A failed lookup is not a wrong key.** With Postgres stopped, a request with a good key got a 500,
+`Something on our side failed`. A 401 there would tell the user their key is wrong, and they might
+delete a key that works.
+
+The routes:
+
+```ts
+// apps/api/src/apiKeys.ts
+import { created, noContent, ok } from "@gusnips/server/hono";
+import { Hono } from "hono";
+import type { AppEnv } from "./app.ts";
+import { hashApiKey, newApiKey } from "./auth.ts";
+import { pool } from "./db.ts";
+import { errors } from "./errors.ts";
+import { ApiKeyId, NewApiKey } from "./schemas.ts";
+
+export const apiKeys = new Hono<AppEnv>();
+
+// Only a signed-in user manages keys. A key that leaked must not be able to make more.
+apiKeys.use(async (c, next) => {
+  if (c.get("apiKeyId")) throw errors.forbidden("Sign in to manage API keys. A key cannot.");
+  await next();
+});
+
+apiKeys.get("/", async (c) => {
+  const { rows } = await pool.query<{ id: string; name: string; createdAt: Date }>(
+    `SELECT id, name, created_at AS "createdAt" FROM app.api_keys
+     WHERE user_id = $1 ORDER BY created_at`,
+    [c.get("userId")],
+  );
+  return ok(c, rows);
+});
+
+// The answer holds the key, this once. We only keep its hash, so we cannot show it again.
+apiKeys.post("/", async (c) => {
+  const { name } = NewApiKey.parse(await c.req.json().catch(() => null));
+  const key = newApiKey();
+  const { rows } = await pool.query<{ id: string; name: string }>(
+    `INSERT INTO app.api_keys (user_id, name, key_hash) VALUES ($1, $2, $3) RETURNING id, name`,
+    [c.get("userId"), name, hashApiKey(key)],
+  );
+  return created(c, { ...rows[0], key });
+});
+
+// Works at once: the next request with that key gets a 401.
+apiKeys.delete("/:id", async (c) => {
+  const { id } = ApiKeyId.parse({ id: c.req.param("id") });
+  const { rowCount } = await pool.query(
+    `DELETE FROM app.api_keys
+     WHERE id = $1 AND user_id = $2`,
+    [id, c.get("userId")],
+  );
+  if (!rowCount) throw errors.notFound("API key");
+  return noContent(c);
+});
+```
+
+They mount at the end of `app.ts`. `perUser` is the limit in the next section.
+
+```ts
+// apps/api/src/app.ts, at the end
+// Where a user makes the keys their own code sends instead of signing in.
+app.use("/keys/*", requireUser, perUser);
+app.route("/keys", apiKeys);
+```
+
+**Only a signed-in user manages keys.** Sent with a key, `GET /keys` and `POST /keys` got a 403,
+`Sign in to manage API keys. A key cannot.` Otherwise a key that leaked could make a new key, and
+deleting the leaked one would not lock anyone out.
+
+**The key is shown once.** The answer to the POST holds it, and `GET /keys` shows names only. A
+delete works at once: the next request with that key got a 401,
+`That API key does not work. It may have been deleted.`
+
+**A key has no mail address.** An import started with a key sent no mail, and the same import from
+the web app sent one. The user's webhooks still heard about it.
+
+### A rate limit
+
+A rate limit caps how many requests one user sends in a minute. The count lives in Redis, so it
+holds across a restart:
+
+```ts
+// apps/api/src/limits.ts
+import { rateLimit } from "@gusnips/server/hono";
+import { createRedis, redisWindowStore } from "@gusnips/server/redis";
+import type { AppEnv } from "./app.ts";
+import { env } from "./env.ts";
+import { errors } from "./errors.ts";
+import { logger } from "./logger.ts";
+
+// Its own connection, one that fails at once when Redis is down, so no request waits on it.
+export const limitsRedis = createRedis({
+  url: env.redisUrl,
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  commandTimeout: 1_000,
+  onError: (error) => logger.error("[redis] limiter connection error", { error }),
+});
+
+// The count for each user and each minute lives in Redis, so it holds across a restart.
+export const limits = redisWindowStore(limitsRedis, { timeoutMs: 500 });
+
+// 300 requests a minute for each user, signed in or with a key.
+export const perUser = rateLimit<AppEnv>({
+  scope: "api",
+  store: limits,
+  // With Redis down, let requests through instead of refusing everyone. The log says so.
+  whenStoreFails: "allow",
+  logger,
+  limit: 300,
+  windowMs: 60_000,
+  key: (c) => c.get("userId"),
+  refuse: (hit) => errors.rateLimited(hit.retryAfterSecs),
+});
+```
+
+`perUser` goes after `requireUser` on `/notes/*` and `/webhooks/*` too, as on `/keys/*` above. The
+drain closes its connection:
+
+```ts
+// apps/api/src/index.ts, in the drain
+{ name: "redis", run: () => Promise.all([quitRedis(redis), quitRedis(limitsRedis)]) },
+```
+
+**Count the user, after the guard.** `key` reads the `userId` that `requireUser` checked. A limit
+that counted the raw token would count whatever string a caller sends, so each new string would be
+a new allowance. We sent 301 requests with one key in a minute. 300 got a 200, and the 301st got:
+
+```text
+429 Too Many Requests
+Retry-After: 52
+{"error":{"code":"RATE_LIMITED","message":"Too many requests","details":{"retryAfterSecs":52}}}
+```
+
+The minutes follow the clock: that request came 8.9 seconds past the minute, so 52 seconds were
+left. A request with the same user's sign-in token got a 429 too, because a key and a sign-in count
+as one user. Another user got a 200.
+
+**Give the limiter its own connection.** With Redis stopped, requests still got a 200, most in 7 ms,
+and the log said `[rate-limit] the store did not answer` for each one. We then built the store on
+the API's main connection instead, and stopped Redis again. Each request waited about half a
+second, the whole `timeoutMs`, because that connection holds a command until Redis is back.
+
+**Choose what a Redis outage means.** `whenStoreFails` has no default. `"allow"` fits this limit:
+refusing every user over a Redis blip is worse than a minute with no limit. A limit that guards a
+bill, such as a form that sends mail to strangers, passes its 503 instead.
+[A rate limit](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-rate-limit).
+
+### An MCP door
+
+The door serves two tools, `list_notes` and `add_note`, at `POST /mcp`. Add
+`"@modelcontextprotocol/sdk": "^1.30.1"` to the catalog and to the API.
+
+A tool and its route should run the same query, so the queries move out of `app.ts`:
+
+```ts
+// apps/api/src/notes.ts
+// The queries behind GET and POST /notes. The MCP tools run the same two.
+import { pool } from "./db.ts";
+
+type NoteRow = { id: string; title: string; createdAt: Date };
+
+export async function listNotes(userId: string) {
+  const { rows } = await pool.query<NoteRow>(
+    `SELECT id, title, created_at AS "createdAt" FROM app.notes
+     WHERE user_id = $1 ORDER BY created_at DESC`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function addNote(userId: string, title: string) {
+  const { rows } = await pool.query<NoteRow>(
+    `INSERT INTO app.notes (user_id, title) VALUES ($1, $2)
+     RETURNING id, title, created_at AS "createdAt"`,
+    [userId, title],
+  );
+  return rows[0];
+}
+```
+
+```ts
+// apps/api/src/app.ts, the notes routes
+app.get("/notes", async (c) => ok(c, await listNotes(c.get("userId"))));
+
+app.post("/notes", async (c) => {
+  const { title } = NewNote.parse(await c.req.json().catch(() => null));
+  return created(c, await addNote(c.get("userId"), title));
+});
+```
+
+The door:
+
+```ts
+// apps/api/src/mcp.ts
+import { hitWindow } from "@gusnips/server";
+import { mcpRoutes, registerOperation, type ToolOperation } from "@gusnips/server/mcp";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Context } from "hono";
+import { z } from "zod";
+import type { AppEnv } from "./app.ts";
+import { errorResponse, errors } from "./errors.ts";
+import { limits } from "./limits.ts";
+import { logger } from "./logger.ts";
+import { addNote, listNotes } from "./notes.ts";
+import { NewNote } from "./schemas.ts";
+
+type Deps = { userId: string };
+
+// What an agent can do, as tools. Each runs the same query as its REST route.
+const TOOLS: ToolOperation<Deps, unknown, unknown>[] = [
+  {
+    name: "list_notes",
+    description: "List the user's notes, newest first.",
+    inputSchema: z.object({}).strict(),
+    run: ({ userId }: Deps) => listNotes(userId),
+  },
+  {
+    name: "add_note",
+    description: "Add a note to the user's list.",
+    inputSchema: NewNote,
+    run: ({ userId }: Deps, { title }: z.infer<typeof NewNote>) => addNote(userId, title),
+  },
+];
+
+function buildMcpServer(c: Context<AppEnv>) {
+  const server = new McpServer({ name: "notes", version: "1.0.0" });
+  const userId = c.get("userId");
+  for (const tool of TOOLS) {
+    registerOperation(server, tool, {
+      errorResponse,
+      logger,
+      requestId: c.get("requestId"),
+      deps: () => ({ userId }),
+      // Runs before each tool call. One request can carry many calls, so the limit counts calls.
+      beforeCall: async () => {
+        const hit = await hitWindow(limits, `mcp:${userId}`, {
+          limit: 60,
+          windowMs: 60_000,
+          whenStoreFails: "allow",
+        });
+        if (hit.outcome === "store-failed") {
+          logger.warn("[mcp] call not counted: Redis did not answer", { error: hit.error });
+        }
+        if (hit.outcome === "limited" || hit.outcome === "shed") {
+          throw errors.rateLimited(hit.retryAfterSecs);
+        }
+      },
+    });
+  }
+  return server;
+}
+
+// POST /mcp and /mcp/. Agents and scripts send no Origin header. No web page may call it.
+export const mcp = mcpRoutes("/mcp", buildMcpServer, { allowedOrigins: new Set() });
+```
+
+```ts
+// apps/api/src/app.ts, at the end
+// The same notes, for AI agents. The door counts each tool call, so it gets no perUser.
+app.use("/mcp/*", requireUser);
+app.route("/", mcp);
+```
+
+**Count tool calls, not requests.** One POST can carry many calls. We sent one POST with 61 calls.
+60 were answered, and the 61st got the same 429 body as REST, with `"retryAfterSecs":58`. `perUser`
+on this route would have counted that POST once.
+
+**Guard `"/mcp/*"`, not `"/mcp"`.** The door answers at `/mcp` and at `/mcp/`. With `"/mcp"`, the
+guard test failed:
+
+```text
+Error: 1 endpoint(s) answer with no guard running in front of them:
+  ALL /mcp/
+```
+
+**Pass the zod object, not its `.shape`.** With `NewNote.shape`, the typecheck failed:
+`Type '{ title: ZodString; }' is not assignable to type 'AnySchema'.` With the strict object, an
+argument the agent made up is refused by name: `Unrecognized key: "pinned"`.
+
+**A tool answers like its route.** A tool sends back the REST body, `{ data }`, as text. With
+Postgres stopped, `add_note` answered
+`{"error":{"code":"INTERNAL_ERROR","message":"Something on our side failed"}}`, marked `isError`.
+The database's address went to the log, under `tool failed`, with the request id, and never to the
+agent.
+
+**No web page may call it.** A request with an `Origin` header got a 403, and a GET got a 405.
+Agents and scripts send no `Origin`.
+[An MCP door](https://github.com/gusnips/serverkit/blob/main/server/README.md#an-mcp-door).
+
+### The reference
+
+`openapi.ts` lists the three key routes under a new `API keys` tag, each with its 403. The shared
+`errors` get a 429, and the reference then shows the `Retry-After` header on every route.
+`bearerAuth` now says a key works too. Redocly still found the document valid. The MCP tools are
+not REST routes, so they are not in it.
+
+### Run it
+
+Run the new migration from `apps/api` with `bun run migrate`, and start the API with `bun run dev`.
+Make a key with your sign-in token:
+
+```bash
+curl -X POST http://localhost:3000/keys \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"name":"Laptop"}'
+```
+
+```text
+{"data":{"id":"…","name":"Laptop","key":"notes_…"}}
+```
+
+Put the key in `$KEY`, and read your notes with it:
+
+```bash
+curl http://localhost:3000/notes -H "Authorization: Bearer $KEY"
+```
+
+Then call a tool, the way an agent does:
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer $KEY" \
+  -H "content-type: application/json" \
+  -H "accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"add_note","arguments":{"title":"Buy milk"}}}'
+```
+
+```text
+{"result":{"content":[{"type":"text","text":"{\"data\":{\"id\":\"…\",\"title\":\"Buy milk\",\"createdAt\":\"…\"}}"}]},"jsonrpc":"2.0","id":1}
+```
+
+Without the `accept` header, the answer is a 406. An MCP client connects with the address
+`http://localhost:3000/mcp` and the same `Authorization` header. The SDK's own client listed both
+tools and added a note.

@@ -1548,8 +1548,7 @@ It runs six tasks: the three typechecks, the two test suites, and the web build.
 
 ## What's next
 
-[Part 2](GUIDE-2.md) covers these, one chapter each. Until a chapter is written, its package README
-covers it:
+[Part 2](GUIDE-2.md) covers these, one chapter each:
 
 - [Pages a search engine can read](GUIDE-2.md#pages-a-search-engine-can-read): prerendering, the
   sitemap and share cards.
@@ -1564,6 +1563,5 @@ covers it:
 - [An OpenAPI reference](GUIDE-2.md#an-openapi-reference): one file that lists every route, built
   from the schemas the routes check. An SDK built from it comes later:
   [@gusnips/sdkgen](https://github.com/gusnips/serverkit/blob/main/sdkgen/README.md).
-- A public API with keys and an MCP door for AI agents:
-  [an MCP door](https://github.com/gusnips/serverkit/blob/main/server/README.md#an-mcp-door),
-  [a rate limit](https://github.com/gusnips/serverkit/blob/main/server/README.md#a-rate-limit).
+- [A public API](GUIDE-2.md#a-public-api): keys a user's own code sends, a limit on how many
+  requests each user sends in a minute, and an MCP door for AI agents.
