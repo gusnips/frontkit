@@ -48,6 +48,14 @@ export interface SessionAdapter {
   signOut(): Promise<void>;
 }
 
+/**
+ * How long anything here waits on a sign-out: the default for
+ * {@link ApiClientOptions.signOutTimeoutMs}, and the deadline of `signOutEvenOffline` in
+ * `@gusnips/react/supabase`. Shared so the two give up together — a redirect that gave up sooner
+ * would navigate away while the session was still in storage.
+ */
+export const SIGN_OUT_TIMEOUT_MS = 3_000;
+
 export interface ApiClientOptions {
   /** Origin + prefix, e.g. `https://api.example.com/v1`. No trailing slash. */
   baseUrl: string;
@@ -248,7 +256,7 @@ export function createApiClient({
   timeoutMs = 30_000,
   maxRefreshAttempts = 2,
   refreshRetryDelayMs = 500,
-  signOutTimeoutMs = 3_000,
+  signOutTimeoutMs = SIGN_OUT_TIMEOUT_MS,
   requestIdHeader = "x-request-id",
 }: ApiClientOptions): ApiClient {
   /**

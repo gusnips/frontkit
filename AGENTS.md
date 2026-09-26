@@ -300,6 +300,15 @@ pin them; if one fails, a lesson is being un-learned.
    `signOut()` before redirecting covers a rejection, not a hang, and a hang leaves someone
    signed out in name only — every request 401ing, nothing left that could redirect it.
 
+   **And a sign-out that cannot reach auth leaves the person signed in.** Measured on nine auth-js
+   versions from 2.106.2 to 2.117.2: with an expired access token and no network, `signOut()`
+   resolves `{ error }` and keeps the stored session at every one of them, and before 2.110.2 it
+   does the same when only `/logout` goes unanswered. `scope: "local"` calls `/logout` too. A
+   reload reads the session back, so a screen showing "signed out" over it is wrong, and on a
+   shared computer the next person is signed in. `signOutEvenOffline` removes it from storage
+   within the API client's 3 s sign-out deadline, then lets auth-js's own local sign-out send
+   `SIGNED_OUT`.
+
    **A 5xx is auth failing, not auth answering, and the vendor's own predicate must not be
    trusted to say so.** `isAuthRetryableFetchError` reads a list its library owns and has already
    changed — 502, 503 and 504 at auth-js 2.91; those plus the 52x family and still **no 500** at

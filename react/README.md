@@ -79,6 +79,38 @@ It is safe to hand it the `error` from a `{ data, error }` result without checki
 `null` answers false. That is worth stating because `null` is the SUCCESS value of every
 supabase-js auth call, so the obvious `if (isAuthOutage(error))` is written against it constantly.
 
+A sign-out that cannot reach auth leaves the person signed in. When the token has expired and the
+network is down, `auth.signOut()` returns an error and keeps the stored session. That held on every
+auth-js version measured, 2.106.2 to 2.117.2, and before 2.110.2 it does the same with a good
+token. A reload then signs them back in, and on a shared computer that is the next person.
+`signOutEvenOffline` removes the session from this device either way, and never waits on auth for
+more than 3 seconds:
+
+```ts
+import { signOutEvenOffline, supabaseStorageKey } from "@gusnips/react/supabase";
+
+export const authStorage = { storage: localStorage, storageKey: supabaseStorageKey(supabaseUrl) };
+export const supabase = createClient(supabaseUrl, supabaseKey, { auth: authStorage });
+
+await signOutEvenOffline(supabase.auth, authStorage);
+```
+
+Two rules come with it:
+
+- **Build one `{ storage, storageKey }` object and pass it to both `createClient` and the helper.**
+  The helper clears the key it is given, so a second copy that drifts leaves the session where it
+  was. `supabaseStorageKey` returns the key supabase-js already uses, so setting it signs nobody
+  out. On React Native, `storage` is your `AsyncStorage`.
+- **If your screen does not reload after signing out, clear your own store when the helper
+  resolves.** The session is out of storage by then, but auth-js sends `SIGNED_OUT` only once it
+  has finished the first call: a moment later, or up to 22 seconds on auth-js 2.106.
+
+`error` is `null` when auth ended the session on the server too. Otherwise the person is signed
+out on this device and may still be signed in on others.
+
+Pass the same object to `createSupabaseSessionAdapter(supabase.auth, authStorage)` and the API
+client's sign-out goes through the helper too.
+
 Supabase email links have two complete patterns. Keep either one, never half of each:
 
 - A link carrying `token_hash` needs one explicit `verifyOtp` call. Guard it against React

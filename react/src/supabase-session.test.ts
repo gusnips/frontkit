@@ -3,13 +3,18 @@ import {
   AuthRefreshDiscardedError,
   AuthRetryableFetchError,
   AuthUnknownError,
+  createClient,
 } from "@supabase/supabase-js";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SIGN_OUT_TIMEOUT_MS } from "./api-client.ts";
 import {
   createSupabaseSessionAdapter,
   isAuthOutage,
   parseAuthCallback,
+  signOutEvenOffline,
+  supabaseStorageKey,
   type SupabaseSessionAuth,
+  type SupabaseSessionStorage,
 } from "./supabase-session.ts";
 
 function auth(overrides: Partial<SupabaseSessionAuth> = {}): SupabaseSessionAuth {
@@ -23,6 +28,95 @@ function auth(overrides: Partial<SupabaseSessionAuth> = {}): SupabaseSessionAuth
     ...overrides,
   };
 }
+
+// The real auth-js this package installs, against a network that is down. A stub would only
+// repeat what this file believes auth-js does, and the whole bug is that it does something else.
+const PROJECT_URL = "https://abcdefghijklmnop.supabase.co";
+const now = (): number => Math.floor(Date.now() / 1000);
+const base64Url = (value: object): string =>
+  btoa(JSON.stringify(value)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+
+function storedSession(expiresAt: number) {
+  const user = {
+    id: "11111111-1111-4111-8111-111111111111",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "someone@example.test",
+    app_metadata: {},
+    user_metadata: {},
+    created_at: "2026-01-01T00:00:00Z",
+  };
+  const claims = { sub: user.id, exp: expiresAt, aud: "authenticated", role: "authenticated" };
+  return {
+    access_token: `${base64Url({ alg: "HS256", typ: "JWT" })}.${base64Url(claims)}.signature`,
+    refresh_token: `refresh-${expiresAt}`,
+    token_type: "bearer",
+    expires_in: expiresAt - now(),
+    expires_at: expiresAt,
+    user,
+  };
+}
+
+function memoryStorage(): SupabaseSessionStorage["storage"] {
+  const items = new Map<string, string>();
+  return {
+    getItem: (key) => items.get(key) ?? null,
+    setItem: (key, value) => {
+      items.set(key, value);
+    },
+    removeItem: (key) => {
+      items.delete(key);
+    },
+  };
+}
+
+const unreachable: typeof fetch = async () => {
+  throw new TypeError("fetch failed");
+};
+
+function reachable(paths: string[] = []): typeof fetch {
+  return async (input) => {
+    const { pathname } = new URL(input instanceof Request ? input.url : input);
+    paths.push(pathname);
+    if (pathname.endsWith("/token")) return Response.json(storedSession(now() + 3600));
+    if (pathname.endsWith("/logout")) return new Response(null, { status: 204 });
+    return Response.json({ msg: "not part of this test" }, { status: 404 });
+  };
+}
+
+function authClient(stored: SupabaseSessionStorage, fetch: typeof fetch) {
+  return createClient(PROJECT_URL, "anon-key", {
+    // Off so that starting the client does not refresh an expired session by itself: the refresh
+    // under test is the one `signOut()` makes.
+    auth: { ...stored, autoRefreshToken: false },
+    global: { fetch },
+  }).auth;
+}
+
+async function signedIn(expiresAt: number, fetch = unreachable) {
+  const stored: SupabaseSessionStorage = {
+    storage: memoryStorage(),
+    storageKey: supabaseStorageKey(PROJECT_URL),
+  };
+  await stored.storage.setItem(stored.storageKey, JSON.stringify(storedSession(expiresAt)));
+  const auth = authClient(stored, fetch);
+  const events: string[] = [];
+  auth.onAuthStateChange((event) => {
+    events.push(event);
+  });
+  await auth.initialize();
+  return { stored, auth, signedOut: () => events.filter((e) => e === "SIGNED_OUT").length };
+}
+
+/** What a reload reads: a new client on the same storage, with the network back. */
+async function sessionAfterReload(stored: SupabaseSessionStorage) {
+  const { data } = await authClient(stored, reachable()).getSession();
+  return data.session;
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("createSupabaseSessionAdapter", () => {
   it("reads the current token and the refreshed token", async () => {
@@ -107,6 +201,102 @@ describe("createSupabaseSessionAdapter", () => {
 
     await expect(adapter.signOut()).rejects.toBe(refusal);
     expect(signOut).toHaveBeenCalledOnce();
+  });
+
+  it("with `stored`, rejects when auth never heard it, but the session has left", async () => {
+    vi.useFakeTimers();
+    const { stored, auth } = await signedIn(now() - 60);
+    const adapter = createSupabaseSessionAdapter(auth, stored);
+
+    const rejected = expect(adapter.signOut()).rejects.toMatchObject({
+      message: expect.stringContaining(`${SIGN_OUT_TIMEOUT_MS} ms`),
+    });
+    await vi.advanceTimersByTimeAsync(SIGN_OUT_TIMEOUT_MS);
+    await rejected;
+
+    expect(await stored.storage.getItem(stored.storageKey)).toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+});
+
+describe("signOutEvenOffline", () => {
+  it("is needed: signOut() alone keeps an expired session when auth is unreachable", async () => {
+    // The positive control for every test below: the reload check can see a live session.
+    vi.useFakeTimers();
+    const { stored, auth, signedOut } = await signedIn(now() - 60);
+
+    const signingOut = auth.signOut();
+    // auth-js retries the refresh with a backoff it gives up on inside 30 s.
+    await vi.advanceTimersByTimeAsync(60_000);
+    const { error } = await signingOut;
+
+    expect(error).toBeInstanceOf(AuthRetryableFetchError);
+    expect(signedOut()).toBe(0);
+    vi.useRealTimers();
+    expect(await sessionAfterReload(stored)).not.toBeNull();
+  });
+
+  it("removes an expired session within the deadline when auth cannot be reached", async () => {
+    vi.useFakeTimers();
+    const { stored, auth, signedOut } = await signedIn(now() - 60);
+
+    const signingOut = signOutEvenOffline(auth, stored);
+    await vi.advanceTimersByTimeAsync(SIGN_OUT_TIMEOUT_MS);
+    const { error } = await signingOut;
+
+    // auth-js is still in its refresh backoff, so it is the deadline that answered.
+    expect(error).toMatchObject({ message: expect.stringContaining(`${SIGN_OUT_TIMEOUT_MS} ms`) });
+    expect(await stored.storage.getItem(stored.storageKey)).toBeNull();
+    // SIGNED_OUT comes from the local sign-out, once auth-js is done with the first call.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(signedOut()).toBe(1);
+    vi.useRealTimers();
+    expect(await sessionAfterReload(stored)).toBeNull();
+  });
+
+  it("removes a valid session when /logout gets no answer, and says SIGNED_OUT once", async () => {
+    // The installed auth-js removes this one itself and still returns the error, so this is the
+    // branch that must not remove it a second time: that would send SIGNED_OUT twice.
+    const { stored, auth, signedOut } = await signedIn(now() + 3600);
+
+    const { error } = await signOutEvenOffline(auth, stored);
+    // A second sign-out would not be awaited, so give it the time to speak before counting.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(error).toBeInstanceOf(AuthRetryableFetchError);
+    expect(await stored.storage.getItem(stored.storageKey)).toBeNull();
+    expect(signedOut()).toBe(1);
+    expect(await sessionAfterReload(stored)).toBeNull();
+  });
+
+  it("ends the session on the server too when auth answers", async () => {
+    const paths: string[] = [];
+    const { stored, auth, signedOut } = await signedIn(now() + 3600, reachable(paths));
+
+    const { error } = await signOutEvenOffline(auth, stored);
+
+    expect(error).toBeNull();
+    expect(paths).toContain("/auth/v1/logout");
+    expect(signedOut()).toBe(1);
+    expect(await sessionAfterReload(stored)).toBeNull();
+  });
+});
+
+describe("supabaseStorageKey", () => {
+  it("names the key supabase-js picks when you set none", async () => {
+    const storage = memoryStorage();
+    await storage.setItem(
+      supabaseStorageKey(PROJECT_URL),
+      JSON.stringify(storedSession(now() + 3600)),
+    );
+    const auth = createClient(PROJECT_URL, "anon-key", {
+      auth: { storage, autoRefreshToken: false },
+      global: { fetch: unreachable },
+    }).auth;
+
+    const { data } = await auth.getSession();
+
+    expect(data.session).not.toBeNull();
   });
 });
 

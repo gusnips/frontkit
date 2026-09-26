@@ -1,5 +1,12 @@
-import { isAuthError, isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supabase-js";
-import type { SessionAdapter } from "./api-client.ts";
+import {
+  isAuthError,
+  isAuthRetryableFetchError,
+  type SignOut,
+  type SupabaseClient,
+  type SupabaseClientOptions,
+  type SupportedStorage,
+} from "@supabase/supabase-js";
+import { SIGN_OUT_TIMEOUT_MS, type SessionAdapter } from "./api-client.ts";
 
 interface SupabaseSessionResult {
   data: { session: { access_token: string } | null };
@@ -9,12 +16,27 @@ interface SupabaseSessionResult {
 export interface SupabaseSessionAuth {
   getSession(): Promise<SupabaseSessionResult>;
   refreshSession(): Promise<SupabaseSessionResult & { error: unknown }>;
-  signOut(): Promise<{ error: unknown }>;
+  signOut(options?: SignOut): Promise<{ error: unknown }>;
+}
+
+/**
+ * Where auth-js keeps the session: the two `createClient` options it reads it from. Build the
+ * object once and pass it both as `createClient`'s `auth` and to {@link signOutEvenOffline}, so
+ * the key the helper clears is the key auth-js writes because they are one value, not because
+ * two copies happen to agree. A wrong key would read as "auth-js already removed it", and the
+ * session would stay.
+ */
+export interface SupabaseSessionStorage {
+  storage: SupportedStorage;
+  storageKey: string;
 }
 
 type Satisfied<T extends true> = T;
 type _SupabaseAuthFitsAdapter = Satisfied<
   SupabaseClient["auth"] extends SupabaseSessionAuth ? true : false
+>;
+type _StorageFitsCreateClient = Satisfied<
+  SupabaseSessionStorage extends NonNullable<SupabaseClientOptions<"public">["auth"]> ? true : false
 >;
 
 /**
@@ -72,14 +94,101 @@ function reachedAuth(error: unknown): boolean {
 }
 
 /**
+ * supabase-js's default storage key: `sb-`, the first label of the project's host name, and
+ * `-auth-token`. Set it as `storageKey` yourself rather than leaving it to the default. The value
+ * is the same, so nobody who is signed in gets signed out by the change, and the key no longer
+ * depends on supabase-js working it out the same way in the next version.
+ */
+export function supabaseStorageKey(supabaseUrl: string): string {
+  return `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token`;
+}
+
+/**
+ * Signs out, and makes sure the session leaves this device even when auth cannot be reached.
+ *
+ * `auth.signOut()` alone does not. In two cases it resolves `{ error }` and keeps the stored
+ * session. Both were measured on nine auth-js versions from 2.106.2 to 2.117.2; run
+ * `bun why @supabase/auth-js` to see which one you have:
+ *
+ * - The access token has expired, or is close enough to expiring that auth-js refreshes it
+ *   first, and the network is down. The refresh fails and `signOut()` returns that error before
+ *   it touches storage. This happens at every version, and it is the common case: a laptop that
+ *   wakes up offline with a tab still open.
+ * - Before 2.110.2, the token is still good but `/logout` gets no answer. `signOut()` returns
+ *   before it removes anything. `scope: "local"` does not help, because it calls `/logout` too.
+ *
+ * Either way a reload reads the session and signs the person back in. On a shared computer, that
+ * person is whoever sits down next. A screen that says "signed out" at that point is wrong.
+ *
+ * Removing the key yourself is not enough on its own: nothing tells your `onAuthStateChange`
+ * listeners or your other tabs, and auth-js's PKCE verifiers stay behind. So after removing it,
+ * this calls `signOut({ scope: "local" })`. That call finds no session, skips `/logout`, and runs
+ * auth-js's own cleanup: every key it owns, and one `SIGNED_OUT` to every listener.
+ *
+ * It waits on auth for {@link SIGN_OUT_TIMEOUT_MS} at most. Offline with an expired token,
+ * `signOut()` first sits in auth-js's refresh backoff, which measured 15 s at 2.108.2 through
+ * 2.116.0 and 41–51 s at 2.106.2. Nobody at a shared computer waits that long, and a page that
+ * navigates away in the meantime takes the removal with it.
+ *
+ * It resolves once the stored session is gone. `error` is `null` when auth ended the session on
+ * the server too. Otherwise it is the reason auth did not — its error, a thrown value, or the
+ * deadline — and the session may still be live on the server and on other devices. `SIGNED_OUT`
+ * arrives once auth-js has finished with the first call: about 100 ms later from 2.108.2 on, and
+ * up to 22 s later at 2.106.2. If your screen does not reload, clear your own store when this
+ * resolves instead of waiting for the event.
+ */
+export async function signOutEvenOffline(
+  auth: Pick<SupabaseSessionAuth, "signOut">,
+  { storage, storageKey }: SupabaseSessionStorage,
+): Promise<{ error: unknown }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<{ error: unknown }>((resolve) => {
+    timer = setTimeout(
+      () =>
+        resolve({
+          error: new Error(`Auth did not answer the sign-out within ${SIGN_OUT_TIMEOUT_MS} ms`),
+        }),
+      SIGN_OUT_TIMEOUT_MS,
+    );
+  });
+  const { error } = await Promise.race([
+    auth.signOut().catch((thrown: unknown) => ({ error: thrown })),
+    deadline,
+  ]);
+  clearTimeout(timer);
+  if (error == null) return { error: null };
+  // From 2.110.2 on, auth-js has already removed the session when only `/logout` failed, and has
+  // already sent SIGNED_OUT. Going on would send it a second time.
+  if ((await storage.getItem(storageKey)) === null) return { error };
+  await storage.removeItem(storageKey);
+  // Not awaited: inside auth-js it can wait behind the first call, which may still be in its
+  // refresh backoff. The session is already out of storage, and storage is what a reload reads.
+  void auth.signOut({ scope: "local" }).catch(() => {});
+  return { error };
+}
+
+/**
  * Connects a Supabase auth client to {@link SessionAdapter}.
  *
  * The distinction this preserves is the one that decides whether anybody is signed out: only
  * auth ANSWERING proves a session is gone. A fetch that never landed says nothing about it, and
  * neither does a 5xx, which is auth failing rather than auth answering. A thrown network error
  * stays on that side of the line too.
+ *
+ * Pass `stored` and `signOut` goes through {@link signOutEvenOffline}. That changes what its
+ * rejection means. It still rejects when auth did not end the session, but by then the session
+ * has already left this device. And a sign-out auth has not answered within
+ * {@link SIGN_OUT_TIMEOUT_MS} now rejects instead of hanging. Without `stored`, it is
+ * `auth.signOut()` and rejects on that call's error, as before.
+ *
+ * `stored` is optional here but not at a sign-out button. The API client signs out only after
+ * auth has answered: a refresh auth refused, or a new token the API refused. So the network was up
+ * a moment earlier, and what `stored` covers is the connection dropping in between.
  */
-export function createSupabaseSessionAdapter(auth: SupabaseSessionAuth): SessionAdapter {
+export function createSupabaseSessionAdapter(
+  auth: SupabaseSessionAuth,
+  stored?: SupabaseSessionStorage,
+): SessionAdapter {
   return {
     getToken: async () => {
       const { data } = await auth.getSession();
@@ -97,7 +206,7 @@ export function createSupabaseSessionAdapter(auth: SupabaseSessionAuth): Session
       }
     },
     signOut: async () => {
-      const { error } = await auth.signOut();
+      const { error } = stored ? await signOutEvenOffline(auth, stored) : await auth.signOut();
       if (error) throw error;
     },
   };
