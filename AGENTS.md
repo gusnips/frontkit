@@ -1131,12 +1131,18 @@ shipped in the same tarball, disagreeing about the name of a field.
   seeing only a 5xx, spent two more requests and about three seconds of spinner on each. Deriving
   the button from the retry rule is what surfaced it, and the fix was one shared list rather than
   either consumer changing its mind.
-- **A code that means two things is a contract gap, not a client decision.** A third 503 in that
-  same family has two raisers — "not configured on this deployment" (durable) and "did not answer
-  just now", which the server tags `severity: "transient"`. The envelope carries no severity, so
-  the client cannot separate them and would be wrong for half the cases whichever way it chose. It
-  stayed off the list, with the reason written beside the list. **Declining to guess is an
-  outcome; leaving the guess undocumented is not.**
+- **Count only the raisers whose error reaches the wire.** A third 503 in that same family was
+  left off the list because it had two raisers: "not configured on this deployment" (durable) and
+  "did not answer just now", which the server tags `severity: "transient"`. The envelope carries
+  no severity, so this bullet called it a contract gap the client could not close. **That was
+  wrong, and a re-read on 2026-09-27 showed why.** The transient raisers are job failures. The
+  server writes them to a job row with their own severity, and they never travel as an HTTP error.
+  The one raiser a client meets is the check at job creation, and it reads configuration only, so
+  it clears with a deploy and never with a wait. The code joined the list, and the SDK beside it,
+  which had treated it as final all along, was right. A search for who raises a code answers a
+  different question from where that error goes. What made the fix cheap was the reason written
+  beside the list: **declining to guess is an outcome, and an undocumented guess is not**, because
+  only a written reason can be checked and reversed.
 - **A bug class checked and found absent is a result worth the reading.** Migration 5's brand-var
   substituter bug — names declared but not matched, so legal text shipped raw placeholders — was
   checked here against the same file shape: four names declared, four matched. Clean. The check
