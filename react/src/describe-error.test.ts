@@ -152,8 +152,8 @@ describe("createErrorDescriber", () => {
   });
 
   it("offers a retry on a 5xx and withholds it on a 4xx", () => {
-    // A 5xx genuinely clears on its own. A 4xx does not, and saying so would cost the reader
-    // another attempt for nothing.
+    // A plain 5xx clears on its own. A 403 does not, and saying so would cost the reader another
+    // attempt for nothing.
     expect(describeError(new ApiError(503, null)).fix).toBe("errors.retrySoon");
     expect(describeError(new ApiError(403, null)).fix).toBeUndefined();
   });
@@ -178,7 +178,7 @@ describe("the recovery kind", () => {
     copyPrefix: "errors.",
     messageKeyPrefix: "serverErrors.",
     knownMessageKeys: { quotaDay: "" },
-    durableLimitCodes: ["QUOTA_EXCEEDED"],
+    durableLimitCodes: ["QUOTA_EXCEEDED", "NOT_CONFIGURED"],
     formatWait: (secs) => humanizeWait(t, secs, "errors."),
   });
 
@@ -221,6 +221,37 @@ describe("the recovery kind", () => {
     const error = new ApiError(503, null);
     expect(shouldRetry(error)).toBe(true);
     expect(describeError(error).recover).toBe("retry");
+  });
+
+  it("never says to try again beside a 5xx the rule will not retry", () => {
+    // A 503 only a deploy clears. "Try again in a moment" over no button is the same two answers
+    // to one question, reached through the words instead of the control.
+    const durable = describeError(new ApiError(503, { code: "NOT_CONFIGURED", message: "off" }));
+    expect(durable.recover).toBe("none");
+    expect(durable.fix).toBeUndefined();
+    // The server can say it too, with an explicit `null` wait, and no list involved.
+    const never = describeError(
+      new ApiError(503, { code: "X", message: "", details: { retryAfterSecs: null } }),
+    );
+    expect(never.recover).toBe("none");
+    expect(never.fix).toBeUndefined();
+
+    expect(describeError(new ApiError(503, null))).toMatchObject({
+      recover: "retry",
+      fix: "errors.retrySoon",
+    });
+  });
+
+  it("says 'in a moment' over a countdown only when the wait is one", () => {
+    // An hour is not a moment. The countdown says when, and the words stay out of its way.
+    const long = describeError(new ApiError(503, null, { retryAfterSecs: 3600 }));
+    expect(long.recover).toBe("wait");
+    expect(long.fix).toBeUndefined();
+    // Short enough that react-query waits it out itself, so "in a moment" is true.
+    expect(describeError(new ApiError(503, null, { retryAfterSecs: 5 }))).toMatchObject({
+      recover: "wait",
+      fix: "errors.retrySoon",
+    });
   });
 
   it("carries the request id the error contract reserves a slot for", () => {
@@ -341,7 +372,8 @@ describe("fallback", () => {
       { retryAfterSecs: 120 },
     );
     expect(describeError(error).fix).toBe('errors.retryIn(errors.waitMinutes({"count":2}))');
-    expect(createErrorDescriber(options)(error).fix).toBe("errors.retrySoon");
+    // Two minutes is past what the query layer waits out, so the built-in says nothing at all.
+    expect(createErrorDescriber(options)(error).fix).toBeUndefined();
   });
 
   it("leaves the derived recovery kind alone unless the arm narrows it", () => {

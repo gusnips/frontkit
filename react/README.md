@@ -396,7 +396,8 @@ adopter writing `fix={hint}` at every error surface.
 `recover` is derived from `shouldRetry` — the same rule react-query retries on — so the button a
 reader sees and the retry that actually happens cannot disagree. Give it the same
 `durableLimitCodes` list you give `queryDefaults`, and a spent quota offers no button instead of
-one that cannot work.
+one that cannot work. The words follow it too: "try again in a moment" appears only on a 5xx that
+react-query would retry by itself, so never beside a durable refusal or a long countdown.
 
 `formatWait` says how a stated wait becomes words:
 

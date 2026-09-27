@@ -385,15 +385,28 @@ export function createErrorDescriber<
     // the session is fine and it is a different account that would help, so it falls through.
     if (error.status === 401) return "signin";
     // It named its own expiry, so there is a real number to count down beside a disabled button.
+    // Before the durable list on purpose: a server that says when a refusal clears is believed
+    // (invariant 8). "wait" is a countdown the reader watches, not a request anyone sends, so a
+    // durable quota that resets in an hour is honest as one. Whether the query layer should wait
+    // that hour by itself is a different question, and `shouldRetry` answers it: no.
     if (waitSecs !== null) return "wait";
     return shouldRetry(error, durableLimitCodes, maxRetryWaitSecs) ? "retry" : "none";
   }
 
   /**
    * Anything `codes` does not name. The server's own sentence is still the most specific thing
-   * we have, and support can act on it. A 5xx additionally gets "try again shortly", because that
-   * one genuinely does clear on its own — a 4xx does not, and saying so would be a lie that costs
-   * the reader another attempt.
+   * we have, and support can act on it. A 5xx additionally gets "try again shortly" — but only
+   * when `recover` says trying can work. A 503 whose code is on `durableLimitCodes` clears with a
+   * deploy, never a wait, and "try again in a moment" above no button is two answers to one
+   * question: the drift `recover` exists to prevent, arriving through the words instead. One
+   * adopter's checkout said "…write to us. Try again in a moment." with `recover: "none"`.
+   *
+   * A stated wait gets the line only while it is a moment: short enough that `shouldRetry` waits
+   * it out itself (`maxRetryWaitSecs`). Past that, "in a moment" over an hour's countdown is wrong
+   * the other way round, so the countdown carries it alone and an arm with `ctx.wait` can say when.
+   *
+   * A 4xx gets nothing here even where the rule retries it (408, 425, a 429). A 429 usually states
+   * its wait, and those words belong to an arm for the same reason.
    *
    * No `code` means no envelope, and then `message` is not the server's: it is the client's own
    * `Request failed (502)`, written for a log. A gateway answering with HTML while the API
@@ -405,9 +418,14 @@ export function createErrorDescriber<
    */
   const unmapped: ErrorArm =
     fallback ??
-    (({ error, says }) => ({
+    (({ error, says, recover }) => ({
       cause: says ?? ((error.code === undefined ? "" : error.message) || copyOf("unexpected")),
-      fix: error.status >= 500 ? copyOf("retrySoon") : undefined,
+      fix:
+        error.status >= 500 &&
+        (recover === "retry" ||
+          (recover === "wait" && shouldRetry(error, durableLimitCodes, maxRetryWaitSecs)))
+          ? copyOf("retrySoon")
+          : undefined,
     }));
 
   return function describeError(error: unknown): DescribedError {
