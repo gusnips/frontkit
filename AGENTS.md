@@ -70,6 +70,10 @@ install. It stays off the main entry because that entry is about addresses: a se
 which the main entry already uses, but it runs in CI and never in a build. A prerender script
 reading `bakeHead` should not load it.
 
+`@gusnips/vite/contrast` is the fourth subpath no peer forced (the third, `@gusnips/http/retry`,
+is below). It shells the Tailwind CLI over the adopter's own entry, so `tailwindcss` and
+`@tailwindcss/cli` are optional peers reachable only from there.
+
 `@gusnips/http/retry` is the third. Invariant 8's rule moved there from `@gusnips/react` so an SDK
 with no React in it can follow it, and every server imports the main entry for the envelope and
 never retries anything. `@gusnips/react` re-exports `retryAfterSecs` from it and keeps

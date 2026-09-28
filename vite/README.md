@@ -274,6 +274,40 @@ If the app merges fragments at runtime with a spread (`{ ...auth.en, ...nav.en }
 off and set `ownTopLevel: true`. A spread keeps only the second of two fragments that share a
 top-level key, so that is refused.
 
+## Check your contrast
+
+```ts
+// scripts/check-contrast.ts
+import { checkContrast, formatContrastReport } from "@gusnips/vite/contrast";
+
+const report = await checkContrast([
+  { name: "web", entry: "src/index.css", sources: ["src/**/*.{ts,tsx}"] },
+]);
+
+console.log(formatContrastReport(report));
+process.exit(report.problems.some((p) => p.level === "error") ? 1 : 0);
+```
+
+The tokens package measures the placeholder colours it ships. This measures yours: it compiles
+your entry with the real Tailwind CLI and reads the CSS that comes back.
+
+| It fails when                                                      | Because the reader gets                                   |
+| ------------------------------------------------------------------ | --------------------------------------------------------- |
+| `--color-input` is under 3:1 on `--color-background`, either mode  | a field border some people cannot see                     |
+| `--color-foreground` is under 4.5:1 on the background, either mode | body copy some people cannot read                         |
+| `--color-primary` is the same fill in both modes                   | a control that lands on the 3:1 line at night             |
+| a token has no value in `.dark`                                    | one mode keeping the other mode's colour                  |
+| a class paints from a colour your `@theme` never declares          | `text-white` reading right at noon and vanishing at night |
+
+A floor it cannot measure fails too: a value that is not a hex colour (or a `var()` chain to
+one) is a floor nobody is keeping. State variants are held to the same token rule, and a
+`hover:` that paints the same fill the base already has is a warning — the state changes
+nothing. A class that compiles to no rule at all is a warning as well: a token Tailwind does
+not have, or a class built dynamically that no scan can see.
+
+Pass `allow: [/^bg-brand-/]` for the classes a repo means. Floors take no allow list: a
+measured ratio is not a judgement call.
+
 ## The vite preset
 
 ```ts

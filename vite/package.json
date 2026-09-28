@@ -18,6 +18,10 @@
       "types": "./dist/preset.d.ts",
       "default": "./dist/preset.js"
     },
+    "./contrast": {
+      "types": "./dist/contrast.d.ts",
+      "default": "./dist/contrast.js"
+    },
     "./i18n": {
       "types": "./dist/i18n.d.ts",
       "default": "./dist/i18n.js"
@@ -72,14 +76,16 @@
     "@gusnips/react": "workspace:*"
   },
   "peerDependencies": {
+    "@tailwindcss/cli": "^4",
     "@tailwindcss/vite": "^4",
     "@vitejs/plugin-react": "^6",
     "react": "^19",
     "react-dom": "^19",
+    "tailwindcss": "^4",
     "vite": "^8"
   },
   "peerDependenciesMeta": {
-    "@tailwindcss/vite": {
+    "@tailwindcss/cli": {
       "optional": true
     },
     "@vitejs/plugin-react": {
@@ -91,11 +97,15 @@
     "react-dom": {
       "optional": true
     },
+    "tailwindcss": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
     "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
@@ -103,6 +113,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^8.0.1",
     "vitest": "^4.1.2"
