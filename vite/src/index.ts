@@ -43,6 +43,15 @@ export {
   type WriteOgCardsOptions,
 } from "./node.ts";
 export {
+  webManifest,
+  writeIconSet,
+  type ManifestIcon,
+  type PackIco,
+  type RenderIcon,
+  type WebManifestOptions,
+  type WriteIconSetOptions,
+} from "./icons.ts";
+export {
   describeOverflow,
   fitText,
   OG_CANVAS,
