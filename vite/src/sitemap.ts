@@ -55,6 +55,25 @@ export function siteOrigin(url: string): string {
 }
 
 /**
+ * The origin the template already declares, read out of its canonical.
+ *
+ * One file is the answer for the head Vite ships and for every file written after it, so there
+ * is no second place for a domain to drift to — no env var the script has to resolve beside
+ * it. Demanded rather than defaulted, for the reason `bakeHead` demands the tag: a template
+ * without one would hand every page somebody else's origin, quietly.
+ */
+export function templateOrigin(template: string): string {
+  const href =
+    /<link[^>]*rel="canonical"[^>]*href="([^"]*)"/.exec(template)?.[1] ??
+    /<link[^>]*href="([^"]*)"[^>]*rel="canonical"/.exec(template)?.[1];
+  if (href === undefined)
+    throw new Error('prerender: <link rel="canonical"> not found in index.html');
+  // A canonical names a PAGE, not the origin — drop the path. `siteOrigin` first, for its
+  // scheme demand: `VITE_SITE_URL=acme.com` looks right in a `.env` and is a relative URL.
+  return new URL(siteOrigin(href)).origin;
+}
+
+/**
  * The three things about a public page that do not translate: where it is, how often it
  * changes, and how it ranks against its siblings.
  *

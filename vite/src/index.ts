@@ -26,8 +26,10 @@ export {
   assertRendered,
   bakeHead,
   EMPTY_ROOT,
+  faqJsonLd,
   ogLocale,
   type Alternate,
+  type FaqEntry,
   type HeadTags,
   type RenderedChecks,
 } from "./head.ts";
@@ -63,6 +65,7 @@ export {
   siteOrigin,
   sitemapFor,
   sitemapXml,
+  templateOrigin,
   type PublicPage,
   type RobotsOptions,
   type SitemapEntry,

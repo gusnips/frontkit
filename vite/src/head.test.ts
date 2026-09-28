@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PRERENDERED_ROUTE_ATTR } from "@gusnips/react";
-import { assertRendered, bakeHead, ogLocale } from "./head.ts";
+import { assertRendered, bakeHead, faqJsonLd, ogLocale } from "./head.ts";
 
 /**
  * Every failure `bakeHead` has is invisible until somebody reads a search result months later
@@ -430,5 +430,45 @@ describe("assertRendered", () => {
     expect(() => assertRendered("pt/pricing.html", html, shell, { lang: "pt-BR" })).toThrow(
       /not marked as pt-BR/,
     );
+  });
+});
+
+describe("faqJsonLd", () => {
+  // One donor's template carried four questions where the page renders seven: the fix is to
+  // generate the block from the same strings, not to keep a second copy beside them.
+  it("writes one Question per entry, with the page's own strings", () => {
+    const script = faqJsonLd([
+      { question: "Can my number get banned?", answer: "Yes, if you spam." },
+      { question: "Is there a free plan?", answer: "Yes." },
+    ]);
+    expect(script.startsWith('<script type="application/ld+json">')).toBe(true);
+    expect(script).toContain('"@type":"FAQPage"');
+    expect(script).toContain('"name":"Can my number get banned?"');
+    expect(script).toContain('"text":"Yes, if you spam."');
+    expect(script.match(/"@type":"Question"/g)).toHaveLength(2);
+  });
+
+  // A `</script>` inside an answer ends the element early and ships the rest of the JSON as
+  // markup. `<\/` is the same string to a JSON parser and inert to an HTML one.
+  it("escapes a script-closing sequence inside an answer", () => {
+    const script = faqJsonLd([
+      { question: "What if I write code?", answer: "Wrap it: </script> ends the block." },
+    ]);
+    expect(script).not.toContain("</script> ends");
+    expect(script).toContain("<\\/script> ends");
+    // …and what it emits still parses, back to the original copy.
+    const json = script.replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "");
+    const parsed = JSON.parse(json) as {
+      mainEntity: Array<{ acceptedAnswer: { text: string } }>;
+    };
+    expect(parsed.mainEntity[0]?.acceptedAnswer.text).toBe("Wrap it: </script> ends the block.");
+  });
+
+  // The positive control for the direction that flatters: an answer WITH markup must fail this
+  // test if the escaping ever stops running, not pass because the assertion went missing.
+  it("leaves no raw `</` sequence anywhere in the block", () => {
+    const script = faqJsonLd([{ question: "q", answer: "a </b> b <!-- c" }]);
+    const inner = script.replace(/<script[^>]*>/g, "").replace(/<\/script>/g, "");
+    expect(inner).not.toMatch(/<\//);
   });
 });
