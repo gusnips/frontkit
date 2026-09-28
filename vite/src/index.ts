@@ -9,12 +9,13 @@
  * Four repos wrote it independently and each learned something the others had not. What is
  * here is the merge; every non-obvious rule carries the reason it exists.
  *
- * Three things live behind their own subpath, because each drags a dependency this barrel would
+ * Five things live behind their own subpath, because each drags a dependency this barrel would
  * otherwise force on everyone: the vite config preset at `@gusnips/vite/preset` (the React and
- * Tailwind plugins), `renderTree` at `@gusnips/vite/render`, and the theme pre-paint plugin at
- * `@gusnips/vite/theme` (both React itself). Nothing here
- * imports React or vite, so a prerender script, an OG generator and a repo that only wants a
- * sitemap all install exactly what they use.
+ * Tailwind plugins), `renderTree` at `@gusnips/vite/render`, the theme pre-paint plugin at
+ * `@gusnips/vite/theme` (both React itself), the catalog check at `@gusnips/vite/i18n`, and the
+ * contrast gate at `@gusnips/vite/contrast` (tailwindcss) — the last two run in CI and never in
+ * a build. Nothing here imports React, vite or tailwindcss, so a prerender script, an OG
+ * generator and a repo that only wants a sitemap all install exactly what they use.
  */
 export { resolveKey } from "./catalog.ts";
 // `headExtra` takes raw markup, so the moment an adopter builds a tag out of its own copy it
@@ -26,8 +27,10 @@ export {
   assertRendered,
   bakeHead,
   EMPTY_ROOT,
+  faqJsonLd,
   ogLocale,
   type Alternate,
+  type FaqEntry,
   type HeadTags,
   type RenderedChecks,
 } from "./head.ts";
@@ -40,6 +43,15 @@ export {
   type OgCard,
   type WriteOgCardsOptions,
 } from "./node.ts";
+export {
+  webManifest,
+  writeIconSet,
+  type ManifestIcon,
+  type PackIco,
+  type RenderIcon,
+  type WebManifestOptions,
+  type WriteIconSetOptions,
+} from "./icons.ts";
 export {
   describeOverflow,
   fitText,
@@ -63,6 +75,7 @@ export {
   siteOrigin,
   sitemapFor,
   sitemapXml,
+  templateOrigin,
   type PublicPage,
   type RobotsOptions,
   type SitemapEntry,

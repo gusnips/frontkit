@@ -185,6 +185,37 @@ export function ogLocale(tag: string): string {
   return TERRITORY[tag] ?? tag.replace("-", "_");
 }
 
+/** One question and its answer, as the page renders them — pass the same strings, so the
+ *  structured data cannot drift from the copy. One donor's template carried four questions
+ *  where the page renders seven, and nothing compared them until the migration. */
+export interface FaqEntry {
+  question: string;
+  answer: string;
+}
+
+/**
+ * FAQ structured data for `headExtra`, with the script-closing sequence escaped.
+ *
+ * A `</script>` inside an answer ends the element early and ships the rest of the JSON as
+ * markup. `<\/` is the same string to a JSON parser and inert to an HTML one, so every `</`
+ * becomes `<\/` and `<!--` becomes `<\!--`. `JSON.stringify` never emits `<` outside a string
+ * — the structural characters are all brackets, quotes and digits — so the replace only ever
+ * touches copy.
+ */
+export function faqJsonLd(faqs: readonly FaqEntry[]): string {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((faq) => ({
+      "@type": "Question",
+      name: faq.question,
+      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+    })),
+  };
+  const json = JSON.stringify(data).replace(/<\//g, "<\\/").replace(/<!--/g, "<\\!--");
+  return `<script type="application/ld+json">${json}</script>`;
+}
+
 /**
  * One page's `<head>` and body, written into the built template.
  *

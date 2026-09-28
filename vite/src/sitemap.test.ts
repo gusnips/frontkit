@@ -7,6 +7,7 @@ import {
   siteOrigin,
   sitemapFor,
   sitemapXml,
+  templateOrigin,
 } from "./sitemap.ts";
 
 describe("pageFile", () => {
@@ -120,5 +121,28 @@ describe("robotsTxt", () => {
     });
     expect(txt).toContain("Disallow: /opt-out/");
     expect(txt.startsWith("User-agent: *\nAllow: /\n")).toBe(true);
+  });
+});
+
+describe("templateOrigin", () => {
+  // One file is the answer for the head Vite ships and for every file written after it: read
+  // the domain out of the template's own canonical instead of resolving a second source.
+  it("reads the origin out of the template's canonical", () => {
+    const template = `<html><head><link rel="canonical" href="https://acme.com/" /></head></html>`;
+    expect(templateOrigin(template)).toBe("https://acme.com");
+  });
+
+  it("reads the reversed attribute order too", () => {
+    const template = `<html><head><link href="https://acme.com/docs" rel="canonical" /></head></html>`;
+    expect(templateOrigin(template)).toBe("https://acme.com");
+  });
+
+  // Demanded, like the tag is in `bakeHead`: a template without one would hand every page
+  // somebody else's origin, quietly.
+  it("refuses a template with no canonical, and a relative one", () => {
+    expect(() => templateOrigin("<html><head></head></html>")).toThrow(/canonical/);
+    expect(() =>
+      templateOrigin(`<html><head><link rel="canonical" href="/pricing" /></head></html>`),
+    ).toThrow(/absolute origin/);
   });
 });
