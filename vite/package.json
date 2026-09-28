@@ -88,6 +88,9 @@
     "@tailwindcss/cli": {
       "optional": true
     },
+    "@tailwindcss/vite": {
+      "optional": true
+    },
     "@vitejs/plugin-react": {
       "optional": true
     },
