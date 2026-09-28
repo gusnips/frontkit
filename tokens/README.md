@@ -42,7 +42,11 @@ Skip the second line and your daytime purple stays on screen at night.
 
 ## Two names you cannot pick freely
 
-A build check measures both, so a bad value fails your build instead of reaching someone.
+The compile check in this repo measures the placeholders below, so a bad default fails our
+build instead of reaching someone. Your overrides need the same measurement, or a bad value
+reaches someone through your files instead: run the contrast gate from `@gusnips/vite` — one
+script in CI — and it fails your build on both rules below, plus every colour outside your
+theme.
 
 - **`--color-input` needs 3:1 against `--color-background`.** It is a field border, and WCAG
   1.4.11 asks 3:1 of anything that outlines a control. This is the one people miss: a grey
