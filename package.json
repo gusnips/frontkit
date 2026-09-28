@@ -23,7 +23,7 @@
     "exports": "bun run scripts/check-exports.ts",
     "release:check": "bun run scripts/check-release.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check . --cache --cache-strategy content --cache-location .cache/prettier-cache",
     "check": "bun run format:check && bun run build && bun run lint && bun run typecheck && bun run purity && bun run exports && bun run test"
   },
   "devDependencies": {
