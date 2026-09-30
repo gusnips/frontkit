@@ -303,9 +303,12 @@ what you want.
 when it builds. If turbo's cache ignores them, a production build can reuse the bundle a staging
 build saved, with the staging API address inside. One team shipped exactly that.
 
-turbo 2.11 already adds `VITE_*` on its own when a workspace depends on vite. Keep the line anyway.
+turbo already adds `VITE_*` on its own when a workspace depends on vite. Keep the line anyway.
 We turned that guess off (`--framework-inference=false`) and removed the line: the build got no
 API address at all, and the next build reused that broken bundle from the cache.
+
+A `<package>#build` entry replaces `build` instead of adding to it. So if you add one, for example
+to list `dist-ssr/**`, repeat the `env` line and the `dependsOn` in it.
 
 ### TypeScript
 
