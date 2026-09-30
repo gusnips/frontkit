@@ -748,11 +748,17 @@ siblings in one tree and only one of them ever got the fix.
   production pass different values. A build right after a staging build is a cache hit, so
   production ships pointing at `stg.` on every address and talking to the staging API, and nothing
   about it looks wrong. `"env": ["VITE_*"]` as a wildcard, because every variable with that prefix
-  goes into the bundle by definition. turbo 2.11 now adds `VITE_*` by itself for a workspace
-  that depends on vite, and the line stays anyway: with that inference off and the line gone, a
-  build came out with no API address at all, and the next build replayed it from the cache.
-  **Every repo on this stack had the same file — all eleven carry the fix now (2026-09-11).**
-  Check it only when a new repo joins the stack.
+  goes into the bundle by definition. turbo's framework inference adds `VITE_*` by itself for a
+  workspace that depends on vite (seen on 2.10 and 2.11, so this said "2.11 now" wrongly), and the
+  line stays anyway: with that inference off and the line gone, a build came out with no API
+  address at all, and the next build replayed it from the cache.
+  **This said every repo on the stack carried the fix (2026-09-11), and two did not.** A fleet
+  drift check on 2026-09-30 found one repo whose `turbo.json` never named `VITE_*`, and one whose
+  site and docs entries had dropped it: a `<pkg>#build` entry REPLACES `build` rather than merging
+  with it, so an entry written to add `dist-ssr/**` resolved to no env and no `dependsOn`
+  (`--dry=json`). Both were covered only by the inference. Measured with the inference off, which
+  is the only way the gap shows: the hash did not move with the variable. Repeat the env in every
+  `<pkg>#build` entry, and check with `--framework-inference=false`, never with the default.
 - **The sibling app is the finding.** Three times over, in one tree: the admin's own
   `isChunkLoadError` matched Chrome's phrasing and not Firefox's, so a stale deploy read as a hard
   crash on Firefox; the admin's `vite:preloadError` handler reloaded the whole page for a CSS
