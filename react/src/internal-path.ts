@@ -30,8 +30,9 @@ export function safeInternalPath(value: unknown): string | null {
 
 /**
  * The keys an OAuth or OIDC implicit response puts in the fragment that are themselves credentials
- * (RFC 6749 §4.2.2, plus the two a provider token is passed through under). The rest of that
- * response — `expires_in`, `token_type`, `state`, `type` — is metadata, worthless on its own.
+ * (RFC 6749 §4.2.2, plus the two a provider token is passed through under, plus `token_hash`, the
+ * single-use hash a Supabase email link carries and `verifyOtp` trades for a session). The rest of
+ * that response — `expires_in`, `token_type`, `state`, `type` — is metadata, worthless on its own.
  */
 const CREDENTIAL_FRAGMENT_KEYS = [
   "access_token",
@@ -39,6 +40,7 @@ const CREDENTIAL_FRAGMENT_KEYS = [
   "id_token",
   "provider_token",
   "provider_refresh_token",
+  "token_hash",
 ];
 
 /** Anything shaped like the current page: `window.location` and react-router's `useLocation()`. */
