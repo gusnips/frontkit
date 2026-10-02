@@ -61,7 +61,7 @@ Everything is generic over your own code union. Two codebases this came from had
 codes, overlapping on nine — a code list is an API's vocabulary and belongs to it.
 
 ```ts
-import { asErrorCode, isApiError, type ApiError } from "@gusnips/http";
+import { asErrorCode, isApiError, type ApiErrorBody } from "@gusnips/http";
 
 type Code = "NOT_FOUND" | "RATE_LIMITED" | "UNKNOWN";
 const CODES = ["NOT_FOUND", "RATE_LIMITED", "UNKNOWN"] as const;
@@ -96,9 +96,9 @@ error, instead of a route answering 500 for a refusal it knew how to explain.
 `@gusnips/http/retry` answers that, and says how long to wait first.
 
 ```ts
-import { shouldRetry } from "@gusnips/http/retry";
+import { isRetryable } from "@gusnips/http/retry";
 
-shouldRetry({ status: 503 }, { repeatable: true }); // → true
+isRetryable({ status: 503 }, { repeatable: true }); // → true
 ```
 
 It reads fields, not a class, so your SDK's own error type works as it is: `status`, `code` and
@@ -108,13 +108,13 @@ counts too, after the header. An error with no `status` got no answer at all: of
 dropped connection.
 
 ```ts
-import { retryDelayMs, shouldRetry } from "@gusnips/http/retry";
+import { retryDelayMs, isRetryable } from "@gusnips/http/retry";
 
 for (let attempt = 0; ; attempt++) {
   try {
     return await send();
   } catch (error) {
-    if (attempt >= 2 || !shouldRetry(error, { repeatable })) throw error;
+    if (attempt >= 2 || !isRetryable(error, { repeatable })) throw error;
     await new Promise((resolve) => setTimeout(resolve, retryDelayMs(attempt, error)));
   }
 }

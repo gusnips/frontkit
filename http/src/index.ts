@@ -49,7 +49,7 @@ export interface ApiSuccess<T, M = PaginationMeta> {
  *   ACTIONABLE — the `resetAt` on a 429, the plan that lifts a 402. A refusal a caller cannot
  *   act on is a dead end, which is the thing the whole product rule exists to prevent.
  */
-export interface ApiError<Code extends string = string> {
+export interface ApiErrorBody<Code extends string = string> {
   error: {
     code: Code;
     /** English fallback — for logs, curl output and agents. Not shown when `messageKey` resolves. */
@@ -84,16 +84,16 @@ export interface ValidationIssue {
 }
 
 export type ApiResponse<T, Code extends string = string, M = PaginationMeta> =
-  ApiSuccess<T, M> | ApiError<Code>;
+  ApiSuccess<T, M> | ApiErrorBody<Code>;
 
 /** True when a parsed body is the error half of the envelope. */
-export function isApiError<Code extends string>(body: unknown): body is ApiError<Code> {
+export function isApiError<Code extends string>(body: unknown): body is ApiErrorBody<Code> {
   return (
     typeof body === "object" &&
     body !== null &&
     "error" in body &&
-    typeof (body as ApiError).error === "object" &&
-    (body as ApiError).error !== null
+    typeof (body as ApiErrorBody).error === "object" &&
+    (body as ApiErrorBody).error !== null
   );
 }
 

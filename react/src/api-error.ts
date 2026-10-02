@@ -1,4 +1,4 @@
-import type { ApiError as ApiErrorBody } from "@gusnips/http";
+import type { ApiErrorBody } from "@gusnips/http";
 
 /**
  * A refusal, with the whole envelope intact.

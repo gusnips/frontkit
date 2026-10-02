@@ -1,4 +1,4 @@
-import { retryDelayMs as delayFor, shouldRetry as retryRule } from "@gusnips/http/retry";
+import { retryDelayMs as delayFor, isRetryable as retryRule } from "@gusnips/http/retry";
 import type { DefaultOptions } from "@tanstack/react-query";
 import { ApiError } from "./api-error.ts";
 
