@@ -59,7 +59,7 @@ export async function renderTree(tree: ReactNode): Promise<string> {
   const markup = html.replace(HOISTED_HEAD, "");
   if (markup.trim() === "")
     throw new Error(
-      "renderTree: the tree rendered to nothing — usually a router whose location or basename " +
+      "renderTree: the tree rendered to nothing. Usually a router whose location or basename " +
         "matches no route, which React reports as an empty string rather than an error",
     );
   return markup;

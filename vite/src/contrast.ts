@@ -334,7 +334,7 @@ async function checkBundle(
         problem({
           rule: "floor",
           message:
-            `${mode}: cannot measure ${token} on ${against} — one of them is no longer a ` +
+            `${mode}: cannot measure ${token} on ${against}, because one of them is no longer a ` +
             `hex colour. Keep the values hex, or teach this check the new notation; ` +
             `do not let the floor go unmeasured.`,
         });
@@ -357,7 +357,7 @@ async function checkBundle(
       if (!dark.has(name))
         problem({
           rule: "rebind",
-          message: `\`${name}\` is missing from the .dark block — one mode keeps the light value`,
+          message: `\`${name}\` is missing from the .dark block, so one mode keeps the light value`,
         });
     }
     // A fill chosen against a white page lands on the 3:1 line on a near-black card instead of
@@ -369,7 +369,7 @@ async function checkBundle(
       problem({
         rule: "retune",
         message:
-          `--color-primary (${day}) is the same fill in both modes — lift it for dark, and ` +
+          `--color-primary (${day}) is the same fill in both modes. Lift it for dark, and ` +
           `flip --color-primary-foreground with it`,
       });
     }
@@ -406,7 +406,7 @@ async function checkBundle(
         class: cls,
         at: firstAt(scanned, cls),
         message:
-          "compiled to no rule — a token Tailwind does not have, or a class built dynamically",
+          "compiled to no rule: a token Tailwind does not have, or a class built dynamically",
       });
       continue;
     }
@@ -425,7 +425,7 @@ async function checkBundle(
             rule: "untokened",
             class: cls,
             at: `${file}:${String(line)}`,
-            message: `paints ${prop} with a literal colour — point it at a theme token instead`,
+            message: `paints ${prop} with a literal colour. Point it at a theme token instead`,
           });
         }
         continue;
@@ -438,8 +438,8 @@ async function checkBundle(
             class: cls,
             at: `${file}:${String(line)}`,
             message:
-              `paints ${prop} from \`${token}\`, which the theme never declares — ` +
-              `a default-palette rung that reads right in one mode and vanishes in the other`,
+              `paints ${prop} from \`${token}\`, which the theme never declares. ` +
+              `A default-palette rung reads right in one mode and vanishes in the other`,
           });
         }
       }
@@ -457,7 +457,7 @@ async function checkBundle(
         class: variant,
         at: firstAt(scanned, variant),
         message:
-          `paints the same ${base} the base state already has — the state changes nothing. ` +
+          `paints the same ${base} the base state already has, so the state changes nothing. ` +
           `If these are on different elements, ignore this.`,
       });
     }

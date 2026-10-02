@@ -455,5 +455,5 @@ export function assertRendered(
   // guard missed it from the other side: it failed a file containing a spinner class its splash
   // does not use. Two checks written for one regression, neither of which could ever fire.
   if (grew < SPLASH_MAX_GROWTH && head.includes('role="status"'))
-    fail("rendered the loading screen, not the page — something suspended and never resolved");
+    fail("rendered the loading screen, not the page. Something suspended and never resolved");
 }

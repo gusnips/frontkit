@@ -35,7 +35,7 @@ export async function loadTemplate(distDir: string): Promise<string> {
   if (!template.includes(EMPTY_ROOT))
     throw new Error(
       `prerender: ${file} does not carry ${EMPTY_ROOT}. Either it is already a rendered page ` +
-        "— run `vite build` to regenerate the shell this reads — or the app's root element " +
+        "(run `vite build` to regenerate the shell this reads), or the app's root element " +
         "carries attributes, which the baker cannot fill.",
     );
   return template;
@@ -75,7 +75,7 @@ export async function loadRenderer<Context = unknown>(
   const mod: unknown = await import(pathToFileURL(entryFile).href);
   if (!exportsRenderer<Context>(mod))
     throw new Error(
-      `prerender: ${entryFile} does not export renderPage — run \`vite build --ssr\` first`,
+      `prerender: ${entryFile} does not export renderPage. Run \`vite build --ssr\` first`,
     );
   return mod.renderPage;
 }
@@ -139,7 +139,7 @@ export async function writeOgCards<Page>({
 
   if (overflows.length > 0)
     throw new Error(
-      `og: ${String(overflows.length)} card(s) cannot hold their copy —\n\n` +
+      `og: ${String(overflows.length)} card(s) cannot hold their copy:\n\n` +
         overflows.map((o) => `  · ${describeOverflow(o)}`).join("\n\n") +
         "\n\n  Shorten the copy, or change the size ladder deliberately. Nothing was written.",
     );
@@ -247,7 +247,7 @@ export async function assertOgImages(distDir: string, origin: string): Promise<n
 
   if (missing.length > 0)
     throw new Error(
-      `og: ${String(missing.length)} page(s) advertise a share card that is not in ${distDir} —\n\n` +
+      `og: ${String(missing.length)} page(s) advertise a share card that is not in ${distDir}:\n\n` +
         missing.map((card) => `  · ${card.page} → ${card.url}`).join("\n") +
         "\n\n  Either render the card, or leave `image` out of the head for that page.",
     );

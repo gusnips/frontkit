@@ -121,7 +121,7 @@ export function webManifest({
 }: WebManifestOptions): string {
   if (name.trim() === "") throw new Error("manifest: `name` is empty");
   if (icons.length === 0)
-    throw new Error("manifest: `icons` is empty — name what writeIconSet wrote");
+    throw new Error("manifest: `icons` is empty. Name what writeIconSet wrote");
   const manifest: Record<string, unknown> = { name };
   if (shortName !== undefined) manifest["short_name"] = shortName;
   if (description !== undefined) manifest["description"] = description;

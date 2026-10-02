@@ -49,7 +49,7 @@ export function pageFile(routePath: string): string {
 export function siteOrigin(url: string): string {
   if (!/^https?:\/\/[^/]+/.test(url))
     throw new Error(
-      `prerender: "${url}" is not an absolute origin — it needs a scheme, as in https://example.com`,
+      `prerender: "${url}" is not an absolute origin. It needs a scheme, as in https://example.com`,
     );
   return url.replace(/\/+$/, "");
 }

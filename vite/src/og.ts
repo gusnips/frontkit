@@ -96,7 +96,7 @@ export function fitText(text: string, options: FitOptions): FitResult {
 /** One overflow, as the line an operator reads in a failed build. */
 export function describeOverflow(overflow: OgOverflow): string {
   return (
-    `${overflow.label} — ${String(overflow.maxLines)} lines of ~${String(overflow.maxChars)} ` +
+    `${overflow.label}: ${String(overflow.maxLines)} lines of ~${String(overflow.maxChars)} ` +
     `chars at ${String(overflow.size)}px, ${String(overflow.text.length)} chars given\n` +
     `    ${JSON.stringify(overflow.text)}`
   );
