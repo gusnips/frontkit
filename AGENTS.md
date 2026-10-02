@@ -219,6 +219,14 @@ Per package: `cd react && bun run test`, etc.
   without a catalog is the one that split. The immunity is the catalog, so a repo that does not keep
   one gets the per-workspace check by hand.
 
+  **`@gusnips/http` rides in that pin too, and so does every package that asks for it.** `react`
+  pins `http` exactly at pack time, so moving `react` moves `http` for the adopter. A package of
+  ours that names an older `http` in a caret (`@gusnips/sdkgen` asked for `^0.1.5`) then leaves the
+  adopter with two copies as soon as `react` passes a minor. Measured at `http` 0.2.0, which renamed
+  `ApiError` and `shouldRetry`: `bun why @gusnips/http` printed 0.1.6 and 0.2.0 in an adopter that
+  had only bumped `react`. So a breaking change in `http` is a release of `react`, `vite`, `server`
+  and `sdkgen` together, and an adopter moves all four, then regenerates its SDK, in one commit.
+
 ## What must NOT be shared
 
 This rule is what keeps the package alive; violating it is how design systems die. Each of
