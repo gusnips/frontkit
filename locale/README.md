@@ -1,7 +1,7 @@
 # @gusnips/locale
 
 Where a language lives in a URL, how it crosses to another origin, which one a reader asked for,
-and what day it is in a time zone. No dependencies, and nothing tied to a framework — your API
+and what day it is in a time zone. No dependencies, and nothing tied to a framework: your API
 server, your browser entry and your prerender script all compile these same files.
 
 ```bash
@@ -18,7 +18,7 @@ localePath("pt-BR", "/terms"); // → "/pt/terms"
 
 ## One list in, nine functions out
 
-The list of languages and which one is the default are yours — they are your content plan, not
+The list of languages and which one is the default are yours: they are your content plan, not
 plumbing. Everything derived from them is here.
 
 ```ts
@@ -38,8 +38,8 @@ Every function is typed on your list, so `localePath("fr", "/")` is a compile er
 | -------------------------------------- | ------------------------------------------------------------------------ |
 | `localePath(locale, path)`             | `("pt-BR", "/terms")` → `/pt/terms`. The default locale is unprefixed.   |
 | `splitLocalePath(pathname)`            | The inverse: `/pt/terms` → `{ locale: "pt-BR", path: "/terms" }`.        |
-| `localePrefix(locale)`                 | `""`, `/pt`, `/es` — the prefix on its own.                              |
-| `localeSegment(locale)`                | `""`, `pt`, `es` — the segment without the slash.                        |
+| `localePrefix(locale)`                 | `""`, `/pt`, `/es`: the prefix on its own.                               |
+| `localeSegment(locale)`                | `""`, `pt`, `es`: the segment without the slash.                         |
 | `asLocale(value)`                      | Narrows an untrusted string to one of yours, or `null`.                  |
 | `matchLocale(tags)`                    | The first of a reader's languages you ship: `["pt-PT", "en"]` → `pt-BR`. |
 | `localeFromAcceptLanguage(header)`     | The same, from an `Accept-Language` header.                              |
@@ -49,7 +49,7 @@ Every function is typed on your list, so `localePath("fr", "/")` is a compile er
 ## Why the default language has no prefix
 
 `/terms` and `/pt/terms`, not `/en/terms` and `/pt/terms`. Asymmetric on purpose: every address
-you have already published stays valid, and the bare root needs no redirect — which is the thing
+you have already published stays valid, and the bare root needs no redirect, which is the thing
 a crawler handles worst, and it is what `x-default` points at, so it has to be a real page.
 
 The reason any of this exists is that **one address serving three languages by sniffing the
@@ -145,7 +145,7 @@ fallback is yours to pick.
 
 It reads every tag, ranked by `q`, and skips `q=0`, which means "not this one". Reading only the
 first tag is the common bug: the reader above is German and also reads Portuguese, and gets your
-default language instead — on the account, and in every e-mail after.
+default language instead, on the account, and in every e-mail after.
 
 `matchLocale(tags)` does the same for a list you already have, like `navigator.languages`. Both
 keep the redirect script's rule: go through the reader's languages in their order, and for each
@@ -173,7 +173,7 @@ localeQueryUrl("https://app.example.com", "pt-BR", "/register");
 ```
 
 On the receiving side, read that parameter **before** storage and the browser, and cache it on
-arrival — it is the only one of the three the reader chose on purpose and just now. With
+arrival. It is the only one of the three the reader chose on purpose and just now. With
 `@gusnips/react`:
 
 ```ts
@@ -201,7 +201,7 @@ A day only exists in a time zone. At 22:00 in São Paulo it is already the next 
 server that asks "what day is it" without naming a zone gets its own machine's answer. Every
 function here takes the zone as an argument, and none of them reads the machine's.
 
-A date with no time — a due date, a birthday — is a **day key**: the string `"2026-09-23"`, which
+A date with no time (a due date, a birthday) is a **day key**: the string `"2026-09-23"`, which
 is what a Postgres `date` column holds. Keep it a string, and compare it as one:
 
 ```ts
@@ -217,7 +217,7 @@ part of the day: pin it to noon, and the invoice shows overdue from noon on the 
 | `wallClock(at, zone)`                             | The day, hour, minute, second and weekday there.                                            |
 | `zonedInstant(day, "09:00", zone)`                | The instant a wall time names. A skipped time moves forward; a doubled one takes the first. |
 | `startOfDay(day, zone)`                           | When a day begins: midnight, or 01:00 where the clocks skipped midnight.                    |
-| `periodAt(at, zone)`                              | The day and month keys, and when each one ends — for a daily cap or a monthly quota.        |
+| `periodAt(at, zone)`                              | The day and month keys, and when each one ends, for a daily cap or a monthly quota.         |
 | `addDays`, `addMonths`, `daysBetween`, `monthKey` | Arithmetic on day keys. `addMonths("2026-01-31", 1)` is `"2026-02-28"`.                     |
 | `formatDayKey(day, locale)`                       | `("2026-09-23", "pt-BR")` → `23/09/2026`, on every machine.                                 |
 | `parseDayKey(raw)`                                | A real date in `YYYY-MM-DD` form, or `null`. Check untrusted input with it.                 |
@@ -226,7 +226,7 @@ part of the day: pin it to noon, and the invoice shows overdue from noon on the 
 Use `formatDayKey`, not `new Date(day).toLocaleDateString()`. That reads the key as midnight UTC
 and prints it in the reader's zone, which is the day before for everyone west of UTC.
 
-Which zone to use is your call — the customer's, your billing zone, or UTC — and nothing here
+Which zone to use is your call (the customer's, your billing zone, or UTC), and nothing here
 guesses. It uses only `Intl`, so it runs on a server, in a browser and in a Worker.
 
 ## Two things it does not do

@@ -1,7 +1,7 @@
 # @gusnips/http
 
 The two shapes your API answers with, written down once as types. No dependencies, and nothing
-tied to a framework or a platform — your server, your browser client and your SDK all compile
+tied to a framework or a platform: your server, your browser client and your SDK all compile
 this same file.
 
 ```bash
@@ -58,7 +58,7 @@ the value that was sent, the validator's own sentence, or the list of allowed va
 ## The codes are yours
 
 Everything is generic over your own code union. Two codebases this came from had 30 codes and 16
-codes, overlapping on nine — a code list is an API's vocabulary and belongs to it.
+codes, overlapping on nine. A code list is an API's vocabulary and belongs to it.
 
 ```ts
 import { asErrorCode, isApiError, type ApiErrorBody } from "@gusnips/http";
