@@ -43,9 +43,9 @@ const DEFAULT_MAX_WAIT_SECS = 10;
 /**
  * Should this failure be retried?
  *
- *     if (attempt < 3 && shouldRetry(error, { repeatable: method === "GET" || !!key }))
+ *     if (attempt < 3 && isRetryable(error, { repeatable: method === "GET" || !!key }))
  */
-export function shouldRetry(error: unknown, options: RetryOptions): boolean {
+export function isRetryable(error: unknown, options: RetryOptions): boolean {
   const { repeatable, durableCodes = [], maxWaitSecs = DEFAULT_MAX_WAIT_SECS } = options;
   const status = statusOf(error);
   // No answer at all: nothing about it is a refusal, but a write may have landed before the
@@ -139,7 +139,7 @@ export function parseRetryAfter(value: string | null | undefined): number | unde
  * frees when another job ends. Present-and-`null` is the whole test; an absent key said nothing.
  *
  * Not exported. It is not "is this refusal durable?": it knows nothing of `durableCodes` or of a
- * wait too long to hold, so a screen branching on it would disagree with `shouldRetry`.
+ * wait too long to hold, so a screen branching on it would disagree with `isRetryable`.
  */
 function waitingNeverHelps(error: unknown): boolean {
   const details = field(error, "details");

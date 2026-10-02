@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { parseRetryAfter, retryAfterSecs, retryDelayMs, shouldRetry } from "./retry.ts";
+import { parseRetryAfter, retryAfterSecs, retryDelayMs, isRetryable } from "./retry.ts";
 
 // Plain objects on purpose: the rule reads fields, never a class, so an SDK's own error type and
 // a react client's `ApiError` get the same answer.
@@ -10,25 +10,25 @@ const never = (status: number) => answer(status, { details: { retryAfterSecs: nu
 const read = { repeatable: true };
 const write = { repeatable: false };
 
-describe("shouldRetry", () => {
+describe("isRetryable", () => {
   // Offline, DNS, a dropped connection. A read runs again; a write may already have landed.
   it("retries no answer only when the request may run twice", () => {
-    expect(shouldRetry(new TypeError("Failed to fetch"), read)).toBe(true);
-    expect(shouldRetry(new TypeError("Failed to fetch"), write)).toBe(false);
+    expect(isRetryable(new TypeError("Failed to fetch"), read)).toBe(true);
+    expect(isRetryable(new TypeError("Failed to fetch"), write)).toBe(false);
   });
 
   // auth-js reports "nothing came back" as status 0, and a missing status is the same thing.
   it("reads a status below 100 as no answer", () => {
-    expect(shouldRetry(answer(0), read)).toBe(true);
-    expect(shouldRetry(answer(0), write)).toBe(false);
-    expect(shouldRetry(answer(Number.NaN), write)).toBe(false);
+    expect(isRetryable(answer(0), read)).toBe(true);
+    expect(isRetryable(answer(0), write)).toBe(false);
+    expect(isRetryable(answer(Number.NaN), write)).toBe(false);
   });
 
   it("retries a 5xx only when the request may run twice", () => {
     for (const status of [500, 502, 503, 504]) {
-      expect(shouldRetry(answer(status), read)).toBe(true);
+      expect(isRetryable(answer(status), read)).toBe(true);
       // The write may have run before the gateway gave up: a second one charges twice.
-      expect(shouldRetry(answer(status), write)).toBe(false);
+      expect(isRetryable(answer(status), write)).toBe(false);
     }
   });
 
@@ -36,55 +36,55 @@ describe("shouldRetry", () => {
   // one no SDK in the fleet retried; 425 is "too early" for data sent in a TLS handshake.
   it("retries 408, 425 and 429 either way", () => {
     for (const status of [408, 425, 429]) {
-      expect(shouldRetry(answer(status), read)).toBe(true);
-      expect(shouldRetry(answer(status), write)).toBe(true);
+      expect(isRetryable(answer(status), read)).toBe(true);
+      expect(isRetryable(answer(status), write)).toBe(true);
     }
   });
 
   it("does not retry a 4xx that is an answer", () => {
     for (const status of [400, 401, 402, 403, 404, 409, 422, 451]) {
-      expect(shouldRetry(answer(status), read)).toBe(false);
+      expect(isRetryable(answer(status), read)).toBe(false);
     }
   });
 
   // `@gusnips/server`'s createIdempotency answers a key whose first call is still running with a
   // 409 and a wait. Given up on, the caller had to send the whole request again by hand.
   it("waits out a 409 that says when it clears, if the request may run twice", () => {
-    expect(shouldRetry(waited(409, 2), read)).toBe(true);
-    expect(shouldRetry(answer(409, { details: { retryAfterSecs: 10 } }), read)).toBe(true);
-    expect(shouldRetry(waited(409, 2), write)).toBe(false);
-    expect(shouldRetry(waited(409, 60), read)).toBe(false);
+    expect(isRetryable(waited(409, 2), read)).toBe(true);
+    expect(isRetryable(answer(409, { details: { retryAfterSecs: 10 } }), read)).toBe(true);
+    expect(isRetryable(waited(409, 2), write)).toBe(false);
+    expect(isRetryable(waited(409, 60), read)).toBe(false);
   });
 
   it("does not retry a code the caller says does not clear by waiting", () => {
     const options = { ...read, durableCodes: ["QUOTA_EXCEEDED"] };
-    expect(shouldRetry(answer(429, { code: "QUOTA_EXCEEDED" }), options)).toBe(false);
-    expect(shouldRetry(answer(503, { code: "QUOTA_EXCEEDED" }), options)).toBe(false);
+    expect(isRetryable(answer(429, { code: "QUOTA_EXCEEDED" }), options)).toBe(false);
+    expect(isRetryable(answer(503, { code: "QUOTA_EXCEEDED" }), options)).toBe(false);
     // The burst limit next to it still retries, which is the whole point of naming codes.
-    expect(shouldRetry(answer(429, { code: "RATE_LIMITED" }), options)).toBe(true);
+    expect(isRetryable(answer(429, { code: "RATE_LIMITED" }), options)).toBe(true);
   });
 
   // No SDK in the fleet read this. The server sends it for a limit no wait clears.
   it("does not retry a refusal whose body says waiting never helps", () => {
-    expect(shouldRetry(never(429), read)).toBe(false);
-    expect(shouldRetry(never(503), read)).toBe(false);
+    expect(isRetryable(never(429), read)).toBe(false);
+    expect(isRetryable(never(503), read)).toBe(false);
     // An absent key is silence, not the claim.
-    expect(shouldRetry(answer(429, { details: { scope: "account" } }), read)).toBe(true);
+    expect(isRetryable(answer(429, { details: { scope: "account" } }), read)).toBe(true);
     // `details` comes off the wire, so a JSON null there must not throw inside the rule.
-    expect(shouldRetry(answer(429, { details: null }), read)).toBe(true);
+    expect(isRetryable(answer(429, { details: null }), read)).toBe(true);
   });
 
   // A limiter can put a number on every 429; the null came from whoever raised this refusal.
   it("takes an explicit never over a stated wait", () => {
     const both = answer(429, { retryAfterSecs: 2, details: { retryAfterSecs: null } });
-    expect(shouldRetry(both, read)).toBe(false);
+    expect(isRetryable(both, read)).toBe(false);
   });
 
   it("does not retry a stated wait longer than the ceiling, which is inclusive", () => {
-    expect(shouldRetry(waited(429, 10), read)).toBe(true);
-    expect(shouldRetry(waited(429, 11), read)).toBe(false);
-    expect(shouldRetry(waited(503, 300), read)).toBe(false);
-    expect(shouldRetry(waited(429, 60), { ...read, maxWaitSecs: 90 })).toBe(true);
+    expect(isRetryable(waited(429, 10), read)).toBe(true);
+    expect(isRetryable(waited(429, 11), read)).toBe(false);
+    expect(isRetryable(waited(503, 300), read)).toBe(false);
+    expect(isRetryable(waited(429, 60), { ...read, maxWaitSecs: 90 })).toBe(true);
   });
 });
 
