@@ -44,6 +44,7 @@ describe("returnPathFromLocation", () => {
     "id_token",
     "provider_token",
     "provider_refresh_token",
+    "token_hash",
   ])("drops a fragment carrying %s, and keeps the page", (key) => {
     expect(
       returnPathFromLocation({
