@@ -20,11 +20,12 @@
     "typecheck": "bun run --filter '*' typecheck",
     "lint": "eslint tokens http locale br react vite",
     "purity": "bun run scripts/check-purity.ts",
+    "no-em-dash": "bun run scripts/check-no-em-dash.ts",
     "exports": "bun run scripts/check-exports.ts",
     "release:check": "bun run scripts/check-release.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check . --cache --cache-strategy content --cache-location .cache/prettier-cache",
-    "check": "bun run format:check && bun run build && bun run lint && bun run typecheck && bun run purity && bun run exports && bun run test"
+    "check": "bun run format:check && bun run build && bun run lint && bun run typecheck && bun run purity && bun run no-em-dash && bun run exports && bun run test"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
