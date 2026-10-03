@@ -2,15 +2,15 @@
  * Where a language lives in an address, and how it crosses to another one.
  *
  * Six repos on this stack wrote this file. Four of its five functions are byte-identical in all
- * six — same regex, same asymmetry, same comments — and the fifth differs only in a parameter
- * name. What is NOT in all six is the half that decides whether a reader keeps the language they
- * picked: one repo had {@link Locales.localeUrl} and {@link Locales.localeQueryUrl}, and three
- * shipped the bug their absence causes.
+ * six, with the same regex, asymmetry and comments. The fifth differs only in a parameter name.
+ * What is NOT in all six is the half that decides whether a reader keeps the language they picked:
+ * one repo had {@link Locales.localeUrl} and {@link Locales.localeQueryUrl}, and three shipped the
+ * bug their absence causes.
  *
- * Zero dependencies and its own package, on purpose. An API server reads `asLocale` at its edges
- * — measured across six repos, that plus the locale list is ALL a server uses — and a server
- * depending on a package named "react" is a smell even when it costs nothing at runtime. Nothing
- * in frontkit depends on this one, so it is a leaf: no version of it can pin a sibling.
+ * Zero dependencies and its own package, on purpose. An API server reads `asLocale` at its edges.
+ * Measured across six repos, that plus the locale list is ALL a server uses. A server depending on
+ * a package named "react" is a smell even when it costs nothing at runtime. Nothing in frontkit
+ * depends on this one, so it is a leaf: no version of it can pin a sibling.
  */
 
 import { runLocaleGate, type GateConfig } from "./gate.ts";
@@ -19,13 +19,12 @@ import { runLocaleGate, type GateConfig } from "./gate.ts";
  *
  *  Pass it to `i18nInitOptions({ queryKey: LOCALE_QUERY_PARAM })` as well, and the reader and the
  *  writer of the language agree by construction. They are the same idea named twice otherwise,
- *  and one repo needed a test asserting the two strings matched — a test that only exists because
- *  there were two strings. */
+ *  and one repo needed a test asserting the two strings matched. That test only exists because there were two strings. */
 export const LOCALE_QUERY_PARAM = "lang";
 
 /** What {@link createLocales} returns: the address shape for one product's closed locale list. */
 export interface Locales<L extends string> {
-  /** Narrow an untrusted string — a column, a header, a query parameter — to a locale we ship. */
+  /** Narrow an untrusted string from a column, header or query parameter to a locale we ship. */
   asLocale: (value: string | null | undefined) => L | null;
   /** The locale we ship that a reader's preference list asks for first: `["pt-PT", "en"]` → `pt-BR`. */
   matchLocale: (tags: readonly string[]) => L | null;
@@ -48,7 +47,7 @@ export interface Locales<L extends string> {
 /**
  * The address shape for one product's locales.
  *
- * The list and the default are the product's — they are its content plan, not plumbing, the same
+ * The list and the default belong to the product. They are its content plan, not plumbing, the same
  * way an API's error codes are its own vocabulary. Everything derived from them is here.
  *
  * ```ts
@@ -267,7 +266,7 @@ export interface LocaleGateOptions<L extends readonly string[]> {
    *  them: an app's own screens served beside a public site, e.g. `["/login", "/w"]`. */
   exclude?: readonly string[];
   /** A storage key that means someone is signed in, e.g. `/^sb-.+-auth-token$/`. Their language
-   *  comes from their account, so the gate leaves them alone — and also leaves alone an address
+   *  comes from their account, so the gate leaves them alone. It also leaves alone an address
    *  that carries a sign-in (`access_token=` in the fragment, `code=` in the query). */
   signedInKey?: RegExp;
 }
@@ -277,19 +276,18 @@ export interface LocaleGateOptions<L extends readonly string[]> {
  *
  * The default locale is unprefixed, so `/pricing` is the only address that can be wrong for a
  * reader: every other one names its language. Every repo on this stack sent that reader to
- * `/pt/pricing` from `main.tsx`, "before the first render" — and still showed the English page
- * for about a second, because the render is not the paint. The prerendered file IS the English
- * page, the browser paints it while the bundle downloads, and only then does the entry run.
- * Deciding in a classic `<head>` script is what gets ahead of the paint: it runs before the body
- * is parsed, and the page it leaves is hidden, so nothing of it shows.
+ * `/pt/pricing` from `main.tsx`, "before the first render", yet still showed the English page for
+ * about a second, because the render is not the paint. The prerendered file IS the English page,
+ * the browser paints it while the bundle downloads, and only then does the entry run. Deciding in a
+ * classic `<head>` script is what gets ahead of the paint: it runs before the body is parsed, and
+ * the page it leaves is hidden, so nothing of it shows.
  *
  * A prefixed address wins. On a bare address, a supported query choice wins over storage and the
  * browser, so choosing the default works even with blocked storage or a context-menu new tab.
  * Otherwise a stored choice wins, then the browser's languages in the reader's own order, exact
  * tag before base subtag. Excluded routes and signed-in/auth callbacks stay untouched.
  *
- * Serve it as a FILE, never inline — `@gusnips/vite`'s `prePaintScript` does that — because a
- * `script-src 'self'` policy silently blocks an inline script, and the blink comes back:
+ * Serve it as a FILE with `@gusnips/vite`'s `prePaintScript`, never inline, because a `script-src 'self'` policy silently blocks an inline script, and the blink comes back:
  *
  * ```ts
  * // vite.config.ts
