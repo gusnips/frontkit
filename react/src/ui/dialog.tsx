@@ -22,9 +22,9 @@ export type DialogContentProps = Primitive.Popup.Props & {
    */
   label?: string;
   /**
-   * Label for the built-in close button — REQUIRED to get one, which is the whole point:
-   * passing the label is the only way to render the button, so an unlabelled close button
-   * cannot be written. There is no default string, because a default would be English.
+   * Label for the built-in close button. REQUIRED to render the button: passing the label is the
+   * only way to render the button, so an unlabelled close button cannot be written. There is no
+   * default string, because a default would be English.
    */
   closeLabel?: string;
   backdropClassName?: StateClassName<Primitive.Backdrop.State>;
@@ -39,8 +39,8 @@ export type DialogContentProps = Primitive.Popup.Props & {
  * page behind it) and is capped to the viewport, so a tall dialog is never taller than the
  * screen it opens on.
  *
- * Everything else — padding, radius, shadow, type — is the product's. What is here is what
- * makes the primitive work.
+ * Padding, radius, shadow and type all belong to the product. What is here is what makes the
+ * primitive work.
  */
 export function DialogContent({
   className,

@@ -8,8 +8,7 @@
  * ```
  *
  * Keeping the options here is what stops a console, a storefront and a docs site in the same
- * product from drifting apart on the details below — each of which is a bug somebody already
- * shipped.
+ * product from drifting apart on the details below. Each is a bug somebody already shipped.
  */
 
 export interface I18nInitOptions {
@@ -28,10 +27,10 @@ export interface I18nInitOptions {
   /**
    * The query parameter that hands a language ACROSS an origin, e.g. `"lang"`.
    *
-   * When set it is detected FIRST, ahead of storage and the browser — it is the only one of the
+   * When set it is detected FIRST, ahead of storage and the browser. It is the only one of the
    * three that somebody chose on purpose and just now. A reader who picked Português on the
-   * storefront and followed a link into the app means it more than their laptop's locale does.
-   * It is cached on arrival, so it decides once and no URL inside the app has to carry it.
+   * storefront and followed a link into the app means it more than their laptop's locale does. It
+   * is cached on arrival, so it decides once and no URL inside the app has to carry it.
    *
    * Only one donor had this. The other has the same split-origin layout and the same problem.
    */
@@ -39,15 +38,15 @@ export interface I18nInitOptions {
   /**
    * Who WRITES {@link storageKey}. The detector, by default.
    *
-   * Pass `"app"` when your own language control writes it. That is not a preference — it is what
-   * a "follow the browser" option costs. Going back to following the browser means clearing the
-   * key and calling `changeLanguage(undefined)`, which re-runs detection; a detector that caches
-   * then writes the language it just detected straight back into the key it was told to clear.
-   * The choice re-pins itself and nothing can reach that state again.
+   * Pass `"app"` when your own language control writes it. A "follow the browser" option needs
+   * this. Going back to following the browser means clearing the key and calling
+   * `changeLanguage(undefined)`, which re-runs detection; a detector that caches then writes the
+   * language it just detected straight back into the key it was told to clear. The choice re-pins
+   * itself and nothing can reach that state again.
    *
    * Three repos on this stack, three answers: one lets the detector write, one writes it from its
-   * own control, and one does both — harmless there only because it offers no "follow the
-   * browser" state. So the rule, rather than the default: one writer per key.
+   * own control, and one does both. Doing both is harmless there only because it offers no "follow
+   * the browser" state. So the rule, rather than the default: one writer per key.
    */
   storageWriter?: "detector" | "app";
 }
@@ -106,13 +105,13 @@ export function i18nInitOptions({
  * i18next ever sees it.
  *
  * Done here rather than through interpolation because i18next v26 has no global interpolation
- * defaults, and these strings are often resolved by dynamic key — so a wrapping `t()` would not
+ * defaults, and these strings are often resolved by dynamic key, so a wrapping `t()` would not
  * reach them. The point is that a rename or a domain move is ONE edit in the brand constants
  * instead of a sweep across every locale file.
  *
- * Returns a fresh tree; the input is untouched. The placeholder names come from `vars`, so
- * adding one needs no change here — two donors hardcoded their own list in the regex and both
- * had to remember to update it.
+ * Returns a fresh tree; the input is untouched. The placeholder names come from `vars`, so adding
+ * one needs no change here. Two donors hardcoded their own list in the regex and both had to
+ * remember to update it.
  */
 export function applyBrandVars<T>(resources: T, vars: Record<string, string>): T {
   const names = Object.keys(vars);

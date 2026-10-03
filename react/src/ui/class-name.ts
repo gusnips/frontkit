@@ -10,10 +10,9 @@ export type StateClassName<State> = string | ((state: State) => string | undefin
 /**
  * Merge a wrapper's own classes with the caller's, keeping BOTH forms working.
  *
- * `cn()` on its own silently DROPS the function form — clsx walks strings, arrays and plain
- * objects, and a function is none of the three — so a caller styling by `open` or
- * `transitionStatus` would get an empty class and no warning. Always returning a function
- * keeps one code path for both.
+ * `cn()` on its own silently DROPS the function form. clsx walks strings, arrays and plain objects,
+ * and a function is none of the three, so a caller styling by `open` or `transitionStatus` would
+ * get an empty class and no warning. Always returning a function keeps one code path for both.
  */
 export function mergeClassName<State>(
   base: ClassValue,

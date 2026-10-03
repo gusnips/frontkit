@@ -14,20 +14,19 @@ type TabListLabel =
 
 export type TabListProps = Omit<Primitive.List.Props, "aria-labelledby"> &
   TabListLabel & {
-    /** Classes for the scroll wrapper — the element that owns the sideways scroll. */
+    /** Classes for the wrapper that owns the sideways scroll. */
     wrapperClassName?: string;
   };
 
 /**
  * The rail, and the reason this file exists.
  *
- * It scrolls sideways rather than wrapping, because a second row of tabs pushes the panel
- * below the fold on a phone. But the scroll cannot live on the rail itself: `overflow-x: auto`
- * makes the element a scroll container, a scroll container clips everything its children paint
- * outside the padding box, and a computed `overflow-x` of `auto` forces `overflow-y` from
- * `visible` to `auto` as well. A self-scrolling rail therefore crops the focus ring on all
- * FOUR sides of whichever tab the keyboard is on — top and bottom always, the left of the
- * first tab and the right of the last.
+ * It scrolls sideways rather than wrapping, because a second row of tabs pushes the panel below the
+ * fold on a phone. But the scroll cannot live on the rail itself: `overflow-x: auto` makes the
+ * element a scroll container, a scroll container clips everything its children paint outside the
+ * padding box, and a computed `overflow-x` of `auto` forces `overflow-y` from `visible` to `auto`
+ * as well. A self-scrolling rail therefore crops the focus ring on all FOUR sides of whichever tab
+ * the keyboard is on: top and bottom always, the left of the first tab and the right of the last.
  *
  * So the scroll goes on a wrapper, and the wrapper's padding is the room the ring needs. The
  * number is derived, not inherited: `@gusnips/tokens` draws `outline: 2px solid` at
@@ -68,17 +67,17 @@ export function Tab({ className, ...rest }: Primitive.Tab.Props) {
 }
 
 /**
- * The travelling marker under the active tab — a SEPARATE part, because the two donors
- * disagreed about whether to have one at all and both were right about their own app. Render
- * it or do not; the rail works either way.
+ * The travelling marker under the active tab. A SEPARATE part, because the two donors disagreed
+ * about whether to have one at all and both were right about their own app. Render it or do not;
+ * the rail works either way.
  *
  * It must be a child of `TabList`: Base UI measures the active tab against the enclosing
  * `[role="tablist"]` and writes `--active-tab-left` / `--active-tab-width` onto this element.
  *
- * `renderBeforeHydration` is on by default because this package's apps are prerendered — with
- * it off, every prerendered page shows the rail with no marker until React arrives. It writes
- * one inline script to do that; under a strict CSP without Base UI's `CspProvider` the script
- * is blocked and the behaviour falls back to exactly what `false` would have done.
+ * `renderBeforeHydration` is on by default because this package's apps are prerendered. With it
+ * off, every prerendered page shows the rail with no marker until React arrives. It writes one
+ * inline script to do that; under a strict CSP without Base UI's `CspProvider` the script is
+ * blocked and the behaviour falls back to exactly what `false` would have done.
  */
 export function TabIndicator({ className, ...rest }: Primitive.Indicator.Props) {
   return (

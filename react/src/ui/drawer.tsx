@@ -38,9 +38,9 @@ const popupSide: Record<DrawerSide, string> = {
 /**
  * Where the portal mounts, and whether the drawer covers the page or a box inside it.
  *
- * A scoped drawer positions itself `absolute` against a container instead of `fixed` against
- * the viewport — so it MUST be given that container, or it lands in `<body>` and positions
- * against a box that is not there. The two travel together in the type.
+ * A scoped drawer positions itself `absolute` against a container instead of `fixed` against the
+ * viewport, so it MUST be given that container, or it lands in `<body>` and positions against a box
+ * that is not there. The two travel together in the type.
  *
  * The container also needs a positioning context of its own (`relative`): `absolute` walks up
  * to the nearest positioned ancestor, so a static container hands the drawer the whole page
@@ -56,20 +56,20 @@ export type DrawerProps<Payload = unknown> = Omit<
 > &
   DrawerPortalTarget & {
     /**
-     * Which edge it comes from. This also sets `swipeDirection` on the root — the two must
-     * agree, and a mismatch is silent: the drawer looks right and dismisses on a swipe
-     * towards the screen it is attached to.
+     * Which edge it comes from. This also sets `swipeDirection` on the root. The two must agree,
+     * and a mismatch is silent: the drawer looks right and dismisses on a swipe towards the screen
+     * it is attached to.
      */
     side?: DrawerSide;
     /** Accessible name, for a drawer with no visible `DrawerTitle`. */
     label?: string;
     children?: ReactNode;
-    /** Classes for the popup — the panel itself. */
+    /** Classes for the popup panel. */
     className?: StateClassName<Primitive.Popup.State>;
     backdropClassName?: StateClassName<Primitive.Backdrop.State>;
     viewportClassName?: StateClassName<Primitive.Viewport.State>;
     contentClassName?: StateClassName<Primitive.Content.State>;
-    /** Popup-level props the wrapper does not own — `initialFocus`, `finalFocus`, `data-*`. */
+    /** Popup-level props the wrapper does not own, such as `initialFocus`, `finalFocus` and `data-*`. */
     popupProps?: Primitive.Popup.Props;
   };
 
@@ -78,8 +78,8 @@ export type DrawerProps<Payload = unknown> = Omit<
  * composed once here because the parts have to be arranged in exactly this order to work at
  * all, and because two of the four rules below cost someone a bug that no test would catch.
  *
- * Everything the root takes — `open`, `onOpenChange`, `modal`, `snapPoints`, `actionsRef`,
- * `data-*` — passes straight through.
+ * Every root prop passes straight through, including `open`, `onOpenChange`, `modal`, `snapPoints`,
+ * `actionsRef` and `data-*`.
  */
 export function Drawer<Payload = unknown>({
   side = "right",

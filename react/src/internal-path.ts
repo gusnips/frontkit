@@ -12,9 +12,9 @@ function containsControl(value: string): boolean {
  * A route the browser can follow without leaving the current origin.
  *
  * Return targets cross a trust boundary: query strings, history state and storage are all writable
- * by somebody outside the app. `startsWith("/")` is not enough — URL parsers read both `//host`
- * and `/\\host` as another origin, and strip tabs or newlines before making the same decision.
- * Parsing against a fixed origin applies the browser's own rules rather than trying to copy them.
+ * by somebody outside the app. `startsWith("/")` is not enough: URL parsers read both `//host` and
+ * `/\\host` as another origin, and strip tabs or newlines before making the same decision. Parsing
+ * against a fixed origin applies the browser's own rules rather than trying to copy them.
  */
 export function safeInternalPath(value: unknown): string | null {
   if (typeof value !== "string" || !value.startsWith("/") || containsControl(value)) return null;
@@ -55,14 +55,15 @@ export interface PathParts {
  *
  * The fragment is the half that is easy to get wrong, and getting it wrong leaks a credential. A
  * Supabase client with no `flowType` uses the IMPLICIT flow, which returns the session in the
- * fragment — `#access_token=…&refresh_token=…`. A return target is recorded in a query string, and
- * a query string is not a fragment: it rides in `Referer`, it is written to every access log on the
+ * fragment, `#access_token=…&refresh_token=…`. A return target is recorded in a query string, and a
+ * query string is not a fragment: it rides in `Referer`, it is written to every access log on the
  * way, and it stays in history. So a fragment carrying a credential is dropped and the page is
  * kept, because the page is the part worth returning to and the anchor is the part that is
  * dangerous.
  *
- * Total on purpose — the caller is handing over its OWN address, which is on this origin by
- * construction. Use `safeInternalPath` for the other direction, where someone else wrote the value.
+ * Accepts every caller address on purpose. The caller is handing over its OWN address, which is on
+ * this origin by construction. Use `safeInternalPath` for the other direction, where someone else
+ * wrote the value.
  */
 export function returnPathFromLocation({ pathname, search, hash }: PathParts): string {
   const fragment = hash.startsWith("#") ? hash.slice(1) : hash;

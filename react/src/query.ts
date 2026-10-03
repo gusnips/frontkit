@@ -3,29 +3,28 @@ import type { DefaultOptions } from "@tanstack/react-query";
 import { ApiError } from "./api-error.ts";
 
 /**
- * react-query defaults — the merge of three repos that each got part of this right.
+ * react-query defaults merged from three repos that each got part of this right.
  *
  * The default is three blind retries, which is wrong for an API that answers refusals
  * precisely: a 402, a 403 or a 451 says exactly the same thing three times, and a 429 we hammer
  * is a 429 we deserve. All three donors knew that much. What each knew alone:
  *
  * - one allowed **408** through, the only 4xx that a second attempt genuinely fixes;
- * - one refused to retry a 429 whose CODE says the limit is durable — a monthly quota or a
- *   spent balance clears by buying, not by waiting, so retrying burns another request against
+ * - one refused to retry a 429 whose CODE says the limit is durable. A monthly quota or a spent balance clears by buying, not by waiting, so retrying burns another request against
  *   the limiter and cannot succeed;
  * - one set **`refetchOnReconnect`**, which none of the others had, and which is the single
  *   most useful refetch there is: coming back from a tunnel is exactly when the screen is stale.
  *
  * The second migration added the fourth rule, which no donor had: **when a 429 says how long,
  * believe it.** Its limiter answers `Retry-After: 60` on a per-minute window, and the default
- * backoff retries at 1s and 2s — two more requests that cannot succeed, both charged against the
- * same limiter, and three seconds added before the screen says anything. So a stated wait is
+ * backoff retries at 1s and 2s, sending two more requests that cannot succeed, both charged against
+ * the same limiter, and three seconds added before the screen says anything. So a stated wait is
  * waited out when it is short, and is an ANSWER when it is not.
  *
  * The fifth rule came from the server half of this fleet rather than from a donor: a refusal can
  * state that waiting will never fix it at all, by sending `details.retryAfterSecs: null`. Read as
- * "did not say how long" — which is what every version before this one did — that 429 is retried
- * against a limit no amount of time moves.
+ * "did not say how long", as every version before this one did, that 429 is retried against a limit
+ * no amount of time moves.
  *
  * This is invariant 8. The rule itself lives in `@gusnips/http/retry`, so an SDK with no React
  * in it follows the same one; what is here is the binding to react-query.
@@ -33,9 +32,9 @@ import { ApiError } from "./api-error.ts";
 
 export interface QueryDefaultsOptions {
   /**
-   * Error codes that mean "this limit does not clear by waiting" — a spent monthly quota, a
-   * balance that needs topping up. They usually arrive as 402 or 429; the status alone cannot
-   * tell them apart from a burst limit, which is why the caller names them.
+   * Error codes for limits that do not clear by waiting, such as a spent monthly quota or a balance
+   * that needs topping up. They usually arrive as 402 or 429; the status alone cannot tell them
+   * apart from a burst limit, which is why the caller names them.
    *
    * Only needed where the server does not say so itself. One that sends
    * `details.retryAfterSecs: null` has already made the claim and `shouldRetry` reads it, which
@@ -47,10 +46,10 @@ export interface QueryDefaultsOptions {
   /**
    * Longest stated wait still worth retrying. Default 10 seconds.
    *
-   * Only applies when the refusal named its own expiry (`Retry-After`, or `retryAfterSecs` in
-   * the body). A burst limit that clears in two seconds is worth sitting out; a monthly ceiling
-   * that clears in an hour is an answer, and holding a spinner for it helps nobody — show the
-   * wait instead, which is what `humanizeWait` is for.
+   * Only applies when the refusal named its own expiry (`Retry-After`, or `retryAfterSecs` in the
+   * body). A burst limit that clears in two seconds is worth sitting out; a monthly ceiling that
+   * clears in an hour is an answer, and holding a spinner for it helps nobody. Show the wait
+   * instead, which is what `humanizeWait` is for.
    */
   maxRetryWaitSecs?: number;
   staleTime?: number;
@@ -84,8 +83,8 @@ export function shouldRetry(
 
 /**
  * How long before the next attempt: the server's stated wait when there is one, an exponential
- * backoff with jitter otherwise, and never less than the backoff — a `Retry-After: 0` is a
- * server saying "immediately", which for a client that just got refused is still too soon.
+ * backoff with jitter otherwise, and never less than the backoff. A `Retry-After: 0` is a server
+ * saying "immediately", which for a client that just got refused is still too soon.
  */
 export function retryDelayMs(attemptIndex: number, error: unknown): number {
   return delayFor(attemptIndex, answerOf(error));
@@ -130,7 +129,7 @@ export function queryDefaults({
  * When it is ready, `refreshError` says whether the last refresh failed.
  *
  * **Never gate a screen on `isError`.** It is also true when a BACKGROUND refetch fails over data
- * already on screen — a window regaining focus, a poll, the invalidation after a save — so
+ * already on screen after a window regains focus, a poll or the invalidation after a save. So
  * `isError ? <failure panel> : <data>` throws away what the reader was looking at over one blip.
  * The adopters that had noticed each wrote `isLoadingError` beside a comment saying so; the ones
  * that had not were a boundary and a great many inline ternaries. A refresh that failed is not a

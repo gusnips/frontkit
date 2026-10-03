@@ -32,7 +32,7 @@ export type SelectProps<T extends string = string> = Omit<
   "children" | "items" | "defaultValue" | "multiple"
 > & {
   options?: readonly SelectOption<T>[];
-  /** Shown while nothing is selected. No default — a default would be English. */
+  /** Shown while nothing is selected. No default because a default would be English. */
   placeholder?: ReactNode;
   /**
    * Shown instead of the list when `options` is empty. Required, because a popup that opens
@@ -40,9 +40,9 @@ export type SelectProps<T extends string = string> = Omit<
    */
   emptyLabel: ReactNode;
   /**
-   * Label of an entry that puts the field back to nothing selected — for an optional
-   * question, where "I'd rather not say" has to stay reachable after the first answer.
-   * Rendered only once there is a value to take back; picking it calls `onValueChange(null)`.
+   * Label of an entry that puts the field back to nothing selected, for an optional question where
+   * "I'd rather not say" has to stay reachable after the first answer. Rendered only once there is
+   * a value to take back; picking it calls `onValueChange(null)`.
    */
   clearLabel?: string;
   /** Accessible name for the trigger, when no visible label points at it. */
@@ -51,15 +51,15 @@ export type SelectProps<T extends string = string> = Omit<
   chevron?: ReactNode;
   /** Mark next to the selected option. */
   indicator?: ReactNode;
-  /** Classes for the trigger — the button you see when the popup is closed. */
+  /** Classes for the trigger button, which you see when the popup is closed. */
   className?: StateClassName<Primitive.Trigger.State>;
   popupClassName?: StateClassName<Primitive.Popup.State>;
   triggerProps?: Primitive.Trigger.Props;
   /**
-   * Positioner props — `align`, `side`, `sideOffset`, `collisionPadding`, and the stacking
-   * order. The default `z-[60]` puts the list above the overlay layer (z-50: dialog, drawer);
-   * raise it with `positionerProps={{ className: "z-[80]" }}` if the app stacks something
-   * higher than a dialog above it.
+   * Positioner props: `align`, `side`, `sideOffset`, `collisionPadding` and the stacking order. The
+   * default `z-[60]` puts the list above the overlay layer (z-50: dialog, drawer); raise it with
+   * `positionerProps={{ className: "z-[80]" }}` if the app stacks something higher than a dialog
+   * above it.
    */
   positionerProps?: Primitive.Positioner.Props;
 };
@@ -71,9 +71,9 @@ export type SelectProps<T extends string = string> = Omit<
  *
  * Controlled only, and that is the point of `value ?? null`: React and Base UI both read
  * `value={undefined}` as "uncontrolled", so a caller holding `T | undefined` in state would
- * silently hand the field back to the primitive the moment the value cleared, and every
- * later render would be ignored. `null` says "nothing selected" out loud. `defaultValue` is
- * not accepted here for the same reason — use the parts for an uncontrolled select.
+ * silently hand the field back to the primitive the moment the value cleared, and every later
+ * render would be ignored. `null` says "nothing selected" out loud. `defaultValue` is not accepted
+ * here for the same reason. Use the parts for an uncontrolled select.
  */
 export function Select<T extends string = string>({
   value,

@@ -37,7 +37,7 @@ export function comboboxInputValue<T>(
   return value === null ? "" : getLabel(value);
 }
 
-/** A loading state needs the line that says so — there is no default, and no English. */
+/** Pass text for the loading state. There is no default text or English fallback. */
 type ComboboxLoadingState =
   { loading: boolean; loadingHint: ReactNode } | { loading?: undefined; loadingHint?: undefined };
 
@@ -60,15 +60,15 @@ export type ComboboxProps<T> = Omit<
 > & {
   value: T | null;
   /**
-   * Items for the current query. Filtering is yours: this passes `filter={null}` to Base UI,
-   * so the list shows exactly what you return — a server search, a fuzzy match, a bounded
-   * page. Bound it here if it needs bounding; there is no cap in the wrapper, because a cap
-   * would quietly truncate a list a caller meant to show whole.
+   * Items for the current query. Filtering is yours: this passes `filter={null}` to Base UI, so the
+   * list shows exactly what you return, whether it is a server search, a fuzzy match or a bounded
+   * page. Bound it here if it needs bounding; there is no cap in the wrapper, because a cap would
+   * quietly truncate a list a caller meant to show whole.
    */
   search: (query: string) => readonly T[];
   /** Stable identity of an item: its React key, and how two items are compared. */
   getKey: (item: T) => string;
-  /** The item's text — what the input shows once it is picked, and what typeahead matches. */
+  /** The item's text, shown in the input once it is picked and used for typeahead matches. */
   getLabel: (item: T) => string;
   renderItem?: (item: T) => ReactNode;
   /**
@@ -76,7 +76,7 @@ export type ComboboxProps<T> = Omit<
    * end, and this is the line that offers one.
    */
   emptyHint: ReactNode;
-  /** Label for the clear button. Required — it is a button with an icon and no text. */
+  /** Label for the clear button. Required because the button has an icon and no text. */
   clearLabel: string;
   /** Label for the button that opens the list. Required, same reason. */
   openLabel: string;
@@ -88,10 +88,10 @@ export type ComboboxProps<T> = Omit<
   popupClassName?: StateClassName<Primitive.Popup.State>;
   inputProps?: Primitive.Input.Props;
   /**
-   * Positioner props — `align`, `side`, `sideOffset`, `collisionPadding`, and the stacking
-   * order. The default `z-[60]` puts the list above the overlay layer (z-50: dialog, drawer);
-   * raise it with `positionerProps={{ className: "z-[80]" }}` if the app stacks something
-   * higher than a dialog above it.
+   * Positioner props: `align`, `side`, `sideOffset`, `collisionPadding` and the stacking order. The
+   * default `z-[60]` puts the list above the overlay layer (z-50: dialog, drawer); raise it with
+   * `positionerProps={{ className: "z-[80]" }}` if the app stacks something higher than a dialog
+   * above it.
    */
   positionerProps?: Primitive.Positioner.Props;
 } & ComboboxLoadingState;

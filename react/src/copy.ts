@@ -29,9 +29,9 @@ export interface CopyOptions {
 }
 
 /**
- * A copy with an outcome the reader can see. What it says stays yours — "Copied", or "Select it
- * and copy it yourself", in a label or a toast — and so does announcing it: a label that changes
- * needs `aria-live="polite"` to be heard.
+ * A copy with an outcome the reader can see. You choose what it says, such as "Copied" or "Select
+ * it and copy it yourself", in a label or a toast. You also choose how to announce it: a label that
+ * changes needs `aria-live="polite"` to be heard.
  *
  * The outcome goes back to `"idle"` on its own. A "Copied" that never clears makes the second copy
  * look like it did not take.

@@ -1,5 +1,5 @@
 /**
- * The two constants the build and the browser both need — and **nothing else in this file**.
+ * The two constants the build and the browser both need. Keep **nothing else in this file**.
  *
  * It is separate from `hydrate.ts` for one reason: that module imports `react-dom/client`, and
  * `@gusnips/vite` needs these constants to WRITE the attribute at build time. If the constants
@@ -12,8 +12,8 @@
  */
 
 /**
- * The attribute a prerendered file names its own route in — written by the build, read by the
- * browser entry.
+ * The attribute where a prerendered file names its own route. The build writes it and the browser
+ * entry reads it.
  *
  * One constant because the writer and the reader are in different builds, and a typo between
  * them would show up only as a silent full re-render: a page that works, and a bug nobody sees.
@@ -23,9 +23,9 @@ export const PRERENDERED_ROUTE_ATTR = "data-prerendered-route";
 /**
  * What a 404 shell writes instead of a route.
  *
- * It is the pattern that actually matched — the catch-all — and it can never equal an address,
- * which is the property that matters: every route a static host answers from the shell mounts
- * fresh rather than hydrating the not-found page over itself. A real 404 pays one redundant
- * client render for that, and keeps the markup a crawler reads.
+ * It is the catch-all pattern that actually matched, and it can never equal an address, which is
+ * the property that matters: every route a static host answers from the shell mounts fresh rather
+ * than hydrating the not-found page over itself. A real 404 pays one redundant client render for
+ * that, and keeps the markup a crawler reads.
  */
 export const SHELL_ROUTE = "*";

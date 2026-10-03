@@ -43,33 +43,33 @@ type _StorageFitsCreateClient = Satisfied<
  * Auth FAILED rather than answered, so nothing is known about the credential it was handed:
  * either the request never landed, or GoTrue failed on its own.
  *
- * This is the question every site that ends a session has to ask — a token refresh, an API
- * door, and a callback choosing between "try again" and "that link is spent". Without it one
- * bad minute at GoTrue signs out everybody whose token happened to need refreshing, and tells
- * everybody clicking a recovery link that it has expired, which sends them to ask the service
- * that is down for a replacement.
+ * This is the question every site that ends a session has to ask: a token refresh, an API door, and
+ * a callback choosing between "try again" and "that link is spent". Without it one bad minute at
+ * GoTrue signs out everybody whose token happened to need refreshing, and tells everybody clicking
+ * a recovery link that it has expired, which sends them to ask the service that is down for a
+ * replacement.
  *
  * Both clauses carry weight, and the second is why this is a function rather than one call.
  * `isAuthRetryableFetchError` is a NAME check, and the statuses that earn that name are a list
- * auth-js owns. The list has drifted — 502, 503 and 504 at 2.91; those plus the 52x family and
- * still no 500 at 2.106; 500 through 530 at 2.108 — so code leaning on it alone is right at
- * whichever version happens to be installed, which is not the same as being right, and a fleet
- * installs several versions at once. It is also a LIST rather than a range, so it has holes at
- * every version, drift or no drift: at 2.112 nothing covers 505 through 519 or 531 up, and a
- * 507 or a 599 with a JSON body arrives as a plain `AuthApiError`. Pinning a recent SDK does not
- * make the status clause redundant.
+ * auth-js owns. The list has drifted: 502, 503 and 504 at 2.91; those plus the 52x family and still
+ * no 500 at 2.106; 500 through 530 at 2.108. Code leaning on it alone is right at whichever version
+ * happens to be installed, which is not the same as being right, and a fleet installs several
+ * versions at once. It is also a LIST rather than a range, so it has holes at every version, drift
+ * or no drift: at 2.112 nothing covers 505 through 519 or 531 up, and a 507 or a 599 with a JSON
+ * body arrives as a plain `AuthApiError`. Pinning a recent SDK does not make the status clause
+ * redundant.
  *
- * The same statuses with a body that is NOT JSON — a proxy's HTML page — arrive as an
- * `AuthUnknownError`, which carries no status at any status, so nothing here can tell that 507
- * from a malformed 400. It answers false for both, on purpose: reading an unreadable 4xx as an
- * outage would leave a dead session retrying forever, which is the other half of the same bug.
+ * The same statuses with a body that is NOT JSON, such as a proxy's HTML page, arrive as an
+ * `AuthUnknownError`, which carries no status at any status, so nothing here can tell that 507 from
+ * a malformed 400. It answers false for both, on purpose: reading an unreadable 4xx as an outage
+ * would leave a dead session retrying forever, which is the other half of the same bug.
  *
  * Read the version a tree really serves with `bun why @supabase/auth-js`, which prints one
  * heading per RESOLVED version; `node_modules` keeps copies the resolver does not serve.
  *
- * Anything that is not an auth error at all answers true: a failure from outside auth-js is not
- * a verdict on the credential either. Nothing at all answers false — `null` is what every
- * supabase-js auth call returns on success, and success is not an outage.
+ * Anything that is not an auth error at all answers true: a failure from outside auth-js is not a
+ * verdict on the credential either. Nothing at all answers false. `null` is what every supabase-js
+ * auth call returns on success, and success is not an outage.
  */
 export function isAuthOutage(error: unknown): boolean {
   // Nothing thrown is not an outage, and this clause exists because the function is exported.
@@ -171,12 +171,12 @@ function localStorageOrMemory(): SupportedStorage {
  * 2.116.0 and 41–51 s at 2.106.2. Nobody at a shared computer waits that long, and a page that
  * navigates away in the meantime takes the removal with it.
  *
- * It resolves once the stored session is gone. `error` is `null` when auth ended the session on
- * the server too. Otherwise it is the reason auth did not — its error, a thrown value, or the
- * deadline — and the session may still be live on the server and on other devices. `SIGNED_OUT`
- * arrives once auth-js has finished with the first call: about 100 ms later from 2.108.2 on, and
- * up to 22 s later at 2.106.2. If your screen does not reload, clear your own store when this
- * resolves instead of waiting for the event.
+ * It resolves once the stored session is gone. `error` is `null` when auth ended the session on the
+ * server too. Otherwise it is the reason auth did not: its error, a thrown value or the deadline.
+ * The session may still be live on the server and on other devices. `SIGNED_OUT` arrives once
+ * auth-js has finished with the first call: about 100 ms later from 2.108.2 on, and up to 22 s
+ * later at 2.106.2. If your screen does not reload, clear your own store when this resolves instead
+ * of waiting for the event.
  */
 export async function signOutEvenOffline(
   auth: Pick<SupabaseSessionAuth, "signOut">,
@@ -254,7 +254,7 @@ export function createSupabaseSessionAdapter(
 }
 
 /**
- * Every link type a GoTrue email can carry — not only the ones this app's templates send today.
+ * Every link type a GoTrue email can carry, including ones this app's templates do not send today.
  * One donor rejected `invite` because "invites are never sent", which was true of the product and
  * false of the deployment: an operator inviting somebody from Studio sent a branded email whose
  * link then said it was invalid. A type the templates never emit costs nothing to accept: the hash
@@ -262,9 +262,9 @@ export function createSupabaseSessionAdapter(
  *
  * Closed on purpose: auth-js's own `EmailOtpType` ends in `(string & {})`, so it cannot make a
  * destination map name every case. `Record<EmailLinkType, string>` can, and that is where an app
- * decides that `recovery` and `invite` both continue to the new-password screen — GoTrue creates
- * an invited account with NO password, so landing one "inside" signs them in once and locks them
- * out after.
+ * decides that `recovery` and `invite` both continue to the new-password screen. GoTrue creates an
+ * invited account with NO password, so landing one "inside" signs them in once and locks them out
+ * after.
  */
 export type EmailLinkType =
   "signup" | "invite" | "magiclink" | "recovery" | "email_change" | "email";
@@ -290,10 +290,10 @@ export type AuthCallback =
   | { kind: "email-link"; tokenHash: string; type: EmailLinkType }
   /**
    * A session arriving in the address: a PKCE `code`, or the implicit flow's tokens. In a browser
-   * with `detectSessionInUrl` on, the client has already taken it — wait for the session, and do
-   * not trade it again, which would be a second exchange racing the first. Where nothing reads
-   * the address for you (React Native), `credential` is what `exchangeCodeForSession` or
-   * `setSession` takes.
+   * with `detectSessionInUrl` on, the client has already taken it. Wait for the session, and do not
+   * trade it again, which would be a second exchange racing the first. Where nothing reads the
+   * address for you (React Native), `credential` is what `exchangeCodeForSession` or `setSession`
+   * takes.
    */
   | {
       kind: "session";
@@ -301,10 +301,9 @@ export type AuthCallback =
       credential: { code: string } | { access_token: string; refresh_token: string };
     }
   /**
-   * GoTrue, or the provider behind it, reported a failure in the address. `code` is GoTrue's
-   * stable `error_code` (`otp_expired`, `bad_oauth_state`, …) and is what to choose words by;
-   * `error_description` is left out on purpose — it is English-only and often names the wrong
-   * cause.
+   * GoTrue, or the provider behind it, reported a failure in the address. `code` is GoTrue's stable
+   * `error_code` (`otp_expired`, `bad_oauth_state`, …) and is what to choose words by;
+   * `error_description` is left out because it is English-only and often names the wrong cause.
    */
   | { kind: "error"; error: string | null; code: string | null; cancelled: boolean }
   /** Nothing usable: cut short between the mail client and here, or edited by hand. */
@@ -312,19 +311,19 @@ export type AuthCallback =
 
 /**
  * Reads an auth callback address. Pure, so every edge case is testable without a router or a
- * client — pass `location.search` and `location.hash`, or the two halves of a deep link.
+ * client. Pass `location.search` and `location.hash`, or the two halves of a deep link.
  *
- * GoTrue writes a failure into the FRAGMENT on every path and into the query only on some — the
- * query too after a provider round trip, the fragment alone after an implicit-flow email link —
- * so a callback reading one of the two misses a failure the other carries, and the person lands
+ * GoTrue writes a failure into the FRAGMENT on every path and into the query only on some. After a
+ * provider round trip, it writes both; after an implicit-flow email link, it writes the fragment
+ * alone. A callback reading one of the two misses a failure the other carries, and the person lands
  * on a screen that says nothing. Both are read here.
  *
- * `cancelled` is the provider refusing on its own, which for Google is the person pressing Cancel
- * — their choice, not a failure to report. It is NOT `error === "access_denied"`: GoTrue writes
- * that same value for an expired email link, a banned user and a disabled signup, each with an
- * `error_code` beside it, while a refusal relayed from the provider arrives with none. The obvious
- * test reads an expired link as a change of mind. And `error` itself is absent for a status
- * outside GoTrue's OAuth mapping — a rate-limited link arrives with `error_code` alone.
+ * `cancelled` is the provider refusing on its own, which for Google is the person pressing Cancel.
+ * That is their choice, not a failure to report. It is NOT `error === "access_denied"`: GoTrue
+ * writes that same value for an expired email link, a banned user and a disabled signup, each with
+ * an `error_code` beside it, while a refusal relayed from the provider arrives with none. The
+ * obvious test reads an expired link as a change of mind. And `error` itself is absent for a status
+ * outside GoTrue's OAuth mapping. A rate-limited link arrives with `error_code` alone.
  */
 export function parseAuthCallback(search: string | URLSearchParams, hash = ""): AuthCallback {
   const query = new URLSearchParams(search);
