@@ -17,7 +17,7 @@ and in dark mode, and no component ever writes a `dark:` variant.
 
 ## The mechanism
 
-Twenty names — `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`,
+Twenty names: `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`,
 `accent`, `destructive`, their `-foreground` pairs, plus `border`, `input`, `ring` and `scrim`.
 
 Dark mode rebinds **the same names** under a `.dark` class. `bg-card` is one utility that
@@ -25,7 +25,7 @@ resolves to a different colour below a `.dark` ancestor. That is the whole trick
 
 ## Your colours
 
-The values that ship are a plain grey scale — readable, and deliberately characterless, so the
+The values that ship are a plain grey scale: readable, and deliberately characterless, so the
 app looks like nothing until you decide what it looks like. Override after the import, and set
 both halves:
 
@@ -44,19 +44,19 @@ Skip the second line and your daytime purple stays on screen at night.
 
 The compile check in this repo measures the placeholders below, so a bad default fails our
 build instead of reaching someone. Your overrides need the same measurement, or a bad value
-reaches someone through your files instead: run the contrast gate from `@gusnips/vite` — one
-script in CI — and it fails your build on both rules below, plus every colour outside your
+reaches someone through your files instead: run the contrast gate from `@gusnips/vite` (one
+script in CI) and it fails your build on both rules below, plus every colour outside your
 theme.
 
 - **`--color-input` needs 3:1 against `--color-background`.** It is a field border, and WCAG
   1.4.11 asks 3:1 of anything that outlines a control. This is the one people miss: a grey
   picked to sit nicely next to `--color-border` will not clear it. One codebase this came from
-  pointed `input` at its divider grey — 1.6:1 — so every text field in two apps had a border
+  pointed `input` at its divider grey, 1.6:1, so every text field in two apps had a border
   some people cannot see.
 - **`--color-primary` needs its own dark value.** Holding one brand colour across both modes is
   the trap. A fill chosen against a white page is dark, and on a near-black card it lands _on_
   the 3:1 line instead of clear of it. Lift it for dark, and flip `--color-primary-foreground`
-  with it — which is why nothing in this family writes `text-white`.
+  with it, which is why nothing in this family writes `text-white`.
 
 ## What is not here
 
@@ -67,7 +67,7 @@ every component follows. The rest is what your product looks like, and it stays 
 One trap worth knowing before you write your own `@theme`: **`--duration-*` is not a Tailwind
 namespace.** `--duration-standard: 250ms` compiles to no utility at all, so `duration-standard`
 in a `className` is dead text and the transition quietly runs at Tailwind's default. `--ease-*`
-beside it _does_ work, which is what hides it — the easing lands, the duration does not. Write
+beside it _does_ work, which is what hides it: the easing lands, the duration does not. Write
 `duration-250`, or keep the token and put `transition-duration: var(--duration-standard)` in a
 real rule. One codebase had 61 of these.
 
@@ -81,7 +81,7 @@ real rule. One codebase had 61 of these.
 - `cursor: pointer` on buttons, which browsers do not give you
 - `color-scheme`, which stops a two-tone seam where a phone toolbar retracts
 - reduced motion clamped to `0.01ms` rather than `none`, so animations still land on their end
-  pose instead of never appearing — including the two delay properties, which are the half
+  pose instead of never appearing, including the two delay properties, which are the half
   people forget
 - a thin scrollbar whose thumb reads `--color-input`, and `.scrollbar-none` for a tab strip
 

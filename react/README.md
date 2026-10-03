@@ -11,7 +11,7 @@ bun add @gusnips/react
 const user = await api.get<User>("/me");
 ```
 
-That is the whole call. `user` is a `User` — not a `Response`, not `res.json()`, not a null
+That is the whole call. `user` is a `User`: not a `Response`, not `res.json()`, not a null
 check. The client attached the token, unwrapped the envelope, and threw a typed `ApiError`
 carrying the code and the request id if the server refused.
 
@@ -30,18 +30,18 @@ const api = createApiClient({
 ## The client knows three things people learn the hard way
 
 **Six queries firing at once send one refresh, not six.** The auth server rotates the refresh
-token when you use it, so the losers of that race each invalidate the winner — and the person is
+token when you use it, so the losers of that race each invalidate the winner, and the person is
 signed out in the middle of a load that was working. Three separate codebases arrived at
 single-flight refresh independently. This is that.
 
 **Only auth ANSWERING is a "no".** Dropping a packet tells you nothing about whether a session is
-good, and neither does a 500 — that is auth failing, not auth answering. So `refresh()` answers
+good, and neither does a 500. That is auth failing, not auth answering. So `refresh()` answers
 `{ token, reachedAuth }`, and only a real refusal signs anyone out. Before that split, a Wi-Fi
 blip logged people out mid-load; without the second half, one bad minute at the auth server signs
 out everybody whose token happened to need refreshing.
 
 **A sign-out has a fail-safe timer.** Awaiting `signOut()` before redirecting covers a rejection,
-not a hang — and a hang leaves someone signed out in name only: every request 401ing, nothing
+not a hang, and a hang leaves someone signed out in name only: every request 401ing, nothing
 left that could redirect it.
 
 ### Supabase sessions
@@ -65,14 +65,14 @@ import { isAuthOutage } from "@gusnips/react/supabase";
 
 // A callback that just failed to trade its one-use link.
 if (isAuthOutage(error))
-  showRetry(); // the link was never spent — the same one still works
+  showRetry(); // the link was never spent: the same one still works
 else showLinkSpent(); // auth said no: only a new link helps
 ```
 
-`isAuthOutage` is true when auth FAILED rather than answered — a request that never landed, or a
+`isAuthOutage` is true when auth FAILED rather than answered: a request that never landed, or a
 5xx. Only a real refusal is an answer, and only an answer may end a session or a link. Use it
-anywhere that decision is made; the sentence you show is a separate question, and a narrower one
-— "check your connection" is true of a request that never landed and false of a 502, which is
+anywhere that decision is made; the sentence you show is a separate question, and a narrower one:
+"check your connection" is true of a request that never landed and false of a 502, which is
 ours. auth-js marks "nothing came back", and only that, with status 0.
 
 It is safe to hand it the `error` from a `{ data, error }` result without checking it first:
@@ -120,7 +120,7 @@ Supabase email links have two complete patterns. Keep either one, never half of 
 - A link carrying `ConfirmationURL` needs `detectSessionInUrl` enabled. That reader consumes an
   implicit `#access_token` or a PKCE `?code`; it does not consume `token_hash`.
 
-Either pattern can carry a destination — the `token_hash` one has to be asked. GoTrue hands every
+Either pattern can carry a destination: the `token_hash` one has to be asked. GoTrue hands every
 template a `{{ .RedirectTo }}`: the `redirectTo` the app passed, already checked against the
 allowlist, falling back to the Site URL when it was absent or not on it. A `{{ .ConfirmationURL }}`
 link carries it for you. A template that writes its own landing drops it unless it asks:
@@ -130,7 +130,7 @@ link carries it for you. A template that writes its own landing drops it unless 
 ```
 
 Leave that parameter off and `redirectTo` and `emailRedirectTo` do nothing on every e-mail flow,
-however carefully the app sets them — four of the codebases this came from pass one that the
+however carefully the app sets them: four of the codebases this came from pass one that the
 template throws away, so a person bounced off a protected page signs in and lands on the front
 door. Nothing reports it: the app's call is correct, the link works, and the destination was
 dropped in an HTML file hosted somewhere else.
@@ -147,7 +147,7 @@ Validate it on arrival even though GoTrue already did: that check is against a l
 so it says the link may come back here, not which page it may open.
 
 Recovery and invite links continue to the new-password screen after the session opens. A callback
-must also tell a used or expired link apart from a request that never landed — or one that landed
+must also tell a used or expired link apart from a request that never landed, or one that landed
 and came back 5xx: the first needs a new link, and the other two can retry the same one, because
 the hash was never spent.
 
@@ -165,7 +165,7 @@ implicit-flow tokens; in a browser the client has already taken it, so wait for 
 React Native hand `credential` to `exchangeCodeForSession` or `setSession`. `error` is a failure
 GoTrue wrote into the address. `invalid` is a link that was cut short or edited.
 
-Pass the fragment too — `parseAuthCallback(location.search, location.hash)`. GoTrue writes a
+Pass the fragment too: `parseAuthCallback(location.search, location.hash)`. GoTrue writes a
 failure into the fragment every time and into the query only sometimes: after an implicit-flow
 email link it is in the fragment alone, so a query-only reader shows nothing to somebody whose
 link expired.
@@ -197,7 +197,7 @@ new QueryClient({
 });
 ```
 
-Retries 408, 425, a transient 429, 5xx, and no-response-at-all. Nothing else — every other 4xx is
+Retries 408, 425, a transient 429, 5xx, and no-response-at-all. Nothing else: every other 4xx is
 an answer, and a second attempt just says it again. The rule itself is
 [`@gusnips/http/retry`](../http#should-this-request-be-tried-again), so an SDK with no React in it
 can retry the same way.
@@ -210,7 +210,7 @@ those codes and they are never retried.
 You only need that list where your API stays quiet. If it answers `Retry-After: 2`, the wait is
 sat out; past `maxRetryWaitSecs` (10 seconds by default) the wait is the answer and the screen
 says so instead of holding a spinner. And if it sends `details.retryAfterSecs: null`, it is
-saying waiting will never fix this — a cap that frees only when somebody deletes something, a
+saying waiting will never fix this: a cap that frees only when somebody deletes something, a
 slot that frees when another job ends. That `null` is read as the claim it is, not as a field
 somebody forgot, so the code never reaches your list.
 
@@ -244,14 +244,14 @@ offer comes from `describeError(view.error).recover`, below.
 ## Survives your deploys
 
 An app with `lazy()` routes serves chunks by hashed filename. Deploy while someone has a tab
-open, and their next click asks for a file that no longer exists — a white screen on a button
+open, and their next click asks for a file that no longer exists: a white screen on a button
 that worked a minute ago. The same deploy breaks a second way that looks nothing like the first:
 the old bundle reads a field your API just renamed, and throws a plain `TypeError` with nothing
 in it about a deploy.
 
 **Fix the cause in your host config first.** This package cannot do it for you and it is worth
 more than everything below. A static host answers a missing `/assets/x.js` with your SPA
-fallback — `index.html`, at a 200, as `text/html` — and that is what the browser's "MIME type
+fallback (`index.html`, at a 200, as `text/html`), and that is what the browser's "MIME type
 text/html" module-script refusal actually is. Hosts then match cache rules against the _request
 path_ rather than the outcome, so the `immutable, max-age=31536000` rule you wrote for hashed
 assets lands on that HTML body: one poisoned asset URL, at the edge and in every browser that
@@ -264,12 +264,12 @@ Then two detectors, for the two failures:
 if (await isStaleBuild()) reloadOnce();
 ```
 
-`isStaleBuild` asks the server instead of reading the error — it compares the entry script this
+`isStaleBuild` asks the server instead of reading the error: it compares the entry script this
 document loaded against the one the live page names. That is the only thing that catches the
 renamed-field crash, where the message carries no signal at all. It asks for the page, not for
 the asset: a CDN serves assets with a long `s-maxage`, so a bundle retired an hour ago still
 answers 200 from the edge and would report "current" during exactly the window when skew is most
-likely. Anything ambiguous — offline, a non-200, a timeout — answers `false`, because dressing a
+likely. Anything ambiguous (offline, a non-200, a timeout) answers `false`, because dressing a
 real bug up as an update hides it from you too.
 
 ```ts
@@ -277,12 +277,12 @@ if (isChunkLoadError(error) && reloadOnce()) return null;
 ```
 
 `isChunkLoadError` matches the message, which is all you have for a failure that never reaches a
-boundary — an `unhandledrejection`, or a listener. Every browser's phrasing is in there.
+boundary: an `unhandledrejection`, or a listener. Every browser's phrasing is in there.
 
 `reloadOnce` reloads at most once a minute, and there is **one** stamp for every reason to
 reload. A tab can reload because a chunk 404'd, because the server says it is behind, or from a
-guard inlined in `index.html` that runs before any module does. Three detectors, one predicament
-— give each its own key and a broken deploy gets three reloads a minute to take turns with. That
+guard inlined in `index.html` that runs before any module does. Three detectors, one predicament:
+give each its own key and a broken deploy gets three reloads a minute to take turns with. That
 inline guard cannot import anything, so the key it has to copy is exported as `RELOAD_GUARD_KEY`.
 
 And in your browser entry:
@@ -294,7 +294,7 @@ installPreloadErrorHandler();
 ```
 
 It is narrower than it looks: it swallows Vite's CSS _preload hint_ failure and nothing else. A
-hint that fails is harmless — the import runs straight after and usually works. Taking Vite's
+hint that fails is harmless: the import runs straight after and usually works. Taking Vite's
 `preventDefault()` for every preload error instead resolves the dynamic import with `undefined`,
 `React.lazy` reads `.default` off nothing, and you get a crash screen plus a TypeError with only
 React frames in it, naming no chunk.
@@ -315,7 +315,7 @@ const RequireStaff = requireProfile(
 
 `onDenied` and `onError` are separate because `!me?.isStaff` reads a 500 as "not staff". An
 operator arriving while `/auth/me` is down gets told the page does not exist: the wrong cause, no
-retry, and no request id to quote. A guard has three answers — wait, fail, refuse — and only a
+retry, and no request id to quote. A guard has three answers (wait, fail, refuse) and only a
 real `false` reaches the refusal.
 
 `createRequireAuth` sends an anonymous visitor to `?next=`, carrying path, query and hash. A hash
@@ -333,7 +333,7 @@ const next = safeInternalPath(new URLSearchParams(location.search).get("next")) 
 `createRequireAnonymous` already performs that check and falls back to the home path you gave it.
 
 Writing a return target down is the other direction, and it has its own hazard. A Supabase client
-with no `flowType` is on the **implicit** flow — the default — so a callback comes back as
+with no `flowType` is on the **implicit** flow (the default), so a callback comes back as
 `#access_token=…&refresh_token=…`. A guard renders exactly when there is no session yet, which is
 that callback's own state while the client parses the fragment: point an OAuth `redirectTo` at a
 guarded route and a concatenated `pathname + search + hash` puts a refresh token into a query
@@ -347,8 +347,8 @@ const returnTo = returnPathFromLocation(window.location);
 ```
 
 It keeps the page and drops only a fragment carrying a credential, because the page is the part
-worth returning to. `createRequireAuth` uses it; use it anywhere else you record where someone was
-— a dead-session redirect is the common one.
+worth returning to. `createRequireAuth` uses it; use it anywhere else you record where someone was:
+a dead-session redirect is the common one.
 
 ## Never dead-end anyone
 
@@ -356,13 +356,13 @@ worth returning to. `createRequireAuth` uses it; use it anywhere else you record
 import type { ErrorStateProps } from "@gusnips/react";
 ```
 
-No component ships — seven codebases have an `ErrorState.tsx` and they overlap 9–37%, because one
+No component ships: seven codebases have an `ErrorState.tsx` and they overlap 9–37%, because one
 draws a tinted icon, one an illustration, one a mascot. What they share is the prop shape, and
 the prop shape _is_ the rule: `problem`, `cause`, `fix`, and `action`. **`fix` and `action` are
 required.** A required prop is the only version of "always offer a way out" that a caller in a
 hurry cannot skip.
 
-`createErrorDescriber` turns a thrown `ApiError` into the `cause` and `fix` to put in it — plus
+`createErrorDescriber` turns a thrown `ApiError` into the `cause` and `fix` to put in it, plus
 which control to offer, and the request id to print under it:
 
 ```ts
@@ -393,7 +393,7 @@ the catalog has, the reader gets it in their own language.
 The field is `fix`, the same word as the prop above. It was `hint` until 0.6.0, which left every
 adopter writing `fix={hint}` at every error surface.
 
-`recover` is derived from `shouldRetry` — the same rule react-query retries on — so the button a
+`recover` is derived from `shouldRetry` (the same rule react-query retries on), so the button a
 reader sees and the retry that actually happens cannot disagree. Give it the same
 `durableLimitCodes` list you give `queryDefaults`, and a spent quota offers no button instead of
 one that cannot work. The words follow it too: "try again in a moment" appears only on a 5xx that
@@ -420,7 +420,7 @@ fallback: ({ says, wait }) => ({
 });
 ```
 
-Some APIs write `message` for whoever reads the screen. Some write it for whoever reads the log —
+Some APIs write `message` for whoever reads the screen. Some write it for whoever reads the log,
 in English, in an app that ships three languages. Your arm also gets the stated wait, which the
 default has nowhere to put.
 
@@ -511,13 +511,13 @@ Detection walks the browser's language list in the reader's order, exact tag fir
 subtag: `[pt-PT, en]` gets `pt-BR` when that is what you ship, and `[en-GB, pt-BR]` gets `en`.
 `localeGateScript` uses the same rule, so the gate and the app agree about a reader.
 
-`createAuthStore` is at `@gusnips/react/store` — a zustand store whose `isLoading` starts `false`
+`createAuthStore` is at `@gusnips/react/store`: a zustand store whose `isLoading` starts `false`
 where there is no window. A session bootstrap can only be in flight in a browser, and `true`
 during a build is a wait that never ends: it once shipped a spinner as the indexable body of a
 page whose whole job was to be found.
 
 When your store needs more than those flags, `authSlice` in the same place gives you them as a
-plain object to spread, so `create` stays yours — and with it `persist`, your own actions, and
+plain object to spread, so `create` stays yours, and with it `persist`, your own actions, and
 fields of your own:
 
 ```ts
@@ -537,7 +537,7 @@ writes you no longer own.
 ## On a phone
 
 The main entry works in React Native. It imports `react` and nothing else you would have to go
-find — no `react-dom`, no router, no store — so the fetch client, the retry rule and the SSE
+find (no `react-dom`, no router, no store), so the fetch client, the retry rule and the SSE
 parser all come along, and the four things that need a browser stay behind the subpaths above.
 `useCopy` imports fine there but has no `navigator.clipboard` to write to, so every copy answers
 `"failed"`: use the platform's clipboard on a phone.
@@ -555,8 +555,8 @@ no wrapper added scroll lock, focus trap, ESC, outside-dismiss, focus return, ro
 typeahead. Base UI already does all of that, and a wrapper "adding" them is a second
 implementation of something that works. Twenty were dropped.
 
-What the remaining seven buy is composition you cannot skip — no caller can ship a scrimless
-dialog — required a11y props expressed as types, and a handful of facts that each cost somebody
+What the remaining seven buy is composition you cannot skip (no caller can ship a scrimless
+dialog), required a11y props expressed as types, and a handful of facts that each cost somebody
 an afternoon. z-index goes on the Viewport, not the Popup, because `position: fixed` makes a
 stacking context. A drawer _ties_ with dialog rather than beating it, or a modal opened from
 inside a drawer never paints. A wrapper earns its place by knowing something, not by styling
@@ -579,7 +579,7 @@ lives behind a subpath, so you install a dependency only if you import the thing
 | `@gusnips/react/theme`    | `createTheme`, `startTheme`              | react                 |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
-point.** An optional peer the barrel imports anyway is not optional — it is a required one whose
+point.** An optional peer the barrel imports anyway is not optional: it is a required one whose
 error moved from install time to your first build, which is the worse of the two places to learn
 about it.
 

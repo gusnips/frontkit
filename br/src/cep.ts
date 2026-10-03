@@ -1,9 +1,9 @@
 /**
  * CEP, the Brazilian postal code: eight digits, shown as `01310-100`.
  *
- * Only the shape lives here. Looking a CEP up is a network call to a provider you choose, and a
- * CEP can be real and still have no street — a whole small town can share one — so "the lookup
- * found no street" is not "this CEP is invalid".
+ * Only the shape lives here. Looking a CEP up is a network call to a provider you choose, and a CEP
+ * can be real and still have no street. A whole small town can share one, so "the lookup found no
+ * street" is not "this CEP is invalid".
  */
 
 /** The eight digits, or `null` when there are not eight. */

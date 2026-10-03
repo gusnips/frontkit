@@ -5,26 +5,26 @@
  * every hashed asset underneath whatever tabs are already open, and those tabs go on running
  * yesterday's bundle. It surfaces two ways, and only one of them looks like a missing file:
  *
- *   1. The next navigation asks for a chunk whose hashed name is gone. React's lazy boundary
- *      throws, and the person gets a white screen on a click that worked a minute ago.
- *   2. The old bundle reads a field the API has since renamed, and throws. That one arrives as a
- *      plain `TypeError` with nothing in it about a deploy — no file, no hash, no signal.
+ * 1. The next navigation asks for a chunk whose hashed name is gone. React's lazy boundary throws,
+ * and the person gets a white screen on a click that worked a minute ago. 2. The old bundle reads a
+ * field the API has since renamed, and throws. That one arrives as a plain `TypeError` with nothing
+ * in it about a deploy: no file, no hash, no signal.
  *
  * So there are two detectors here and they are not interchangeable. {@link isChunkLoadError}
- * matches the message, which is all you have for a failure that never reaches a boundary.
- * {@link isStaleBuild} asks the server, which is evidence rather than a guess — and it is the
- * only one that catches case 2 at all.
+ * matches the message, which is all you have for a failure that never reaches a boundary. {@link
+ * isStaleBuild} asks the server for evidence rather than a guess. It is the only one that catches
+ * case 2 at all.
  *
  * **The deepest fix is not in this file, and it is worth more than everything in it.** A static
- * host answers a missing `/assets/x.js` with the SPA fallback — `index.html`, at a 200, as
- * `text/html` — which is what the browser's "MIME type text/html" module-script refusal actually
- * is. Hosts then match cache rules against the REQUEST PATH rather than the outcome, so the
- * `immutable, max-age=31536000` rule written for hashed assets gets applied to that HTML body:
- * one poisoned asset URL, at the edge and in every browser that touched it, for a year. One
- * adopter removed the cause instead of recovering from it — no blanket fallback over `/assets/`,
- * and an edge function that refuses to answer an asset path with `text/html` — which turns a
- * dead chunk into a real, uncacheable 404 and lets everything below be recovery rather than the
- * plan. A package cannot ship that; it can refuse to let it go unwritten.
+ * host answers a missing `/assets/x.js` with the SPA fallback, `index.html`, at a 200, as
+ * `text/html`. That is what the browser's "MIME type text/html" module-script refusal actually is.
+ * Hosts then match cache rules against the REQUEST PATH rather than the outcome, so the `immutable,
+ * max-age=31536000` rule written for hashed assets gets applied to that HTML body: one poisoned
+ * asset URL, at the edge and in every browser that touched it, for a year. One adopter removed the
+ * cause instead of recovering from it: no blanket fallback over `/assets/`, and an edge function
+ * that refuses to answer an asset path with `text/html`. That turns a dead chunk into a real,
+ * uncacheable 404 and lets everything below be recovery rather than the plan. A package cannot ship
+ * that; it can refuse to let it go unwritten.
  */
 
 /**
@@ -48,14 +48,14 @@ const RELOAD_WINDOW_MS = 60_000;
 const PROBE_TIMEOUT_MS = 4_000;
 
 /**
- * A lazy-chunk fetch failure — recoverable by reloading.
+ * A lazy-chunk fetch failure that a reload can fix.
  *
- * Matched by message because no browser gives it a shared type. Every phrasing in the wild is
- * here: Chrome/Edge "Failed to fetch dynamically imported module", Firefox "error loading
- * dynamically imported module", Safari "Importing a module script failed", webpack's
- * ChunkLoadError and "Loading chunk N failed", and the SPA-fallback "MIME type" refusal —
- * which is the one that fires on a static host that has not fixed the cause above, because the
- * missing `.js` is answered with `index.html`.
+ * Matched by message because no browser gives it a shared type. Every phrasing in the wild is here:
+ * Chrome/Edge "Failed to fetch dynamically imported module", Firefox "error loading dynamically
+ * imported module", Safari "Importing a module script failed", webpack's ChunkLoadError and
+ * "Loading chunk N failed", and the SPA-fallback "MIME type" refusal. The last one that fires on a
+ * static host that has not fixed the cause above, because the missing `.js` is answered with
+ * `index.html`.
  *
  * A standalone predicate rather than a method on the boundary, so a global `unhandledrejection`
  * handler can classify the same failure without importing a component.
@@ -93,13 +93,13 @@ function runningEntry(): string {
 /**
  * Is the build this tab is running still the one being served?
  *
- * Asked of the server, so the answer is evidence rather than a guess. Everything ambiguous —
- * offline, a non-200, a captive portal, a probe that times out — resolves to `false`: dressing a
- * genuine bug up as an update hides it from the user and from us.
+ * Asked of the server, so the answer is evidence rather than a guess. An offline request, a non-200
+ * response, a captive portal or a timed-out probe resolves to `false`: dressing a genuine bug up as
+ * an update hides it from the user and from us.
  *
  * It asks for the PAGE, not for the asset, and that is not the obvious choice. A missing asset
  * looks like the direct question, but a CDN commonly serves assets with a long `s-maxage`, so a
- * bundle a deploy retired an hour ago still answers 200 from the edge — it would report "current"
+ * bundle a deploy retired an hour ago still answers 200 from the edge. It would report "current"
  * during exactly the window when skew is most likely. The page is the one URL that cannot lie: it
  * ships `max-age=0, must-revalidate` and never enters the edge cache.
  */
@@ -124,9 +124,9 @@ export async function isStaleBuild(): Promise<boolean> {
  * rather than watching the same attempt loop.
  *
  * The guard is the part that matters. Reloading on a failure is obvious; reloading on a failure
- * that the reload does not fix is an infinite loop with the user inside it. At most one reload
- * per minute, so a genuinely broken deploy degrades to the error screen — which can at least say
- * something — instead of flickering forever.
+ * that the reload does not fix is an infinite loop with the user inside it. At most one reload per
+ * minute, so a genuinely broken deploy shows the error screen instead of flickering forever. That
+ * screen can at least say something.
  *
  * `sessionStorage` and not `localStorage`: the guard is about this tab's current predicament, and
  * a stale stamp in another tab must not suppress a reload this one needs. Wrapped because storage
@@ -149,11 +149,11 @@ export function reloadOnce(): boolean {
 /**
  * Vite's *hint* failure, which is not the same thing and must not be treated as one.
  *
- * Vite injects a speculative `<link rel="stylesheet">` for a chunk's CSS before importing it.
- * When that link fails, the import itself still runs right after and usually succeeds — so this
- * one is worth swallowing, where a failure of the import is the real thing
- * {@link isChunkLoadError} matches. Vite builds this message in exactly one place and only ever
- * for a stylesheet link; script hints never reject.
+ * Vite injects a speculative `<link rel="stylesheet">` for a chunk's CSS before importing it. When
+ * that link fails, the import itself still runs right after and usually succeeds, so this one is
+ * worth swallowing, where a failure of the import is the real thing {@link isChunkLoadError}
+ * matches. Vite builds this message in exactly one place and only ever for a stylesheet link;
+ * script hints never reject.
  */
 export function isPreloadHintFailure(error: unknown): boolean {
   return error instanceof Error && error.message.startsWith("Unable to preload CSS for");
@@ -162,12 +162,12 @@ export function isPreloadHintFailure(error: unknown): boolean {
 /**
  * Install the `vite:preloadError` listener. Call once, from the browser entry.
  *
- * Vite offers `preventDefault()` here so an app can own a failed asset itself — but taking that
- * deal unconditionally resolves the dynamic import with `undefined` (Vite's helper ends in
+ * Vite offers `preventDefault()` here so an app can own a failed asset itself, but taking that deal
+ * unconditionally resolves the dynamic import with `undefined` (Vite's helper ends in
  * `baseModule().catch(handlePreloadError)`), and `React.lazy` then reads `.default` off nothing.
- * The user gets the crash screen and the developer gets a TypeError with only React frames in
- * it, naming no chunk. So it is taken ONLY for a failed preload hint, where the import still
- * runs. A real module failure is left to throw, where the error boundary can recognise it.
+ * The user gets the crash screen and the developer gets a TypeError with only React frames in it,
+ * naming no chunk. So it is taken ONLY for a failed preload hint, where the import still runs. A
+ * real module failure is left to throw, where the error boundary can recognise it.
  */
 export function installPreloadErrorHandler(): void {
   window.addEventListener("vite:preloadError", (event) => {

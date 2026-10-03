@@ -5,10 +5,10 @@ import { ApiError } from "./api-error.ts";
 /**
  * The app's one door to the API. Nothing else should call `fetch`.
  *
- * Every route answers the same envelope, so unwrapping and error-shaping belong here once
- * rather than in every hook. Three donors built this independently and all three arrived at
- * single-flight token refresh — see {@link SessionAdapter.refresh} for the reason, which is
- * the sharpest thing in this file.
+ * Every route answers the same envelope, so unwrapping and error-shaping belong here once rather
+ * than in every hook. Three donors built this independently and all three arrived at single-flight
+ * token refresh. See {@link SessionAdapter.refresh} for the reason, which is the sharpest thing in
+ * this file.
  *
  * Four things deliberately did NOT come across from the donors, because they belong to a
  * product and not to a client:
@@ -16,7 +16,7 @@ import { ApiError } from "./api-error.ts";
  * - **Toasts.** Whether a failure is spoken aloud is a design decision that differs per surface.
  *   Throw, and let the caller decide.
  * - **In-flight GET deduplication.** react-query already dedups by key, so the client's copy is
- *   redundant — and one donor's version returned a `clone()` of a body already being consumed,
+ *   redundant. One donor's version also returned a `clone()` of a body already being consumed,
  *   which is a race with no symptom until it has one.
  * - **Service-status tracking and impersonation.** One donor's, and firmly its own.
  * - **Analytics correlation headers.** Injected through {@link ApiClientOptions.headers}.
@@ -26,8 +26,8 @@ import { ApiError } from "./api-error.ts";
 export interface RefreshResult {
   token: string | null;
   /**
-   * False when the refresh never got an ANSWER out of the auth server — a dropped connection,
-   * a 5xx, a captive portal.
+   * False when the refresh never got an ANSWER out of the auth server because of a dropped
+   * connection, a 5xx or a captive portal.
    *
    * This flag is invariant 3, and only one of three donors had it. Losing a packet says nothing
    * about whether a session is still good, so a client that collapses "auth said no" into
@@ -39,8 +39,8 @@ export interface RefreshResult {
 }
 
 /**
- * The seam onto whatever holds the session. Supabase in every donor so far, but nothing here
- * knows that — an adapter is four lines and keeps the auth vendor out of this package.
+ * The seam onto whatever holds the session. Supabase in every donor so far, but nothing here knows
+ * that. An adapter is four lines and keeps the auth vendor out of this package.
  */
 export interface SessionAdapter {
   getToken(): Promise<string | null>;
@@ -49,9 +49,9 @@ export interface SessionAdapter {
 }
 
 /**
- * How long anything here waits on a sign-out: the default for
- * {@link ApiClientOptions.signOutTimeoutMs}, and the deadline of `signOutEvenOffline` in
- * `@gusnips/react/supabase`. Shared so the two give up together — a redirect that gave up sooner
+ * How long anything here waits on a sign-out: the default for {@link
+ * ApiClientOptions.signOutTimeoutMs}, and the deadline of `signOutEvenOffline` in
+ * `@gusnips/react/supabase`. Shared so the two give up together. A redirect that gave up sooner
  * would navigate away while the session was still in storage.
  */
 export const SIGN_OUT_TIMEOUT_MS = 3_000;
@@ -70,54 +70,54 @@ export interface ApiClientOptions {
    */
   headers?: () => Record<string, string>;
   /**
-   * The session is gone and cannot be renewed — send them to sign in.
+   * The session is gone and cannot be renewed. Send them to sign in.
    *
    * The client does not know the route, and it deliberately still THROWS after calling this:
    * `location.replace()` does not stop the current frame, so a caller's own `onError` must
    * still run or a half-finished screen keeps rendering against data that will never arrive.
    * The error it throws carries `expected: true`.
    *
-   * Ending the session IN PLACE is equally supported — routing to the sign-in screen without a
-   * reload — and it is the case that keeps this client alive across the next sign-in. The
-   * sign-out latch is keyed on the refused token for exactly that reason; see `refusedToken`.
+   * Routing to the sign-in screen without a reload is equally supported. It is the case that keeps
+   * this client alive across the next sign-in. The sign-out latch is keyed on the refused token for
+   * exactly that reason; see `refusedToken`.
    */
   onSessionDead: () => void;
   /**
    * Every failed response, seen once, just before it is thrown.
    *
-   * For a reaction that belongs to the whole app rather than to one call site. The donor's case
-   * is the sharp one: a mid-session account suspension 403s every authed route except
-   * `GET /auth/me`, so the moment one arrives the app has to refresh `me` and route to the
-   * screen that explains it — otherwise every query on the page fails at once and the shell
-   * half-renders behind an error storm until `me` goes stale on its own.
+   * For a reaction that belongs to the whole app rather than to one call site. The donor's case is
+   * the sharp one: a mid-session account suspension 403s every authed route except `GET /auth/me`,
+   * so the moment one arrives the app has to refresh `me` and route to the screen that explains it.
+   * Otherwise every query on the page fails at once and the shell half-renders behind an error
+   * storm until `me` goes stale on its own.
    *
-   * It cannot live at a call site, because the point is that it fires from whichever call
-   * happened to be first. It went in the donor's client directly, which made the client import
-   * its query cache and its query keys — a cycle that this hook removes.
+   * It cannot live at a call site, because the point is that it fires from whichever call happened
+   * to be first. It went in the donor's client directly, which made the client import its query
+   * cache and its query keys, creating a cycle that this hook removes.
    *
    * Observation only: the error is thrown either way, and throwing from here would replace a
    * real API failure with whatever the listener hit.
    *
    * **The response comes with it, because a refusal's headers are otherwise unreachable.**
-   * `request` throws before the `Response` escapes, so an adopter whose API states something on
-   * the error path had no way to read it at all — one reports what every call cost, refusals
-   * included, which is how "a blocked page costs nothing" becomes a thing a customer can check
-   * rather than a thing we assert. That is the distinction worth keeping: field-error flattening
-   * and a per-call meter callback both stayed in their products, because a product can write
-   * those itself. This one it cannot, at any price, and a capability the kit makes unreachable
-   * is a regression the kit has to undo.
+   * `request` throws before the `Response` escapes, so an adopter whose API states something on the
+   * error path had no way to read it at all. One reports what every call cost, refusals included,
+   * which is how "a blocked page costs nothing" becomes a thing a customer can check rather than a
+   * thing we assert. That is the distinction worth keeping: field-error flattening and a per-call
+   * meter callback both stayed in their products, because a product can write those itself. This
+   * one it cannot, at any price, and a capability the kit makes unreachable is a regression the kit
+   * has to undo.
    *
-   * The BODY has already been read by the time this runs — the envelope was needed to build the
-   * error — so `response.json()` here throws. The headers are what is left, and what this is for.
+   * The BODY has already been read by the time this runs to build the error from the envelope, so
+   * `response.json()` here throws. The headers are what is left, and what this is for.
    */
   onError?: (error: ApiError, response: Response) => void;
   /**
    * Abort a request that has not answered. Default 30s.
    *
-   * Neither donor bounded its authenticated requests at all — both bounded only their keyless
-   * clients — so a stalled connection was a spinner with no end. providerkit learned the same
-   * lesson about streams: a request with no deadline is a bug that only shows up on a bad
-   * network, which is exactly when nobody can reproduce it.
+   * Neither donor bounded its authenticated requests. Both bounded only their keyless clients, so a
+   * stalled connection was a spinner with no end. providerkit learned the same lesson about
+   * streams: a request with no deadline is a bug that only shows up on a bad network, which is
+   * exactly when nobody can reproduce it.
    */
   timeoutMs?: number;
   /** How many times to refresh-and-retry a 401. Default 2. */
@@ -127,9 +127,9 @@ export interface ApiClientOptions {
   /**
    * How long to wait for `signOut()` before redirecting anyway. Default 3s.
    *
-   * A fail-safe, and one donor added it after the failure it prevents: awaiting `signOut()`
-   * covers a rejection but not a HANG, and a hang leaves the tab signed out in name only —
-   * still on the page, every request 401ing, nothing left that could redirect it.
+   * A fail-safe, and one donor added it after the failure it prevents: awaiting `signOut()` covers
+   * a rejection but not a HANG, and a hang leaves the tab signed out in name only: still on the
+   * page, every request 401ing, nothing left that could redirect it.
    */
   signOutTimeoutMs?: number;
   /** Header carrying the server's request id, echoed onto {@link ApiError.requestId}. */
@@ -151,9 +151,9 @@ export interface ApiClient {
   put<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>;
   patch<T>(path: string, body?: unknown, options?: RequestOptions): Promise<T>;
   /**
-   * DELETE, discarding whatever comes back. Returns `void` because 204 is the usual answer and
-   * a 204 has NO BODY — `res.json()` on one throws `Unexpected end of JSON input`, which reads
-   * like a malformed response and is really just a success nobody was allowed to parse.
+   * DELETE, discarding whatever comes back. Returns `void` because 204 is the usual answer and a
+   * 204 has NO BODY. `res.json()` on one throws `Unexpected end of JSON input`, which reads like a
+   * malformed response and is really just a success nobody was allowed to parse.
    *
    * Split from {@link ApiClient.delJson} rather than guessing per response, because the guess is
    * the part that hides a bug: a route that was supposed to answer with data and returned
@@ -161,21 +161,21 @@ export interface ApiClient {
    * layers away. The donor that hit this had written exactly these two functions.
    */
   del(path: string, options?: RequestOptions): Promise<void>;
-  /** The DELETE that answers with something worth reading — a queue entry it handed back. */
+  /** The DELETE that answers with something worth reading, such as a queue entry it handed back. */
   delJson<T>(path: string, options?: RequestOptions): Promise<T>;
   /**
-   * The whole envelope rather than just `data`, for a route whose `meta` is half the answer —
-   * a list's `total`, or a metered call's receipt.
+   * The whole envelope rather than just `data`, for a route whose `meta` is half the answer, such
+   * as a list's `total` or a metered call's receipt.
    */
   page<T, M>(path: string, options?: RequestOptions): Promise<ApiSuccess<T, M>>;
   /**
    * The same, off a POST.
    *
-   * Two adopters needed this and both wrote the same workaround: `client.request(…)` followed by
-   * a hand-rolled `res.json()`, stepping around the client's own envelope reader and its one
-   * assertion about the success shape. One of them left the reason sitting in a comment — "the
-   * whole envelope is reachable off a GET and not off a POST, so this one reads the body itself"
-   * — which is this package describing its own gap in somebody else's file.
+   * Two adopters needed this and both wrote the same workaround: `client.request(…)` followed by a
+   * hand-rolled `res.json()`, stepping around the client's own envelope reader and its one
+   * assertion about the success shape. One of them left the reason sitting in a comment: "the whole
+   * envelope is reachable off a GET and not off a POST, so this one reads the body itself". This
+   * package's gap was described in somebody else's file.
    *
    * A metered route takes a body whenever its input is too long or too punctuated to be a path
    * segment (a URL, a search query), and then the receipt has to survive the POST too. When the

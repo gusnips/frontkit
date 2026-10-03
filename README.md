@@ -3,7 +3,7 @@
 The layer under a Vite + React SPA: the build rig, the fetch client, the auth store, the
 guards, the tokens.
 
-Not a component library. There is no Button here, and there never will be — the two best copies
+Not a component library. There is no Button here, and there never will be: the two best copies
 in the repos this came from are 104 lines and 60 lines, and they share the idea and nothing
 else. Behaviour is shared, skin is not.
 
@@ -58,13 +58,13 @@ const user = await api.get<User>("/me");
 ```
 
 Two things in there took a production incident each to learn. Six queries firing at once send
-**one** refresh, not six — the auth server rotates the refresh token, so the losers of that race
+**one** refresh, not six. The auth server rotates the refresh token, so the losers of that race
 each invalidate the winner and sign the person out mid-load. And a refresh that never _reached_
 the auth server does not count as a refusal: dropping a packet says nothing about whether a
 session is good, so a Wi-Fi blip no longer signs anyone out.
 
 **Survives your deploys.** An app with `lazy()` routes serves chunks by hashed filename. Deploy
-while someone has a tab open and their next click asks for a file that no longer exists — a
+while someone has a tab open and their next click asks for a file that no longer exists: a
 white screen on a button that worked a minute ago.
 
 ```ts
@@ -80,12 +80,12 @@ A required prop is the only version of that rule a caller in a hurry cannot skip
 ## Where it came from
 
 Twelve private frontends, all on the same stack, that had each independently grown the same
-layer — about 48,000 lines solving one problem nine times. Six filenames exist in all twelve.
+layer, about 48,000 lines solving one problem nine times. Six filenames exist in all twelve.
 
 They were not copies, and that is the point. Three of them separately invented the same
 hydration guard, down to the attribute name. Three separately invented single-flight token
 refresh. Three wrote three different retry rules, and **each one was right about something the
-other two got wrong** — one allowed 408 through, one knew a spent quota does not clear by
+other two got wrong**: one allowed 408 through, one knew a spent quota does not clear by
 waiting, one refetched on reconnect. All three are in here now.
 
 Reading them against each other found nine live bugs, in repos that were not even the source.

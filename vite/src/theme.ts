@@ -5,8 +5,7 @@
  * It lives behind its own subpath because it imports the controller, and that module imports
  * React. The barrel stays free of React so a script that only wants a sitemap does not load it.
  *
- * The delivery — a hashed same-origin file and one classic `<script src>`, never inline — is
- * `prePaintScript`'s, and that module says why. What is particular to the theme:
+ * `prePaintScript` owns the delivery: a hashed same-origin file and one classic `<script src>`, never inline, and that module says why. What is particular to the theme:
  *
  * - **Not hand-written.** The file is `startTheme`'s own source, called with your options. The
  *   script that paints first and the controller the app talks to cannot disagree, because they

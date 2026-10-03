@@ -12,8 +12,8 @@ const TEXTAREA_MAX_HEIGHT = 160;
 /**
  * The inline height an autosizing textarea should carry, or `""` for "leave it to CSS".
  *
- * ponytail: this whole observer is here only until `field-sizing: content` is baseline —
- * one CSS line does the same job. Ceiling: it does not exist in every browser we support yet.
+ * ponytail: this whole observer is here only until `field-sizing: content` is baseline. One CSS
+ * line does the same job. Ceiling: it does not exist in every browser we support yet.
  */
 export function textareaHeight(clientWidth: number, scrollHeight: number): string {
   if (clientWidth < TEXTAREA_MIN_AUTO_WIDTH) return "";

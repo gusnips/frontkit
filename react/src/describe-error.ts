@@ -6,21 +6,21 @@ import { shouldRetry } from "./query.ts";
  * Turning anything thrown into copy a person can act on.
  *
  * The API already answers with a message written for a developer, a stable `messageKey` for the
- * domain refusals, and `details` carrying the parts that make a refusal actionable. This is the
- * one place that decides what the SCREEN says — which is not always the same sentence.
- * "Monthly quota spent, upgrade or buy a pack" is right in a JSON body and wrong under a button
- * that could just say what to do next.
+ * domain refusals, and `details` carrying the parts that make a refusal actionable. This is the one
+ * place that decides what the SCREEN says. It is not always the same sentence. "Monthly quota
+ * spent, upgrade or buy a pack" is right in a JSON body and wrong under a button that could just
+ * say what to do next.
  *
  * `cause` is what happened. `fix` is what to do about it. **A surface that shows only the first
- * half is the dead end this exists to prevent** — which is why the type has two fields and not
- * one, and why `fix` being absent should be a deliberate choice at each call site rather than
- * the default nobody noticed.
+ * half is the dead end this exists to prevent**. That is why the type has two fields and not one,
+ * and why `fix` being absent should be a deliberate choice at each call site rather than the
+ * default nobody noticed.
  *
- * `fix`, and not the `hint` this returned until 0.6.0. `ErrorStateProps` — the contract this same
- * package ships for the component that renders this — has always called it `fix`, so every
- * adopter wrote `fix={hint}` at every error surface: a rename adapter, which is the shape of an
- * API we got wrong. It also clears a collision, because in at least one adopter a form field's
- * `hint` is the requirement text under the input, which is a different thing entirely.
+ * `fix`, and not the `hint` this returned until 0.6.0. `ErrorStateProps`, the contract this same
+ * package ships for the component that renders this, has always called it `fix`, so every adopter
+ * wrote `fix={hint}` at every error surface: a rename adapter, which is the shape of an API we got
+ * wrong. It also clears a collision, because in at least one adopter a form field's `hint` is the
+ * requirement text under the input, which is a different thing entirely.
  *
  * The per-code switch stays in the product: two donors' switches shared their SHAPE and almost
  * no arms, because the arms are that API's vocabulary. What ships is the scaffolding around it,
@@ -30,11 +30,11 @@ import { shouldRetry } from "./query.ts";
 /**
  * Which control to offer beside the words.
  *
- * The fourth adopter had this and the package did not, which left every adopter re-deriving
- * "can a second attempt fix this" from its own switch — beside a `shouldRetry` already deciding
- * exactly that for react-query. Two answers to one question drift, and the drift is visible: a
- * screen offering "try again" for a refusal the query layer refuses to retry, so the button does
- * nothing and the reader presses it twice.
+ * The fourth adopter had this and the package did not, which left every adopter re-deriving "can a
+ * second attempt fix this" from its own switch, beside a `shouldRetry` already deciding exactly
+ * that for react-query. Two answers to one question drift, and the drift is visible: a screen
+ * offering "try again" for a refusal the query layer refuses to retry, so the button does nothing
+ * and the reader presses it twice.
  *
  * So this is DERIVED from `shouldRetry`, not switched on separately. One rule, two consumers.
  */
@@ -54,7 +54,7 @@ export interface ErrorCopy {
   cause: string;
   /** What to do about it. Its absence should be a decision, not an oversight. */
   fix?: string;
-  /** Override the derived kind — a 429 whose code means a spent quota is `"none"`, not `"wait"`. */
+  /** Override the derived kind. A 429 whose code means a spent quota is `"none"`, not `"wait"`. */
   recover?: RecoveryKind;
   /** Override the request id. Rarely wanted; the envelope's is used by default. */
   reference?: string;
@@ -66,14 +66,14 @@ export interface DescribedError extends ErrorCopy {
 }
 
 /**
- * The subset of i18next's `t` this module needs — typed here so `i18next` stays optional.
+ * The subset of i18next's `t` this module needs, typed here so `i18next` stays optional.
  *
- * `Key` is a parameter and not plain `string` for a reason the first migration found. Every app
- * on this stack declares `CustomTypeOptions.resources`, which types `t` to accept ONLY the keys
- * its catalog has — so a `t` is not assignable to anything asking for `(key: string) => string`,
- * and the adopter is left with a cast. Naming the keys instead turns that around: each function
- * below asks for exactly the keys it looks up, a typed `t` accepts a superset of them and goes
- * in directly, and a catalog missing one is a compile error rather than a raw key on screen.
+ * `Key` is a parameter and not plain `string` for a reason the first migration found. Every app on
+ * this stack declares `CustomTypeOptions.resources`, which types `t` to accept ONLY the keys its
+ * catalog has, so a `t` is not assignable to anything asking for `(key: string) => string`, and the
+ * adopter is left with a cast. Naming the keys instead turns that around: each function below asks
+ * for exactly the keys it looks up, a typed `t` accepts a superset of them and goes in directly,
+ * and a catalog missing one is a compile error rather than a raw key on screen.
  */
 export type Translate<Key extends string = string> = (
   key: Key,
@@ -87,8 +87,8 @@ type WaitName = "waitSeconds" | "waitMinutes" | "waitHours";
  * Every name {@link createErrorDescriber} looks up itself. Your catalog carries all of them.
  *
  * The three wait names are deliberately NOT here, which is the other half of 0.6.0. This module
- * used to humanize a stated wait itself, so `waitSeconds`/`waitMinutes`/`waitHours` — each with
- * an ICU plural — landed in the key union of every adopter's `t` whether or not a wait was ever
+ * used to humanize a stated wait itself, so `waitSeconds`/`waitMinutes`/`waitHours`, each with an
+ * ICU plural, landed in the key union of every adopter's `t` whether or not a wait was ever
  * rendered. An app that formats waits with `Intl.RelativeTimeFormat` needs none of them and was
  * left adding six entries per language to satisfy a compiler. `formatWait` owns that now.
  */
@@ -99,11 +99,11 @@ type CopyName = "network" | "networkHint" | "unexpected" | "retrySoon";
  *
  * i18next keeps `seatLimitReached_one` and `seatLimitReached_other`; the server sends
  * `serverErrors.seatLimitReached`, because that is the key a person resolves with a `count`. So
- * `Object.keys` on a catalog does NOT contain the name the server actually sends, and a gate
- * built from it alone rejects a sentence the app is carrying — falling back to the server's
- * English for the one refusal that had a written answer. Measured in the seventh migration: two
- * of that API's 112 keys, both of them plan limits, both of them the exact screen where a
- * specific sentence earns its keep.
+ * `Object.keys` on a catalog does NOT contain the name the server actually sends, and a gate built
+ * from it alone rejects a sentence the app is carrying, falling back to the server's English for
+ * the one refusal that had a written answer. Measured in the seventh migration: two of that API's
+ * 112 keys, both of them plan limits, both of them the exact screen where a specific sentence earns
+ * its keep.
  */
 type PluralSuffix = "zero" | "one" | "two" | "few" | "many" | "other";
 type PluralBase<N extends string> = N extends `${infer Base}_${PluralSuffix}` ? Base : N;
@@ -135,17 +135,17 @@ type _TypedCatalogNeedsNoCast = Satisfied<
 >;
 
 /**
- * "in 4 minutes" / "in 2 hours" — a wait nobody has to convert from seconds.
+ * Format a wait as "in 4 minutes" or "in 2 hours", without making the reader convert seconds.
  *
  * The thresholds are deliberately not round: 90 seconds rather than 60, so "in 75 seconds" does
  * not become the less precise "in 1 minute", and 90 minutes rather than 60 for the same reason
  * one rung up. Needs `waitSeconds` / `waitMinutes` / `waitHours` under `prefix`, each with a
  * `count` plural.
  *
- * This is what you pass as `formatWait` when your catalog carries those three:
- * `formatWait: (secs) => humanizeWait(t, secs, "errors.")`. An app that formats a wait with
- * `Intl.RelativeTimeFormat` passes its own one-liner instead and needs no wait keys at all —
- * which also gets it correct plurals in languages with more than two forms, for free.
+ * This is what you pass as `formatWait` when your catalog carries those three: `formatWait: (secs)
+ * => humanizeWait(t, secs, "errors.")`. An app that formats a wait with `Intl.RelativeTimeFormat`
+ * passes its own one-liner instead and needs no wait keys at all. It also gets correct plurals in
+ * languages with more than two forms, for free.
  */
 export function humanizeWait<Prefix extends string>(
   t: Translate<`${Prefix}${WaitName}`>,
@@ -181,17 +181,17 @@ interface DescriberRules {
    * How a stated wait becomes words, for the `wait` an arm reads off its context.
    *
    * Required rather than defaulted, because there is no answer that is right for everyone and a
-   * default hid the cost: {@link humanizeWait} reads three ICU plural keys out of your catalog,
-   * and an app that already formats relative time with `Intl` would have had to add them to
-   * compile. Say which you want — `(secs) => humanizeWait(t, secs, "errors.")`, or your own
-   * `(secs) => formatIn(secs, locale)` — and the catalog you need is the one you can see.
+   * default hid the cost: {@link humanizeWait} reads three ICU plural keys out of your catalog, and
+   * an app that already formats relative time with `Intl` would have had to add them to compile.
+   * Pass `(secs) => humanizeWait(t, secs, "errors.")` or your own `(secs) => formatIn(secs,
+   * locale)`. The choice makes the catalog you need visible.
    */
   formatWait: (secs: number) => string;
   /**
    * Per-code copy. Everything not listed falls through to the default arm.
    *
-   * The arms look up the app's own keys, so they close over the app's `t` rather than being
-   * handed one — this module has no names for that copy and no business typing it.
+   * The arms look up the app's own keys, so they close over the app's `t` rather than being handed
+   * one. This module has no names for that copy and no business typing it.
    *
    * Annotate your object `Partial<Record<YourErrorCode, ErrorArm>>` where you write it, and a
    * code that does not exist is a compile error at the arm rather than a branch that never runs.
@@ -201,21 +201,21 @@ interface DescriberRules {
    * What to say when nothing in `codes` matches: a code this build has no arm for, or an answer
    * with no envelope at all.
    *
-   * The built-in arm hands the reader the server's own `message`, and for one API in the fleet
-   * that is right — its message IS the sentence a person should read. For another it is exactly
+   * The built-in arm hands the reader the server's own `message`, and for one API in the fleet that
+   * is right, because its message IS the sentence a person should read. For another it is exactly
    * wrong: that repo's own i18n rules say `message` is "the English fallback for logs", and it
    * ships three languages, so the built-in would put developer English in front of a reader who
-   * does not speak it. One default cannot be right for both, and the one baked in here was
-   * simply the first adopter's convention, mistaken for a fact.
+   * does not speak it. One default cannot be right for both, and the one baked in here was simply
+   * the first adopter's convention, mistaken for a fact.
    *
    * An arm here is also handed the stated wait, which the built-in spends on nothing: a refusal
    * with no arm of its own could state its expiry and have that go unsaid.
    */
   fallback?: ErrorArm;
   /**
-   * The codes that mean "this limit does not clear by waiting" — **the same list you hand
-   * `queryDefaults`**, because it answers the same question and a second copy is a second
-   * chance to disagree with the retry rule. Declare it once in the app and pass it twice.
+   * The codes that mean "this limit does not clear by waiting". Pass **the same list to
+   * `queryDefaults`**, because it answers the same question and a second copy is a second chance to
+   * disagree with the retry rule. Declare it once in the app and pass it twice.
    */
   durableLimitCodes?: readonly string[];
   /** Longest stated wait still worth a retry rather than a countdown. Matches `queryDefaults`. */
@@ -230,10 +230,10 @@ export interface ErrorDescriberOptions<
   /**
    * Checked against the keys, never used to find them: the three type parameters come from
    * `copyPrefix`, `messageKeyPrefix` and `knownMessageKeys`. With `t` as a source too, the call
-   * every adopter writes — an inline `(key, params) => i18n.t(key, params)` beside an inline arm —
+   * every adopter writes, an inline `(key, params) => i18n.t(key, params)` beside an inline arm,
    * failed overload resolution (TS2769, measured on TypeScript 5.9.3) once the one-language
-   * overload existed, although this signature alone accepted it. A typed `t` missing a key is
-   * still refused.
+   * overload existed, although this signature alone accepted it. A typed `t` missing a key is still
+   * refused.
    */
   t: Translate<
     NoInfer<`${Prefix}${CopyName}` | `${ServerPrefix}${ServerName | PluralBase<ServerName>}`>
@@ -242,13 +242,13 @@ export interface ErrorDescriberOptions<
   copyPrefix: Prefix;
   /**
    * The server's own catalog namespace, e.g. `"serverErrors."`. A `messageKey` outside it is
-   * ignored — the server names a sentence, it does not get to name any key in the app.
+   * ignored. The server names a sentence, it does not get to name any key in the app.
    *
-   * The `code` is read under this prefix too, for an API that has no `messageKey` field and
-   * lets the code name the sentence — one repo in the fleet has 98 of those, `errors.NOT_FOUND`
-   * and its siblings, against another repo's `messageKey`. Both are the same claim ("the server
-   * named a sentence this app carries"), both pass the same gate below, and an app that uses
-   * neither is unaffected because nothing matches.
+   * The `code` is read under this prefix too, for an API that has no `messageKey` field and lets
+   * the code name the sentence. One repo in the fleet has 98 of those, `errors.NOT_FOUND` and its
+   * siblings, against another repo's `messageKey`. Both are the same claim ("the server named a
+   * sentence this app carries"), both pass the same gate below, and an app that uses neither is
+   * unaffected because nothing matches.
    */
   messageKeyPrefix: ServerPrefix;
   /**
@@ -256,13 +256,13 @@ export interface ErrorDescriberOptions<
    * catalog. Passing the catalog itself is both the membership test and the proof the compiler
    * wants: a name that is in it IS a key, so the lookup below needs no cast.
    *
-   * It is required because leaving it out is not a smaller version of this — it is the bug the
-   * option exists to prevent. i18next answers a key it does not have with the key itself, so a
+   * It is required because leaving it out reintroduces the bug the option exists to prevent rather
+   * than making this smaller. i18next answers a key it does not have with the key itself, so a
    * deploy landing ahead of the bundle a tab is still running would render `serverErrors.foo` at
    * somebody. A name that is absent falls back to the server's English `message` instead.
    *
-   * Hand it over as it is. A plural sits in the catalog under suffixed names while the server
-   * names the base, so the base is admitted too — see {@link PluralBase}.
+   * Hand it over as it is. A plural sits in the catalog under suffixed names while the server names
+   * the base, so the base is admitted too. See {@link PluralBase}.
    */
   knownMessageKeys: Record<ServerName, unknown>;
   /**
@@ -270,13 +270,13 @@ export interface ErrorDescriberOptions<
    *
    * The envelope carries what the SERVER knows, which is not always a word anyone should read: a
    * role id (`admin`), an action verb (`approve_content`). The sentence needs whatever the app's
-   * own screens call those things, and the substitution happens here — inside the one lookup that
-   * reads `params` — so there is nowhere else an adopter could intervene. Without this seam the
-   * choice is to ship the raw id into `{{role}}`, or to stop using the server's sentence at all
-   * and re-resolve every key by hand, which is how i18n ended up inside a transport once already.
+   * own screens call those things, and the substitution happens here, inside the one lookup that
+   * reads `params`. There is nowhere else an adopter could intervene. Without this seam the choice
+   * is to ship the raw id into `{{role}}`, or to stop using the server's sentence at all and
+   * re-resolve every key by hand, which is how i18n ended up inside a transport once already.
    *
    * Optional, and identity by default: an API whose params are already words passes nothing. It
-   * deliberately takes only the params — an arm that needs the error has `ctx` for that.
+   * deliberately takes only the params. An arm that needs the error has `ctx` for that.
    */
   localizeParams?: (
     params: Record<string, string | number> | undefined,

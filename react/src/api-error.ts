@@ -3,9 +3,9 @@ import type { ApiErrorBody } from "@gusnips/http";
 /**
  * A refusal, with the whole envelope intact.
  *
- * `code` is what the UI switches on, `messageKey` is what gets localized, and `details` carries
- * the parts that make a refusal actionable — the `resetAt` on a 429, the plan that lifts a 402.
- * Keeping all of it means a caller never has to re-parse a response body that has already been
+ * `code` is what the UI switches on, `messageKey` is what gets localized, and `details` carries the
+ * parts that make a refusal actionable, such as the `resetAt` on a 429 or the plan that lifts a
+ * 402. Keeping all of it means a caller never has to re-parse a response body that has already been
  * read once.
  *
  * A real `class` and not an interface with a factory: one donor used the interface shape, which
@@ -23,17 +23,17 @@ export class ApiError extends Error {
    *
    * Read from the `Retry-After` HEADER, which is where HTTP puts it and where a rate limiter
    * written by anyone puts it. The second migration is why this exists: that API sends
-   * `Retry-After: 60` on every 429 and nothing in its body, so the package's only reader —
-   * which looked in `details.retryAfterSecs`, the first donor's convention — found nothing, and
-   * both the copy and the retry rule were flying blind on the one refusal that states its own
-   * expiry. Two conventions, same fact; `retryAfterSecs` from `@gusnips/http/retry` reads either.
+   * `Retry-After: 60` on every 429 and nothing in its body, so the package's only reader looked in
+   * `details.retryAfterSecs`, the first donor's convention, and found nothing, and both the copy
+   * and the retry rule were flying blind on the one refusal that states its own expiry. Two
+   * conventions, same fact; `retryAfterSecs` from `@gusnips/http/retry` reads either.
    */
   readonly retryAfterSecs: number | undefined;
 
   /**
-   * The client raised this itself to stop a caller while it was already handling the
-   * situation — today, the 401 thrown after a dead session, where the person is already on
-   * their way to the sign-in page.
+   * The client raised this itself to stop a caller while it was already handling the situation.
+   * Today this is the 401 thrown after a dead session, where the person is already on their way to
+   * the sign-in page.
    *
    * It is control flow, not a fault. Exception reporting should skip it, and an error surface
    * should not ask somebody to retry something that is not broken. One donor had this and it is
@@ -65,7 +65,7 @@ export class ApiError extends Error {
 }
 
 /**
- * An aborted request — the caller's own `AbortController`, or a navigation that unmounted the
+ * A request aborted by the caller's own `AbortController` or a navigation that unmounted the
  * component waiting on it.
  *
  * Worth its own predicate because it is the one failure that must NOT be reported, retried or

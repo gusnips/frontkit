@@ -18,7 +18,7 @@ export type RenderIcon = (svg: string, size: number) => Uint8Array | Promise<Uin
 export type PackIco = (pngs: readonly Uint8Array[]) => Uint8Array | Promise<Uint8Array>;
 
 export interface WriteIconSetOptions {
-  /** Where the files land — `public/` in every donor, so they are served as static files. */
+  /** Where the files land. Every donor uses `public/`, so they are served as static files. */
   outDir: string;
   /** The one master artwork. A single path with no variants is what keeps every size in step. */
   svg: string;
@@ -27,9 +27,9 @@ export interface WriteIconSetOptions {
   /** The file name for one PNG size. Default `` `icon-${size}.png` ``. */
   file?: (size: number) => string;
   /**
-   * The size written as `apple-touch-icon.png`. Default 180 — what the reader's home screen
-   * asks for. Reuses the PNG render when it is already in `pngSizes`, so the common case costs
-   * no extra raster.
+   * The size written as `apple-touch-icon.png`. Defaults to 180, the size the reader's home screen
+   * asks for. Reuses the PNG render when it is already in `pngSizes`, so the common case costs no
+   * extra raster.
    */
   appleTouchSize?: number;
   /** Sizes re-rendered and packed into `favicon.ico`, e.g. `[16, 32, 48]`. */
@@ -44,7 +44,7 @@ export interface WriteIconSetOptions {
  * Render one icon set and write it, plus the multi-size `favicon.ico`.
  *
  * Every size is rendered BEFORE anything is written, so a renderer that throws leaves no
- * half-written set behind — the same order `writeOgCards` keeps for the same reason.
+ * half-written set behind. This is the same order `writeOgCards` keeps for the same reason.
  */
 export async function writeIconSet({
   outDir,
@@ -100,7 +100,7 @@ export interface WebManifestOptions {
   display?: string;
   backgroundColor?: string;
   themeColor?: string;
-  /** At least one — a manifest with no icons fails installability with no error anywhere. */
+  /** At least one icon is required. A manifest with no icons fails installability with no error anywhere. */
   icons: readonly ManifestIcon[];
 }
 
@@ -121,7 +121,7 @@ export function webManifest({
 }: WebManifestOptions): string {
   if (name.trim() === "") throw new Error("manifest: `name` is empty");
   if (icons.length === 0)
-    throw new Error("manifest: `icons` is empty — name what writeIconSet wrote");
+    throw new Error("manifest: `icons` is empty. Name what writeIconSet wrote");
   const manifest: Record<string, unknown> = { name };
   if (shortName !== undefined) manifest["short_name"] = shortName;
   if (description !== undefined) manifest["description"] = description;

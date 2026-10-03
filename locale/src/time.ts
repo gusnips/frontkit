@@ -10,9 +10,9 @@
  * 21:00, because one side wrote the São Paulo day and the other asked for the UTC one.
  *
  * So the zone is always an ARGUMENT, never a default and never the process's. Which zone decides a
- * period is a product decision — the billing zone, the customer's, UTC, or Pacific for a quota a
- * Google API resets at its own midnight — and nothing here guesses it. The host's zone is never
- * read: no box in the fleet pinned `TZ`, so reading it means the answer depends on a machine.
+ * period is a product decision: the billing zone, the customer's, UTC, or Pacific for a quota a
+ * Google API resets at its own midnight. Nothing here guesses it. The host's zone is never read: no
+ * box in the fleet pinned `TZ`, so reading it means the answer depends on a machine.
  *
  * Intl only, no dependency. `Temporal` is undefined on node 22, node 26 and bun 1.3 (measured
  * 2026-09-23), and a date library would put a dependency under a package servers, browsers and
@@ -24,7 +24,7 @@
  *   instant has to be pinned to SOME hour, and every hour anyone picks is wrong for part of the day.
  * - **A day's start is computed, not assumed to be midnight.** Some zones skip midnight on the day
  *   their clocks go forward (São Paulo did until 2019; Santiago and Havana still do), so the day
- *   starts at 01:00. A two-pass offset guess — the most-copied technique here — lands an hour
+ *   starts at 01:00. A two-pass offset guess, the most-copied technique here, lands an hour
  *   early on exactly those days (measured).
  */
 
@@ -37,21 +37,21 @@ export type MonthKey = string;
 const UTC_OFFSET = /^[+-]\d{1,2}(:?\d{2})?$/;
 
 /**
- * An IANA zone the runtime can render, in the runtime's spelling — or null.
+ * An IANA zone the runtime can render, in the runtime's spelling, or null.
  *
  * Validated by BUILDING a formatter, not by looking the name up in
- * `Intl.supportedValuesOf("timeZone")`: that list has 418 entries on node and 445 on bun
- * (measured 2026-09-23), so a list-based check accepts a zone on one side of the wire and refuses it on the
- * other. What this answers is the only question that matters — can a time be rendered in it.
+ * `Intl.supportedValuesOf("timeZone")`: that list has 418 entries on node and 445 on bun (measured
+ * 2026-09-23), so a list-based check accepts a zone on one side of the wire and refuses it on the
+ * other. What this answers is the only question that matters: can a time be rendered in it?
  *
  * It normalizes CASE (`america/sao_paulo` → `America/Sao_Paulo`). It does not reliably fold
  * aliases: node turns `Brazil/East` into `America/Sao_Paulo` and bun keeps it as written. Both
  * spellings render the same times, so the cost is two stored spellings of one zone, not a wrong
  * time.
  *
- * A bare offset is refused even though Intl accepts it. `-03:00` is a fixed shift with no rules,
- * so someone who stored one drifts an hour off for half of every year the moment their region
- * changes its clocks — the exact failure a zone preference exists to prevent. Zones only.
+ * A bare offset is refused even though Intl accepts it. `-03:00` is a fixed shift with no rules, so
+ * someone who stored one drifts an hour off for half of every year the moment their region changes
+ * its clocks. That is the exact failure a zone preference exists to prevent. Zones only.
  */
 export function canonicalTimeZone(raw: string): string | null {
   if (UTC_OFFSET.test(raw.trim())) return null;
@@ -137,7 +137,7 @@ function wallAsUtc(at: Date | number, timeZone: string): number {
 }
 
 /** The zone's wall clock at an instant. Throws a `RangeError` for a zone the runtime does not
- *  know — validate stored zones with {@link canonicalTimeZone} where they come in. */
+ *  know. Validate stored zones with {@link canonicalTimeZone} where they come in. */
 export function wallClock(at: Date | number, timeZone: string): WallClock {
   const wall = new Date(wallAsUtc(at, timeZone));
   return {
@@ -216,8 +216,8 @@ export function addDays(day: DayKey, n: number): DayKey {
 
 /**
  * A day key `n` months later, clamped to the end of a shorter month: Jan 31 + 1 is Feb 28 (29 in a
- * leap year), and Feb 29 + 12 is Feb 28. `Date.prototype.setMonth` overflows instead — Jan 31 + 1
- * becomes Mar 3 — which is how a monthly renewal once fell due in the wrong month.
+ * leap year), and Feb 29 + 12 is Feb 28. `Date.prototype.setMonth` overflows instead: Jan 31 + 1
+ * becomes Mar 3. That is how a monthly renewal once fell due in the wrong month.
  */
 export function addMonths(day: DayKey, n: number): DayKey {
   dayMs(day);
@@ -277,9 +277,9 @@ const dayFormats = new Map<string, Intl.DateTimeFormat>();
 /**
  * A day key for a reader: `formatDayKey("2026-09-23", "pt-BR")` is `23/09/2026` on every machine.
  *
- * Rendered in UTC on purpose, because the key has no zone to render in. The obvious version,
- * `new Date("2026-09-23").toLocaleDateString()`, parses the key as UTC midnight and then shows it
- * in the viewer's zone — the day before, for everyone west of UTC. Four repos re-derived this fix
+ * Rendered in UTC on purpose, because the key has no zone to render in. The obvious version, `new
+ * Date("2026-09-23").toLocaleDateString()`, parses the key as UTC midnight and then shows it in the
+ * viewer's zone. For everyone west of UTC, that is the day before. Four repos re-derived this fix
  * after shipping that bug; one had it right in one file and wrong two files away.
  */
 export function formatDayKey(

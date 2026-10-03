@@ -1,10 +1,10 @@
 /**
  * The build-time half of a prerendered Vite + React SPA.
  *
- * A Vite SPA ships one `index.html` and draws the rest with JavaScript. Nothing that reads a
- * link for a living runs that bundle — not a search crawler, not an LLM, not the thing that
- * draws the preview card in a chat app. So the build renders every public route to a real file
- * with a real `<head>` and a real body, and this is the part every app doing that shares.
+ * A Vite SPA ships one `index.html` and draws the rest with JavaScript. Nothing that reads a link
+ * for a living runs that bundle, whether it is a search crawler, an LLM or the thing that draws the
+ * preview card in a chat app. So the build renders every public route to a real file with a real
+ * `<head>` and a real body, and this is the part every app doing that shares.
  *
  * Four repos wrote it independently and each learned something the others had not. What is
  * here is the merge; every non-obvious rule carries the reason it exists.
@@ -13,9 +13,9 @@
  * otherwise force on everyone: the vite config preset at `@gusnips/vite/preset` (the React and
  * Tailwind plugins), `renderTree` at `@gusnips/vite/render`, the theme pre-paint plugin at
  * `@gusnips/vite/theme` (both React itself), the catalog check at `@gusnips/vite/i18n`, and the
- * contrast gate at `@gusnips/vite/contrast` (tailwindcss) — the last two run in CI and never in
- * a build. Nothing here imports React, vite or tailwindcss, so a prerender script, an OG
- * generator and a repo that only wants a sitemap all install exactly what they use.
+ * contrast gate at `@gusnips/vite/contrast` (tailwindcss). The last two run in CI and never in a
+ * build. Nothing here imports React, vite or tailwindcss, so a prerender script, an OG generator
+ * and a repo that only wants a sitemap all install exactly what they use.
  */
 export { resolveKey } from "./catalog.ts";
 // `headExtra` takes raw markup, so the moment an adopter builds a tag out of its own copy it

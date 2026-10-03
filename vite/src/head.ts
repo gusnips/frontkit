@@ -15,7 +15,7 @@
 import { PRERENDERED_ROUTE_ATTR } from "@gusnips/react/contract";
 import { escapeAttr, escapeRegex } from "./escape.ts";
 
-/** The empty root a template must carry — `bakeHead` fills it, and refuses a filled one. */
+/** The empty root a template must carry. `bakeHead` fills it and refuses a filled one. */
 export const EMPTY_ROOT = '<div id="root"></div>';
 
 /**
@@ -106,7 +106,7 @@ function setMetaIfPresent(html: string, patterns: readonly RegExp[], value: stri
   return rewriteAttr(html, patterns, value) ?? html;
 }
 
-/** One `<link rel="alternate" hreflang>` — this page's address in another language. */
+/** One `<link rel="alternate" hreflang>` for this page's address in another language. */
 export interface Alternate {
   /** A BCP-47 tag, or `x-default` for the address a crawler should show when it has no reason
    *  to prefer one. */
@@ -122,17 +122,16 @@ export interface HeadTags {
   /**
    * The page's own URL, for `<link rel="canonical">` and the share tags.
    *
-   * `null` means this page has no canonical URL and must not claim one — the 404 shell, which
-   * is served for every address that does not exist and would otherwise tell a crawler that
+   * `null` means this page has no canonical URL and must not claim one, as with the 404 shell,
+   * which is served for every address that does not exist and would otherwise tell a crawler that
    * all of them are the front page.
    */
   canonical: string | null;
   ogTitle?: string;
   ogDescription?: string;
-  /** Absolute URL of the share card. Omit where the template carries no `og:image` tag at all
-   *  — setting one there is a build error, by design. */
+  /** Absolute URL of the share card. Omit where the template carries no `og:image` tag. Setting one there is a build error, by design. */
   image?: string;
-  /** Markup inserted before `</head>` — structured data, and nothing else so far. Emitted here
+  /** Markup inserted before `</head>` for structured data, and nothing else so far. Emitted here
    *  because its only reader is a crawler. */
   headExtra?: string;
   /** Keep this page out of every index. Pairs with `canonical: null`. */
@@ -142,8 +141,8 @@ export interface HeadTags {
    * goes with it.
    *
    * A crawler and a screen reader both read `lang`, and neither runs the bundle that would
-   * otherwise set it — so a Portuguese file whose `<html>` still says `en` is announced in the
-   * wrong voice and indexed as the wrong language.
+   * otherwise set it, so a Portuguese file whose `<html>` still says `en` is announced in the wrong
+   * voice and indexed as the wrong language.
    */
   lang?: string;
   /**
@@ -158,14 +157,14 @@ export interface HeadTags {
    * The rendered page, injected into `<div id="root">`, and the route it is a render OF.
    *
    * The head alone was never enough. A shipped `<div id="root"></div>` is a page whose entire
-   * content is a description tag — it can be listed, and it can never be read, quoted or
-   * answered from.
+   * content is a description tag. It can be listed, and it can never be read, quoted or answered
+   * from.
    *
-   * The two travel together because markup alone is not enough to hydrate against. A static
-   * host answers every unpublished address with the nearest `404.html`, and that file has a
-   * rendered body in it — so a route served from the shell would find a full root and hydrate
-   * the not-found page into a page that is not it. The marker is what the browser entry
-   * compares its own route against before deciding to hydrate or to mount fresh.
+   * The two travel together because markup alone is not enough to hydrate against. A static host
+   * answers every unpublished address with the nearest `404.html`, and that file has a rendered
+   * body in it, so a route served from the shell would find a full root and hydrate the not-found
+   * page into a page that is not it. The marker is what the browser entry compares its own route
+   * against before deciding to hydrate or to mount fresh.
    */
   body?: { route: string; html: string };
 }
@@ -174,18 +173,18 @@ export interface HeadTags {
  * A BCP-47 tag in Open Graph's spelling: underscore, and a TERRITORY it will not infer.
  *
  * `og:locale` wants `language_TERRITORY` and quietly ignores anything else, which is the same
- * outcome as omitting it — the `en_US` default. So a Portuguese page with a Portuguese
- * `og:title` and no `og:locale` tells every share crawler the card is English. `pt-BR` already
- * carries its territory; `en` and `es` do not, so one is chosen here rather than left to a
- * crawler. `es_ES` is not a claim that the copy is peninsular Spanish — it is the most widely
- * recognised Spanish value, and the tag's job is to be understood, not precise about dialect.
+ * outcome as omitting it: the `en_US` default. So a Portuguese page with a Portuguese `og:title`
+ * and no `og:locale` tells every share crawler the card is English. `pt-BR` already carries its
+ * territory; `en` and `es` do not, so one is chosen here rather than left to a crawler. `es_ES` is
+ * not a claim that the copy is peninsular Spanish. It is the most widely recognised Spanish value,
+ * and the tag's job is to be understood, not precise about dialect.
  */
 export function ogLocale(tag: string): string {
   const TERRITORY: Record<string, string> = { en: "en_US", es: "es_ES" };
   return TERRITORY[tag] ?? tag.replace("-", "_");
 }
 
-/** One question and its answer, as the page renders them — pass the same strings, so the
+/** One question and its answer, as the page renders them. Pass the same strings, so the
  *  structured data cannot drift from the copy. One donor's template carried four questions
  *  where the page renders seven, and nothing compared them until the migration. */
 export interface FaqEntry {
@@ -196,11 +195,11 @@ export interface FaqEntry {
 /**
  * FAQ structured data for `headExtra`, with the script-closing sequence escaped.
  *
- * A `</script>` inside an answer ends the element early and ships the rest of the JSON as
- * markup. `<\/` is the same string to a JSON parser and inert to an HTML one, so every `</`
- * becomes `<\/` and `<!--` becomes `<\!--`. `JSON.stringify` never emits `<` outside a string
- * — the structural characters are all brackets, quotes and digits — so the replace only ever
- * touches copy.
+ * A `</script>` inside an answer ends the element early and ships the rest of the JSON as markup.
+ * `<\/` is the same string to a JSON parser and inert to an HTML one, so every `</` becomes `<\/`
+ * and `<!--` becomes `<\!--`. `JSON.stringify` never emits `<` outside a string, since the
+ * structural characters are all brackets, quotes and digits. The replacement only ever touches
+ * copy.
  */
 export function faqJsonLd(faqs: readonly FaqEntry[]): string {
   const data = {
@@ -219,9 +218,9 @@ export function faqJsonLd(faqs: readonly FaqEntry[]): string {
 /**
  * One page's `<head>` and body, written into the built template.
  *
- * Every tag is SET rather than appended, and `setMeta` throws on a tag the template does not
- * carry — so the failure mode of editing `index.html` is a red build, never a page quietly
- * shipping somebody else's description.
+ * Every tag is SET rather than appended, and `setMeta` throws on a tag the template does not carry,
+ * so the failure mode of editing `index.html` is a red build, never a page quietly shipping
+ * somebody else's description.
  */
 export function bakeHead(template: string, tags: HeadTags): string {
   const shareTitle = tags.ogTitle ?? tags.title;
@@ -345,7 +344,7 @@ export function bakeHead(template: string, tags: HeadTags): string {
 }
 
 export interface RenderedChecks {
-  /** The BCP-47 tag this file must be marked with — the same `lang` passed to `bakeHead`. */
+  /** The BCP-47 tag this file must be marked with. Pass the same `lang` to `bakeHead`. */
   lang?: string;
   /** Bytes the page must have gained over the template before it counts as rendered.
    *  500 is the floor both donor builds ran with. */
@@ -375,11 +374,11 @@ const RENDERER_ERROR =
 /**
  * What every written file must be true of before the build is allowed to pass.
  *
- * The regression this exists for is a root that renders to nothing. A router whose location
- * does not match its routes yields empty markup with no error and no warning — it looks fine
- * in every browser and is invisible to everything that reads a link. Checking the bytes we
- * actually wrote is the only thing that catches it, and it needs no browser, so it gates the
- * BUILD rather than sitting in a test suite.
+ * The regression this exists for is a root that renders to nothing. A router whose location does
+ * not match its routes yields empty markup with no error and no warning. It looks fine in every
+ * browser and is invisible to everything that reads a link. Checking the bytes we actually wrote is
+ * the only thing that catches it, and it needs no browser, so it gates the BUILD rather than
+ * sitting in a test suite.
  *
  * The loading-screen check is the half a size floor misses. With `lazy()` routes behind one
  * `<Suspense fallback={<Spinner />}>`, a render that resolves nothing still produces a
@@ -455,5 +454,5 @@ export function assertRendered(
   // guard missed it from the other side: it failed a file containing a spinner class its splash
   // does not use. Two checks written for one regression, neither of which could ever fire.
   if (grew < SPLASH_MAX_GROWTH && head.includes('role="status"'))
-    fail("rendered the loading screen, not the page — something suspended and never resolved");
+    fail("rendered the loading screen, not the page. Something suspended and never resolved");
 }

@@ -37,18 +37,18 @@ export type MenuContentProps = Primitive.Popup.Props & {
   /** Where the portal mounts. Defaults to `<body>`. */
   container?: Primitive.Portal.Props["container"];
   /**
-   * Positioner props — `side`, `align`, `sideOffset`, `collisionPadding`, and the stacking
-   * order. The default `z-[60]` puts the menu above the overlay layer (z-50: dialog, drawer)
-   * so a menu opened inside a dialog is not painted behind it; raise it with
-   * `positionerProps={{ className: "z-[80]" }}` if the app stacks something higher.
+   * Positioner props: `side`, `align`, `sideOffset`, `collisionPadding` and the stacking order. The
+   * default `z-[60]` puts the menu above the overlay layer (z-50: dialog, drawer) so a menu opened
+   * inside a dialog is not painted behind it; raise it with `positionerProps={{ className: "z-[80]"
+   * }}` if the app stacks something higher.
    */
   positionerProps?: Primitive.Positioner.Props;
 };
 
 /**
- * A dropdown of decisions — the account menu, a row's actions, a picker. Portal, positioner
- * and popup composed once, for the same reason the dialog's are: the arrangement is not
- * optional and getting it wrong throws a number.
+ * A dropdown for choices, such as the account menu, a row's actions or a picker. Portal, positioner
+ * and popup composed once, for the same reason the dialog's are: the arrangement is not optional
+ * and getting it wrong throws a number.
  *
  * Roving focus, typeahead, escape, outside-dismiss and focus return all come from Base UI.
  * Nothing here re-implements any of them.
@@ -146,7 +146,7 @@ export function MenuGroup({ label, children, ...rest }: Primitive.Group.Props & 
   );
 }
 
-/** A set of choices — theme, locale, one axis of a filter. Same caption rule as `MenuGroup`. */
+/** A set of choices for a theme, locale or one axis of a filter. Same caption rule as `MenuGroup`. */
 export function MenuRadioGroup({
   label,
   children,

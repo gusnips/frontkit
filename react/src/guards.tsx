@@ -6,9 +6,9 @@ import { returnPathFromLocation, safeInternalPath } from "./internal-path.ts";
 /**
  * Route guards.
  *
- * Two donors wrote these four, gave two of them the same names, and explained them in nearly
- * the same words. What differed was one line — and that line is invariant 4, so it is the
- * reason this file exists rather than being copied a ninth time.
+ * Two donors wrote these four, gave two of them the same names, and explained them in nearly the
+ * same words. What differed was one line. That line is invariant 4, so it is the reason this file
+ * exists rather than being copied a ninth time.
  *
  * These are factories because the destinations are the app's: `paths.signIn` is not something a
  * package can know, and one donor hardcoded `/login` in four places for exactly that reason.
@@ -27,18 +27,18 @@ export interface SessionState {
 /**
  * The answer to a "who is this?" query, in the three states it actually has.
  *
- * This shape is invariant 4. A guard reading `!me?.isStaff` collapses "pending", "failed" and
- * "no" into one branch — so an operator arriving while `/auth/me` is 500ing is told the page
- * does not exist. Wrong cause, no retry, and no request id to quote to support. One donor hit
- * that and fixed it; the other still has the collapsed version.
+ * This shape is invariant 4. A guard reading `!me?.isStaff` collapses "pending", "failed" and "no"
+ * into one branch, so an operator arriving while `/auth/me` is 500ing is told the page does not
+ * exist. Wrong cause, no retry, and no request id to quote to support. One donor hit that and fixed
+ * it; the other still has the collapsed version.
  *
  * `"pending"` and not `"loading"` for one measured reason: it is react-query's own word for this
  * state since v5, and with the words matching a `UseQueryResult<TMe>` satisfies this type
- * STRUCTURALLY — `createRequireProfile(useMe, …)` takes the hook directly, no adapter. With
- * `"loading"` it does not typecheck and every adopter hand-writes the same six-line mapping;
- * eight of the twelve repos this serves are on react-query, and the first migration wrote that
- * mapping before anyone noticed. Nothing here imports react-query at runtime — the type stays
- * structural, so an app on SWR or a plain `useState` still answers it in three lines.
+ * STRUCTURALLY: `createRequireProfile(useMe, …)` takes the hook directly, no adapter. With
+ * `"loading"` it does not typecheck and every adopter hand-writes the same six-line mapping; eight
+ * of the twelve repos this serves are on react-query, and the first migration wrote that mapping
+ * before anyone noticed. Nothing here imports react-query at runtime. The type stays structural, so
+ * an app on SWR or a plain `useState` still answers it in three lines.
  */
 export type MeQuery<TMe> =
   { status: "pending" } | { status: "error"; error: unknown } | { status: "success"; data: TMe };
@@ -68,8 +68,8 @@ function signInUrl(signInPath: string, returnTo: string): string {
 }
 
 /**
- * Signed in, or off to sign in — remembering where they were headed, so the redirect afterwards
- * lands on the page they actually wanted rather than the home screen.
+ * Require sign-in and remember where they were headed, so the redirect afterwards lands on the page
+ * they actually wanted rather than the home screen.
  */
 export function createRequireAuth(
   useSession: () => SessionState,
@@ -114,7 +114,7 @@ export function createRequireAnonymous(
 }
 
 /**
- * A gate on something the profile says — suspended, staff, on a given plan.
+ * A gate on a profile field, such as whether the person is suspended, staff or on a given plan.
  *
  * `allow` gets the profile and answers yes or no. `onDenied` draws the refusal; `onError` draws
  * the failure, and they are SEPARATE arguments on purpose. That separation is the whole point

@@ -3,9 +3,9 @@
  *
  * Brazilian only, on purpose. A number that is not Brazilian comes back as `null`, never as a
  * guess: a general parser reading bare digits guesses a country from the first ones, and for a
- * Brazilian mobile typed without `+55` that guess is wrong often — area code 31 reads as the
- * Netherlands and 81 as Japan. If you take international numbers too, send the ones that start
- * with `+` and are not `+55` to a real international library, and keep this for the rest.
+ * Brazilian mobile typed without `+55` that guess is often wrong: area code 31 reads as the
+ * Netherlands and 81 as Japan. If you take international numbers too, send the ones that start with
+ * `+` and are not `+55` to a real international library, and keep this for the rest.
  */
 
 /**
@@ -27,8 +27,8 @@ export interface BrPhone {
 }
 
 /**
- * Reads a Brazilian number in whatever shape a person or a system wrote it — `(11) 98765-4321`,
- * `+55 11 98765-4321`, `5511987654321`, `011 3456-7890` — or returns `null`.
+ * Reads a Brazilian number in forms such as `(11) 98765-4321`, `+55 11 98765-4321`, `5511987654321`
+ * or `011 3456-7890`. Returns `null` if it cannot read the number.
  *
  * **Length decides before the prefix does**, because `55` is ambiguous: it is the country code and
  * also a DDD (Rio Grande do Sul). Eleven digits starting with 55 are a gaúcho mobile, not a country
@@ -103,9 +103,9 @@ export function maskBrPhone(partial: string): string {
  * digit and without it. Anything else comes back alone.
  *
  * An account created before the ninth digit can still be registered without it, and WhatsApp no
- * longer reliably bridges the two, so a lookup that tries one form misses the person — or opens a
- * second conversation with somebody already in one. Which form an account uses cannot be known
- * from the number, so this gives candidates to look up, never a rewrite.
+ * longer reliably bridges the two, so a lookup that tries one form misses the person or opens a
+ * second conversation with somebody already in one. Which form an account uses cannot be known from
+ * the number, so this gives candidates to look up, never a rewrite.
  *
  * Takes an INTERNATIONAL number (`5511987654321`, `+55 11 98765-4321`), not a bare national one:
  * guessing that ten or eleven bare digits are Brazilian is exactly how a foreign number gets a
