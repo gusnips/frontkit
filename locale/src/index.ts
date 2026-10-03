@@ -41,7 +41,7 @@ export interface Locales<L extends string> {
   splitLocalePath: (pathname: string) => { locale: L; path: string };
   /** A route on another of our origins that HAS per-locale addresses. */
   localeUrl: (origin: string, locale: L, path?: string) => string;
-  /** A route on another of our origins that does NOT — the language rides a query parameter. */
+  /** Carry an explicit language in a URL. An empty origin produces a relative navigation href. */
   localeQueryUrl: (origin: string, locale: L, path?: string) => string;
 }
 
@@ -213,30 +213,30 @@ export function createLocales<const L extends readonly string[]>(
     `${origin}${localePath(locale, path)}`;
 
   /**
-   * A route on an origin that has NO per-locale addresses — the language rides a query parameter.
+   * Carry the reader's choice in a URL, including the default language.
    *
-   * A console is auth-gated, never prerendered, and has one address per route, so there is nothing
-   * in the path to put a language in. The destination detects this parameter AHEAD of storage and
-   * the browser, because it is the only one of the three the reader chose on purpose and just now,
-   * and caches it on arrival — so no address inside the console has to carry it and it never shows
-   * up twice.
+   * An app without locale prefixes detects this parameter before storage and the browser. A public
+   * site's language picker also needs it: the default language has no prefix, and a new tab or
+   * blocked storage cannot carry the original page's click handler. An empty origin makes a
+   * relative href; combine it with `localePath` for a localized public destination.
    *
-   * It is emitted for the DEFAULT locale too, which looks like a default leaking and is not: a
-   * reader on an unprefixed address has that language as their resolved preference, and dropping
-   * the parameter there would let the destination re-sniff a browser that disagrees with what the
-   * reader is plainly reading.
+   * Replace any previous language value rather than appending one. Otherwise a switch from an
+   * address already carrying `?lang=es` leaves Spanish first and the new choice never arrives.
+   * Other query values survive, although native URLSearchParams may normalize their encoding.
+   * The path and fragment keep their spelling, and the fragment stays behind the query.
    *
-   * The fragment is kept behind the query, which is the ordering a URL requires: written the
-   * obvious way, `"/pricing#plans"` becomes `/pricing#plans?lang=pt-BR` and the whole parameter is
-   * part of the fragment — the language silently does not arrive, which is the exact failure this
-   * function exists to prevent.
+   * Use `localePath` and `localeUrl` without this parameter for prerender paths and canonical URLs.
    */
   const localeQueryUrl = (origin: string, locale: Locale, path = ""): string => {
-    const hash = path.indexOf("#");
-    const route = hash === -1 ? path : path.slice(0, hash);
-    const fragment = hash === -1 ? "" : path.slice(hash);
-    const separator = route.includes("?") ? "&" : "?";
-    return `${origin}${route}${separator}${queryParam}=${encodeURIComponent(locale)}${fragment}`;
+    const href = `${origin}${path}`;
+    const hash = href.indexOf("#");
+    const route = hash === -1 ? href : href.slice(0, hash);
+    const fragment = hash === -1 ? "" : href.slice(hash);
+    const question = route.indexOf("?");
+    const address = question === -1 ? route : route.slice(0, question);
+    const query = new URLSearchParams(question === -1 ? "" : route.slice(question + 1));
+    query.set(queryParam, locale);
+    return `${address}?${query}${fragment}`;
   };
 
   return {
@@ -257,8 +257,10 @@ export interface LocaleGateOptions<L extends readonly string[]> {
   /** The same list and default {@link createLocales} gets. */
   locales: L;
   defaultLocale: L[number];
-  /** Where the reader's explicit choice is stored — the key the language picker writes. */
+  /** Where the reader's explicit choice is stored. The language picker writes the same key. */
   storageKey: string;
+  /** Query parameter carrying an explicit choice. Defaults to LOCALE_QUERY_PARAM, like createLocales. */
+  queryParam?: string;
   /** Where the pages are mounted when it is not the origin's root, e.g. `/docs`. */
   base?: string;
   /** Route paths (unprefixed, after `base`) that are never redirected, with everything under
@@ -281,11 +283,10 @@ export interface LocaleGateOptions<L extends readonly string[]> {
  * Deciding in a classic `<head>` script is what gets ahead of the paint: it runs before the body
  * is parsed, and the page it leaves is hidden, so nothing of it shows.
  *
- * The decision is the one those entries made, merged from all of them: a stored choice wins
- * (and a stored choice of the default stays put), then the browser's languages in the reader's
- * own order, exact tag before base subtag. Blocked storage falls through to the browser rather
- * than failing, which one copy did not do. A crawler still gets the unprefixed page: it has no
- * stored choice, and its browser asks for English or runs no script at all.
+ * A prefixed address wins. On a bare address, a supported query choice wins over storage and the
+ * browser, so choosing the default works even with blocked storage or a context-menu new tab.
+ * Otherwise a stored choice wins, then the browser's languages in the reader's own order, exact
+ * tag before base subtag. Excluded routes and signed-in/auth callbacks stay untouched.
  *
  * Serve it as a FILE, never inline — `@gusnips/vite`'s `prePaintScript` does that — because a
  * `script-src 'self'` policy silently blocks an inline script, and the blink comes back:
@@ -312,6 +313,7 @@ export function localeGateScript<const L extends readonly string[]>(
       .filter((locale) => locale !== options.defaultLocale)
       .map((locale) => [locale, localeSegment(locale)] as const),
     storageKey: options.storageKey,
+    queryParam: options.queryParam ?? LOCALE_QUERY_PARAM,
     base: (options.base ?? "").replace(/\/+$/, ""),
     exclude: (options.exclude ?? []).map((path) =>
       path.length > 1 ? path.replace(/\/+$/, "") : path,

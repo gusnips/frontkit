@@ -18,6 +18,7 @@ export interface GateConfig {
   /** `[locale, segment]` for every locale whose pages carry a prefix. */
   prefixed: ReadonlyArray<readonly [string, string]>;
   storageKey: string;
+  queryParam: string;
   base: string;
   exclude: readonly string[];
   signedIn: { source: string; flags: string } | null;
@@ -86,9 +87,10 @@ export function runLocaleGate(config: GateConfig, page: GatePage): void {
     const asLocale = (value: string | null): string | null =>
       config.locales.find((locale) => locale.toLowerCase() === value?.toLowerCase()) ?? null;
 
-    // Their explicit choice outranks their browser, and a choice of the default is still a choice:
-    // it stops here rather than falling through to a browser that disagrees with it.
-    let wanted = asLocale(read(config.storageKey));
+    // An explicit URL choice wins even when a new tab cannot read the picker's stored preference.
+    let wanted =
+      asLocale(new URLSearchParams(location.search).get(config.queryParam)) ??
+      asLocale(read(config.storageKey));
     if (wanted === null) {
       const { languages, language } = page.navigator;
       const tags = languages !== undefined && languages.length > 0 ? languages : [language ?? ""];

@@ -130,6 +130,12 @@ describe("crossing to another origin", () => {
     );
   });
 
+  it("replaces old language values while keeping other parameters and the fragment", () => {
+    expect(
+      EN.localeQueryUrl("", "en", "/pricing?lang=es&plan=pro&lang=pt-BR&tag=a&tag=b#plans"),
+    ).toBe("/pricing?lang=en&plan=pro&tag=a&tag=b#plans");
+  });
+
   it("uses one spelling of the parameter, and lets a product override it", () => {
     expect(LOCALE_QUERY_PARAM).toBe("lang");
     const custom = createLocales(["en", "pt-BR"] as const, "en", { queryParam: "hl" });
