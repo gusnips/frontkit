@@ -35,6 +35,7 @@ function visit(options: LocaleGateOptions<readonly string[]>, v: Visit) {
   let replaced: string | null = null;
   const style = { visibility: "" };
   const page = {
+    URLSearchParams,
     location: {
       pathname: url.pathname,
       search: url.search,
@@ -80,6 +81,25 @@ describe("localeGateScript", () => {
   it("stays put for a reader who wants the default or a language we do not ship", () => {
     expect(visit(site, { address: "/pricing", languages: ["en-GB", "pt-BR"] })).toBeNull();
     expect(visit(site, { address: "/pricing", languages: ["fr", "de"] })).toBeNull();
+  });
+
+  it("honors an explicit query choice before saved or browser language", () => {
+    const stored = { "app.locale": "es" };
+    for (const storage of ["ok", "blocked", "throws"] as const) {
+      expect(
+        visit(site, { address: "/pricing?lang=en", languages: ["pt-BR"], stored, storage }),
+      ).toBeNull();
+    }
+    expect(visit(site, { address: "/pricing?lang=pt-BR#plans", stored })).toBe(
+      "/pt/pricing?lang=pt-BR#plans",
+    );
+    expect(visit(site, { address: "/pt/pricing?lang=en", stored })).toBeNull();
+    expect(visit(site, { address: "/pricing?lang=invalid", stored })).toBe(
+      "/es/pricing?lang=invalid",
+    );
+    expect(
+      visit({ ...site, queryParam: "hl" }, { address: "/pricing?hl=en", languages: ["pt-BR"] }),
+    ).toBeNull();
   });
 
   it("puts a stored choice ahead of the browser, including a choice of the default", () => {

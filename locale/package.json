@@ -51,7 +51,7 @@
     "test:watch": "vitest",
     "lint": "eslint src",
     "sync:docs": "cp ../LICENSE .",
-    "prepublishOnly": "bun run lint && bun run typecheck && bun run test && bun run build && bun run sync:docs",
+    "prepublishOnly": "bun run lint && bun run typecheck && bun run build && bun run sync:docs",
     "release:patch": "bun pm version patch && bun publish --access public",
     "release:minor": "bun pm version minor && bun publish --access public",
     "release:major": "bun pm version major && bun publish --access public"

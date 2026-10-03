@@ -87,22 +87,22 @@ prePaintScript({
 
 It picks the language in this order:
 
-1. The language the reader chose before, which your language picker saved under `storageKey`.
-   Choosing the default counts: that reader stays on the bare address.
-2. The browser's languages, in the reader's own order. `pt-PT` and `pt` both find `pt-BR`.
-3. Nothing matched: the reader stays where they are.
+1. A supported query choice, such as `?lang=en`. It wins even when storage is blocked.
+2. The language saved under `storageKey`. A saved default keeps the bare address.
+3. The browser's languages, in the reader's own order. `pt-PT` and `pt` both find `pt-BR`.
+4. Nothing matched: the reader stays where they are.
+
+The query key defaults to `lang`. Set `queryParam` to match a custom key in `createLocales`.
 
 It never moves a reader off an address that already names a language, and it keeps the query and
 the `#fragment`. A crawler that runs no scripts stays on the default page.
 
-So your language picker has to save the choice. The default language's link is a bare address,
-and without a saved choice the gate decides that address from the browser: a reader with a
-Portuguese browser who clicks "English" lands back in Portuguese. Save on a middle click too. It
-opens the link in a new tab without firing `click`, so that tab never sees the choice:
+Put the choice in the language link, including the default. That lets a new tab carry it without
+relying on the original page's click handler:
 
 ```tsx
 <a
-  href={localePath("en", path)}
+  href={localeQueryUrl("", "en", localePath("en", path))}
   hrefLang="en"
   onClick={() => remember("en")}
   onAuxClick={(event) => {
@@ -113,13 +113,13 @@ opens the link in a new tab without firing `click`, so that tab never sees the c
 </a>
 ```
 
-`remember` writes the locale under `storageKey`, inside a `try`, because storage can be blocked. A
-right click and "Open in new tab" fires no event a page can see, so that one path still guesses.
+`remember` saves the choice for future unmarked visits, inside a `try` because storage can be blocked.
+The query makes the link work even for "Open in new tab", which fires no click handler.
+`localeQueryUrl` replaces old language parameters and keeps the other values and the fragment.
+Its native query serialization may normalize encoding, such as `%20` to `+`.
 
-When storage is blocked, nothing is saved, and the gate decides every bare address from the browser.
-A reader whose browser prefers Portuguese then cannot stay on the English pages: each click on
-"English" lands back in Portuguese. The gate has nowhere else to keep a choice, so this is a known
-limit.
+When storage is blocked, later links also need the query choice if their next load must keep it.
+Keep canonical URLs and prerender paths on `localePath` and `localeUrl`, without the parameter.
 
 Three options, for sites that need them:
 

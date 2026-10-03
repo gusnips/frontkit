@@ -1,10 +1,10 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    // No DOM, no @types/node. An API server reads `asLocale` at its edges, a browser entry reads
-    // `splitLocalePath`, and a prerender script reads both; the narrowest lib is what proves one
-    // build of this file serves all three.
-    "lib": ["ES2022"],
+    // URLSearchParams is shared by browsers, Node and Workers. DOM supplies its compile-time
+    // type, not a browser dependency. Public declarations stay platform-neutral; the purity
+    // check still rejects browser-only globals and Node imports.
+    "lib": ["ES2022", "DOM"],
     "types": [],
     "rootDir": "./src",
     "outDir": "./dist"
