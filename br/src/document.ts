@@ -7,10 +7,10 @@
  *
  * The CNPJ is alphanumeric from July 2026 (Receita Federal, IN RFB 2.229/2024): the first twelve
  * characters may be A-Z as well as digits, and the two check digits stay numeric. Every copy this
- * package replaced stripped letters before it checked, so a company registered under the new
- * format was refused everywhere — and one display formatter turned `12.ABC.345/01DE-35` into a
- * different, numeric CNPJ. The check digits are the same mod-11 over the same weights, with each
- * character counting as its ASCII code minus 48, so a digit counts as itself and `A` as 17.
+ * package replaced stripped letters before it checked, so a company registered under the new format
+ * was refused everywhere. One display formatter also turned `12.ABC.345/01DE-35` into a different,
+ * numeric CNPJ. The check digits are the same mod-11 over the same weights, with each character
+ * counting as its ASCII code minus 48, so a digit counts as itself and `A` as 17.
  */
 
 export type DocumentKind = "cpf" | "cnpj";
@@ -29,8 +29,8 @@ function cnpjCharacters(value: string): string {
  * Which document this is, by SHAPE only: 11 digits is a CPF, 14 CNPJ characters is a CNPJ.
  *
  * Deliberately not a validity check. Government datasets carry test CPFs that fail the check digit,
- * and an adopter reading those has to know "this is a person" without calling the record invalid —
- * keep "what is it" and "does it check" as two questions.
+ * and an adopter reading those has to know "this is a person" without calling the record invalid.
+ * Keep "what is it" and "does it check" as two questions.
  */
 export function classifyDocument(value: string): DocumentKind | null {
   if (cpfCharacters(value).length === 11 && !/[A-Za-z]/.test(value)) return "cpf";
@@ -77,7 +77,7 @@ export function isValidCpf(value: string): boolean {
   return cpfCheckDigits(digits.slice(0, 9)) === digits.slice(9);
 }
 
-/** Whether a CNPJ's check digits hold — numeric or alphanumeric, formatted or bare. */
+/** Whether a numeric or alphanumeric CNPJ's check digits hold, formatted or bare. */
 export function isValidCnpj(value: string): boolean {
   const chars = cnpjCharacters(value);
   if (!/^[0-9A-Z]{12}\d{2}$/.test(chars)) return false;
@@ -141,8 +141,8 @@ export function maskCnpj(partial: string): string {
 }
 
 /**
- * One field for either document: a CPF mask up to 11 digits, a CNPJ mask past that — or as soon as
- * a letter is typed, since only a CNPJ can carry one.
+ * One field for either document: a CPF mask up to 11 digits, a CNPJ mask past that or as soon as a
+ * letter is typed, since only a CNPJ can carry one.
  */
 export function maskDocument(partial: string): string {
   const chars = cnpjCharacters(partial);
