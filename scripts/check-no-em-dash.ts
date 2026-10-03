@@ -6,9 +6,9 @@
  *
  * Run: bun run scripts/check-no-em-dash.ts
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 
-const EM_DASH = "—";
+const EM_DASH = /—|\\u2014|\\u\{2014\}|&mdash;|&#(?:0*8212|x0*2014);/i;
 const packages = readdirSync(".", { withFileTypes: true })
   .filter(
     (entry) => entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules",
@@ -16,22 +16,14 @@ const packages = readdirSync(".", { withFileTypes: true })
   .map((entry) => entry.name);
 const files = [
   "README.md",
+  "package.json",
   ...packages.flatMap((dir) => [`${dir}/README.md`, `${dir}/package.json`]),
-].filter((file) => {
-  try {
-    readFileSync(file);
-    return true;
-  } catch {
-    return false;
-  }
-});
+].filter((file) => existsSync(file));
 
 const problems = files.flatMap((file) =>
   readFileSync(file, "utf8")
     .split("\n")
-    .flatMap((line, i) =>
-      line.includes(EM_DASH) ? [`${file}:${String(i + 1)}: ${line.trim()}`] : [],
-    ),
+    .flatMap((line, i) => (EM_DASH.test(line) ? [`${file}:${String(i + 1)}: ${line.trim()}`] : [])),
 );
 
 if (problems.length > 0) {

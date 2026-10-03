@@ -9,7 +9,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 // READMEs and package.json are covered by scripts/check-no-em-dash.ts.
 const NO_EM_DASH = [
   "Literal[value=/\\u2014/]",
-  "TemplateElement[value.raw=/\\u2014/]",
+  "TemplateElement[value.cooked=/\\u2014/]",
   "JSXText[value=/\\u2014/]",
 ].map((selector) => ({
   selector,
