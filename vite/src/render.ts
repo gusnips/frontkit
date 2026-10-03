@@ -1,10 +1,10 @@
 /**
  * One page, as the markup that goes inside `<div id="root">`.
  *
- * This is the build-time half of `main.tsx`, and the app's `entry-server.tsx` is expected to
- * be four lines around it: the same `<App />` and the same route table the browser runs, with
- * a `StaticRouter` in place of the history the build does not have. `main.tsx` is deliberately
- * NOT reused — it reads `window.location`, registers listeners and starts analytics at module
+ * This is the build-time half of `main.tsx`, and the app's `entry-server.tsx` is expected to be
+ * four lines around it: the same `<App />` and the same route table the browser runs, with a
+ * `StaticRouter` in place of the history the build does not have. `main.tsx` is deliberately NOT
+ * reused because it reads `window.location`, registers listeners and starts analytics at module
  * scope, none of which mean anything here.
  *
  * No `node:` import: this file is bundled into the SSR build by Vite, and it is React's own
@@ -37,9 +37,9 @@ const HOISTED_HEAD = /^(?:<title>[^<]*<\/title>|<meta\b[^>]*\/?>|<link\b[^>]*\/?
  * Render a tree to markup with `prerender` from `react-dom/static`.
  *
  * **Never `renderToString`.** With `lazy()` routes behind a `<Suspense fallback={<Spinner />}>`,
- * `renderToString` renders the FALLBACK — it would write a loading screen into every file and
- * pass every gate that only asks whether the root has children. `prerender` waits for the tree
- * to settle, which is also why this is async and why the whole renderer contract is.
+ * `renderToString` renders the FALLBACK. It would write a loading screen into every file and pass
+ * every gate that only asks whether the root has children. `prerender` waits for the tree to
+ * settle, which is also why this is async and why the whole renderer contract is.
  *
  * Two more halves of the same lesson are here too: `onError` is captured and rethrown, so a
  * render failure fails the build rather than shipping a partial page; and an empty result is
@@ -68,8 +68,8 @@ export async function renderTree(tree: ReactNode): Promise<string> {
 /**
  * What an SSR entry exports, and what {@link loadRenderer} looks for.
  *
- * `context` is opaque on purpose. A multi-locale app builds its i18n instance per call — three
- * languages render in one process and a shared singleton would have them racing for one `lng` —
+ * `context` is opaque on purpose. A multi-locale app builds its i18n instance per call. Three
+ * languages render in one process and a shared singleton would have them racing for one `lng`,
  * while a single-locale app ignores the argument and keeps its singleton.
  */
 export type PageRenderer<Context = unknown> = (route: string, context?: Context) => Promise<string>;

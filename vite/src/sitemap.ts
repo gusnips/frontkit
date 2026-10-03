@@ -12,19 +12,19 @@ import type { Alternate } from "./head.ts";
 /**
  * Where a rendered page lands.
  *
- * FLAT (`pricing.html`), not directory-style (`pricing/index.html`). Cloudflare Pages serves
- * the directory form at `/pricing/` and answers `/pricing` with a 308 to it — so every address
- * the app advertises in its canonical and its sitemap would be a redirect rather than a page.
- * A flat file answers `/pricing` — the address the canonical and the sitemap name — with a 200,
- * and normalizes `/pricing/` to it with a 308.
+ * FLAT (`pricing.html`), not directory-style (`pricing/index.html`). Cloudflare Pages serves the
+ * directory form at `/pricing/` and answers `/pricing` with a 308 to it, so every address the app
+ * advertises in its canonical and its sitemap would be a redirect rather than a page. A flat file
+ * answers the advertised `/pricing` address with a 200, and normalizes `/pricing/` to it with a
+ * 308.
  *
  * This said "200 either way" until somebody measured it. On a live Pages deployment `/precos/`
- * answers `308` with `location: /precos`, which then answers 200. The rule is untouched by that
- * — the ADVERTISED form is the one that must be a page, and it is — but the parenthetical was
- * inherited from a donor comment and repeated into an adopter's commit message as a live bug
- * before anyone checked. It also has a consequence worth knowing: on a host that normalizes,
- * `hydrateOrMount`'s slash tolerance can never fire, because the browser is redirected before it
- * runs. That tolerance earns its place on hosts that serve both forms, not on this one.
+ * answers `308` with `location: /precos`, which then answers 200. The rule is untouched: the
+ * ADVERTISED form is the one that must be a page, and it is. But the parenthetical was inherited
+ * from a donor comment and repeated into an adopter's commit message as a live bug before anyone
+ * checked. It also has a consequence worth knowing: on a host that normalizes, `hydrateOrMount`'s
+ * slash tolerance can never fire, because the browser is redirected before it runs. That tolerance
+ * earns its place on hosts that serve both forms, not on this one.
  *
  * That is Cloudflare Pages, not every host. Firebase Hosting serves the directory form at
  * `/pricing` itself with `trailingSlash: false`, and an adopter there names its own files. What
@@ -57,10 +57,10 @@ export function siteOrigin(url: string): string {
 /**
  * The origin the template already declares, read out of its canonical.
  *
- * One file is the answer for the head Vite ships and for every file written after it, so there
- * is no second place for a domain to drift to — no env var the script has to resolve beside
- * it. Demanded rather than defaulted, for the reason `bakeHead` demands the tag: a template
- * without one would hand every page somebody else's origin, quietly.
+ * One file is the answer for the head Vite ships and for every file written after it, so there is
+ * no second place for a domain to drift to and no env var the script has to resolve beside it.
+ * Demanded rather than defaulted, for the reason `bakeHead` demands the tag: a template without one
+ * would hand every page somebody else's origin, quietly.
  */
 export function templateOrigin(template: string): string {
   const href =
@@ -77,11 +77,11 @@ export function templateOrigin(template: string): string {
  * The three things about a public page that do not translate: where it is, how often it
  * changes, and how it ranks against its siblings.
  *
- * A product's registry extends this with its own copy fields — one donor names an i18n key per
- * page, another keys its locale catalogs by `pageSlug` and stores no copy here at all. Where
- * the copy lives is the product's call. These three are what a sitemap needs from every one of
- * them, and the registry is the single source the prerender, the sitemap and the share cards
- * all walk, so a page can never be in one and missing from another.
+ * A product's registry extends this with its own copy fields. One donor names an i18n key per page,
+ * another keys its locale catalogs by `pageSlug` and stores no copy here at all. Where the copy
+ * lives is the product's call. These three are what a sitemap needs from every one of them, and the
+ * registry is the single source the prerender, the sitemap and the share cards all walk, so a page
+ * can never be in one and missing from another.
  */
 export interface PublicPage {
   path: string;
@@ -105,7 +105,7 @@ export function ogImagePath(path: string): string {
 export interface SitemapEntry {
   loc: string;
   changefreq: string;
-  /** Already formatted — an app ranks its own pages, and that rule does not belong here. */
+  /** Already formatted, because an app ranks its own pages, and that rule does not belong here. */
   priority: string;
   /** `YYYY-MM-DD`. The one hint in a sitemap Google actually reads. One date for the whole
    *  build is the honest answer: these pages ship together. */
@@ -144,8 +144,8 @@ export function sitemapXml(entries: readonly SitemapEntry[]): string {
 }
 
 /**
- * `sitemap.xml` for a single-language site, straight from the registry — the common case, and
- * the reason a registry exists: the sitemap can never drift from the routes the app serves.
+ * `sitemap.xml` for a single-language site, straight from the registry. This is the common case,
+ * and the reason a registry exists: the sitemap can never drift from the routes the app serves.
  *
  * A localized site walks its own locales and calls {@link sitemapXml}, because only it knows
  * how an address carries a language.
@@ -166,17 +166,16 @@ export function sitemapFor(origin: string, pages: readonly PublicPage[], lastmod
 
 export interface RobotsOptions {
   /** The origin this file is served from. Every sitemap path is resolved against it, so the
-   *  file can never advertise a host it is not on — a mistake one donor is still shipping,
+   *  file can never advertise a host it is not on. One donor still ships that mistake,
    *  where a static `robots.txt` and the build's fallback name different domains. */
   origin: string;
   /** Every sitemap on this ORIGIN, as paths (`/sitemap.xml`, `/docs/sitemap.xml`).
    *
    *  A crawler reads only the robots.txt at the origin root. An app served from a
-   *  subdirectory therefore cannot ship its own — the one file at the root has to list its
+   *  subdirectory therefore cannot ship its own. The one file at the root has to list its
    *  sitemap too, or nothing ever finds it. */
   sitemaps: readonly string[];
-  /** Paths to keep out of every index. A page nobody should be able to find by searching —
-   *  a per-request status page, an unsubscribe link — belongs here AND in `noindex`. */
+  /** Paths to keep out of every index. A per-request status page or an unsubscribe link that nobody should be able to find by searching belongs here AND in `noindex`. */
   disallow?: readonly string[];
 }
 

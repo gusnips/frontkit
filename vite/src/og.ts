@@ -1,7 +1,7 @@
 /**
  * Fitting copy into a share card.
  *
- * The card's ART — the palette, the lockup, the size ladder — is the product, and it stays in
+ * The card's ART, including the palette, lockup and size ladder, is the product, and it stays in
  * the product. What ships here is the part two independent generators got wrong the same way:
  * deciding what happens when a headline does not fit.
  *
@@ -19,7 +19,7 @@ export interface OgOverflow {
   /** The string as given. */
   text: string;
   maxLines: number;
-  /** Characters per line at this size — the budget the text blew. */
+  /** Characters per line at this size, the budget the text exceeded. */
   maxChars: number;
   size: number;
 }
@@ -34,11 +34,11 @@ export interface FitOptions {
   /**
    * Average glyph advance as a fraction of the font size.
    *
-   * Character-budget estimation rather than real metrics: an SVG rasterizer gives no measuring
-   * API, and card copy is short enough that the estimate never drifts more than a word. Measure
-   * it off a rendered card and round UP — a budget that is too generous overflows the column,
-   * while one that is too mean only breaks a line early. Donor values: ~0.5 for a display face
-   * at headline sizes, ~0.46 for body copy.
+   * Character-budget estimation rather than real metrics: an SVG rasterizer gives no measuring API,
+   * and card copy is short enough that the estimate never drifts more than a word. Measure it off a
+   * rendered card and round UP. A budget that is too generous overflows the column, while one that
+   * is too mean only breaks a line early. Donor values: ~0.5 for a display face at headline sizes,
+   * ~0.46 for body copy.
    */
   advance: number;
   /** Names this line in an overflow report. `"pricing headline"`, not `"line 1"`. */

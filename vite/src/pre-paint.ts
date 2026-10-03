@@ -26,10 +26,10 @@ export interface PrePaintScriptOptions {
   /** The script's full text. It runs alone, so it must not reference anything outside itself. */
   source: string;
   /**
-   * Where the tag goes. `"head"` (the end of `<head>`) when the script reads elements above it —
+   * Where the tag goes. `"head"` (the end of `<head>`) when the script reads elements above it, as
    * the theme reads `<meta name="theme-color">`. `"head-prepend"` when it only needs to run as
-   * early as possible: a classic script after a stylesheet waits for that stylesheet, so the
-   * locale gate goes first and redirects without downloading the page's CSS.
+   * early as possible: a classic script after a stylesheet waits for that stylesheet, so the locale
+   * gate goes first and redirects without downloading the page's CSS.
    */
   position?: "head" | "head-prepend";
 }

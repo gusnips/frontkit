@@ -16,9 +16,9 @@ import type { Plugin, PluginOption, UserConfig } from "vite";
  * `index.html` cannot import TypeScript, so a brand name or tagline written there is a literal
  * that drifts from the one the app renders. This injects them from the module that owns them.
  *
- * Vite already replaces `%VITE_FOO%` from the environment, and that is the right tool when the
- * value IS environment — an API URL, a build id. It is the wrong one for brand identity, which
- * belongs in a typed module the app imports, not in a `.env` nobody reviews.
+ * Vite already replaces `%VITE_FOO%` from the environment, and that is the right tool for an
+ * environment value, such as an API URL or a build id. It is the wrong one for brand identity,
+ * which belongs in a typed module the app imports, not in a `.env` nobody reviews.
  */
 export function htmlPlaceholders(values: Readonly<Record<string, string>>): Plugin {
   return {
@@ -34,7 +34,7 @@ export function htmlPlaceholders(values: Readonly<Record<string, string>>): Plug
 }
 
 export interface WebPresetOptions {
-  /** The app folder — the one holding `index.html`. In a `vite.config.ts` that is
+  /** The app folder holding `index.html`. In a `vite.config.ts` that is
    *  `import.meta.dirname`. `@` resolves to `<root>/src`. */
   root: string;
   /** Dev server port. Two apps in one repo must not share one, which is why it has no clever
@@ -48,11 +48,11 @@ export interface WebPresetOptions {
   /**
    * The workspace scope to bundle into the SSR build, as in `"@acme"`.
    *
-   * INSURANCE, not a fix. Measured: Vite already bundles linked workspace dependencies in an
-   * SSR build — one donor runs without this declaration and its SSR output has zero bare
-   * imports. It is here because workspace packages are consumed as TypeScript SOURCE through
-   * subpath exports, and leaving them external would hand the runtime `.ts` files with
-   * Vite-only semantics in them (aliases, `?raw`, `define`) if that behaviour ever changed.
+   * INSURANCE, not a fix. Measured: Vite already bundles linked workspace dependencies in an SSR
+   * build. One donor runs without this declaration and its SSR output has zero bare imports. It is
+   * here because workspace packages are consumed as TypeScript SOURCE through subpath exports, and
+   * leaving them external would hand the runtime `.ts` files with Vite-only semantics in them
+   * (aliases, `?raw`, `define`) if that behaviour ever changed.
    */
   ssrScope?: string;
   /** More plugins, after the preset's own: `[themeScript(THEME)]`. */

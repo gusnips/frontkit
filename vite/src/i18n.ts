@@ -43,7 +43,7 @@ export interface I18nBundle {
   /** The app's `fallbackLng`: the language the others are compared to, and code keys must be in. */
   canonical: string;
   /**
-   * One language's catalogs. A throw fails the check with its message — it never skips the bundle,
+   * One language's catalogs. A throw fails the check with its message. It never skips the bundle,
    * because every other rule compares languages and a missing one would pass them all.
    */
   load: (locale: string) => Catalogs | Promise<Catalogs>;
@@ -388,8 +388,8 @@ async function files(root: string, patterns: readonly string[]): Promise<string[
 export interface MergeOptions {
   /**
    * Refuse two fragments that share a top-level key. Set it when the app merges fragments at
-   * runtime with a spread — `{ ...auth.en, ...nav.en }` — where the second `nav` replaces the
-   * first instead of joining it, and the keys of one fragment vanish with no error anywhere.
+   * runtime with a spread, `{ ...auth.en, ...nav.en }`, where the second `nav` replaces the first
+   * instead of joining it, and the keys of one fragment vanish with no error anywhere.
    */
   ownTopLevel?: boolean;
 }
@@ -446,10 +446,11 @@ function sortTree(tree: Tree): Tree {
 }
 
 /**
- * Fold `dir/*.json` — one file per area, every language side by side, `{ "en": {…}, "pt-BR": {…} }`
- * — into one catalog per language. Fragments exist so that people and agents building screens in
- * parallel do not all edit the same three files. Deterministic: files in name order, keys sorted,
- * so two runs write the same bytes and a derived catalog can be compared with a fresh merge.
+ * Fold `dir/*.json` into one catalog per language. Each file holds one area, with languages side by
+ * side: `{ "en": {…}, "pt-BR": {…} }`. Fragments exist so that people and agents building screens
+ * in parallel do not all edit the same three files. Deterministic: files in name order, keys
+ * sorted, so two runs write the same bytes and a derived catalog can be compared with a fresh
+ * merge.
  */
 export async function mergeFragments(
   dir: string,
