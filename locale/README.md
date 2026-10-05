@@ -229,6 +229,66 @@ and prints it in the reader's zone, which is the day before for everyone west of
 Which zone to use is your call (the customer's, your billing zone, or UTC), and nothing here
 guesses. It uses only `Intl`, so it runs on a server, in a browser and in a Worker.
 
+## What a language pays in
+
+```ts
+import { currencyForLocale, formatMoney, quoteCurrency } from "@gusnips/locale/money";
+
+currencyForLocale("pt-BR"); // → "brl"
+formatMoney(9_700, "brl", "pt-BR"); // → "R$ 97"
+```
+
+Portuguese pays in reais, Spanish in euros, every other language in dollars. It reads the language
+and never the country, so `pt-BR`, `pt-br` and `pt` agree. Spanish pays in euros even in Latin
+America: a reader there is one click from dollars in a currency picker, which beats guessing from
+an address.
+
+`quoteCurrency` is the rule for which currency one reader is quoted and charged in, in this order:
+
+1. The currency their customer is **locked** to. Stripe bills one customer in one currency, so the
+   first purchase fixes it, and nothing moves it after.
+2. The one they **chose** in a picker, when you can sell it.
+3. The one their **language** pays in, when you can sell it.
+4. Your **fallback**.
+
+```ts
+quoteCurrency({
+  locked: customer.billingCurrency, // null until they have bought
+  chosen: request.query.currency, // untrusted: narrowed inside
+  locale: user.locale, // from their account, never from the browser
+  sellable: (currency) => priceIdFor(plan, currency) !== undefined,
+  fallback: "usd",
+});
+```
+
+`sellable` is what keeps a half-seeded currency from reaching a reader: a currency whose Stripe
+prices do not all exist is not offered. The fallback has to be one you can always sell.
+
+`formatMoney` drops the cents on a whole amount (`R$ 97`, not `R$ 97,00`), because a pricing page
+that prints `,00` reads as an invoice. The reader's own currency reads by its symbol. A foreign one
+reads by its code (`USD 19` to a pt-BR reader), because a bare `$` is a dollar to one reader and a
+peso to another.
+
+This file holds no price. Every amount is set by hand for its market, never converted, and that
+table is your catalog.
+
+`currencyLabel` is how a currency reads in a list: `BRL (R$)`, `USD ($)`, `EUR (€)`, the code
+first because it is the part nobody misreads. It is the label of an option, and the picker itself
+is yours, in whatever select the product already has:
+
+```tsx
+<select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+  {CURRENCIES.map((code) => (
+    <option key={code} value={code}>
+      {currencyLabel(code, locale)}
+    </option>
+  ))}
+</select>
+```
+
+Once a customer has paid their currency is fixed, so `disabled` the select and say why in words
+beside it. A control that disappears leaves a question with no answer.
+
 ## Two things it does not do
 
 **It never detects a language on its own.** The redirect script reads the browser on a bare
