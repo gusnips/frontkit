@@ -1,7 +1,7 @@
 {
   "name": "@gusnips/locale",
   "version": "0.1.4",
-  "description": "Where a language lives in a URL, how it crosses to another origin, which one a request asks for, and what day it is in a time zone. Zero dependencies, no framework.",
+  "description": "Where a language lives in a URL, how it crosses to another origin, which one a request asks for, what day it is in a time zone, and what currency a language pays in. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",
   "author": "Gustavo Salomé",
@@ -17,6 +17,10 @@
     "./time": {
       "types": "./dist/time.d.ts",
       "default": "./dist/time.js"
+    },
+    "./money": {
+      "types": "./dist/money.d.ts",
+      "default": "./dist/money.js"
     }
   },
   "types": "./dist/index.d.ts",
