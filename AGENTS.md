@@ -44,7 +44,7 @@ into the history once, and the only fix was rewriting all of it before the first
 frontkit/               ← repo root (this folder), git root
 ├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
 ├── http/               ← @gusnips/http   — the envelope; /retry, when to try again. Zero deps, no framework.
-├── locale/             ← @gusnips/locale — where a language lives in a URL; /time, what day it is; /money, what a language pays in. A leaf.
+├── locale/             ← @gusnips/locale — where a language lives in a URL; /time, what day it is. A leaf.
 ├── br/                 ← @gusnips/br     — CPF, CNPJ, Brazilian phones, CEP. Zero deps, a leaf.
 ├── react/              ← @gusnips/react  — the headless runtime. One required peer: react.
 │   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
@@ -78,12 +78,6 @@ is below). It shells the Tailwind CLI over the adopter's own entry, so `tailwind
 with no React in it can follow it, and every server imports the main entry for the envelope and
 never retries anything. `@gusnips/react` re-exports `retryAfterSecs` from it and keeps
 `shouldRetry(error, codes, maxWait)` as the react-query binding.
-
-`@gusnips/locale/money` is the fifth, and no peer forced it either: which currency a language pays
-in, which one a customer is locked to, and how an amount reads are one rule that every product
-selling in more than one currency would otherwise write again, and a mistake in it charges somebody
-the wrong amount. It holds no price. `@gusnips/react/ui`'s `CurrencySelect` takes plain strings
-because `react/` must not import this leaf.
 
 `react` is the only peer `@gusnips/react`'s main entry requires, and that is deliberate rather
 than incidental: it is what makes the package importable from **React Native**, which has no

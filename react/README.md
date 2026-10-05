@@ -562,24 +562,6 @@ stacking context. A drawer _ties_ with dialog rather than beating it, or a modal
 inside a drawer never paints. A wrapper earns its place by knowing something, not by styling
 something.
 
-`CurrencySelect` sits on top of them as a preset, not an eighth wrapper: a `Select` that already
-knows how a currency reads (`BRL (R$)`), so the picker on a pricing page looks the same in every
-product.
-
-```tsx
-<CurrencySelect
-  currencies={["brl", "usd", "eur"]}
-  locale="pt-BR"
-  value={currency}
-  onValueChange={(next) => next && setCurrency(next)}
-  label="Moeda"
-  disabled={lockedCurrency !== null}
-/>
-```
-
-Pass `disabled` once a customer has paid, because their currency is fixed from then on. Keep it on
-screen and say why in words next to it. A control that disappears leaves a question with no answer.
-
 ## Subpaths, and what each one costs you
 
 `@gusnips/react` itself needs `react` and nothing else. Anything that needs another runtime peer

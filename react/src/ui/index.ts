@@ -89,8 +89,6 @@ export {
   type SelectProps,
 } from "./select.tsx";
 
-export { CurrencySelect, currencyLabel, type CurrencySelectProps } from "./currency-select.tsx";
-
 export {
   Combobox,
   comboboxInputValue,
