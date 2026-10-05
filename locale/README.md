@@ -270,7 +270,24 @@ reads by its code (`USD 19` to a pt-BR reader), because a bare `$` is a dollar t
 peso to another.
 
 This file holds no price. Every amount is set by hand for its market, never converted, and that
-table is your catalog. `@gusnips/react/ui` has a `CurrencySelect` for the picker.
+table is your catalog.
+
+`currencyLabel` is how a currency reads in a list: `BRL (R$)`, `USD ($)`, `EUR (€)`, the code
+first because it is the part nobody misreads. It is the label of an option, and the picker itself
+is yours, in whatever select the product already has:
+
+```tsx
+<select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+  {CURRENCIES.map((code) => (
+    <option key={code} value={code}>
+      {currencyLabel(code, locale)}
+    </option>
+  ))}
+</select>
+```
+
+Once a customer has paid their currency is fixed, so `disabled` the select and say why in words
+beside it. A control that disappears leaves a question with no answer.
 
 ## Two things it does not do
 

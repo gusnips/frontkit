@@ -76,6 +76,28 @@ export function quoteCurrency({
 }
 
 /**
+ * A currency as a reader finds it in a list: the code first, then the symbol in their language,
+ * `BRL (R$)`, `USD ($)`, `EUR (€)`. The code leads because it is the part nobody misreads, and the
+ * symbol follows because it is the part a reader scans for. Where the two are the same string the
+ * code stands alone.
+ *
+ * This is the label of an `<option>`, or of the same entry in whatever select a product uses.
+ * There is no picker here: every product already has a select of its own.
+ */
+export function currencyLabel(currency: Currency, locale: string): string {
+  const code = currency.toUpperCase();
+  const symbol =
+    new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "narrowSymbol",
+    })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? code;
+  return symbol === code ? code : `${code} (${symbol})`;
+}
+
+/**
  * An amount in a reader's words: `R$ 97` in pt-BR, `$19` in en, `19 €` in es. A whole amount
  * drops its cents, because "R$ 97,00" on a pricing page reads as an invoice. The reader's own
  * currency reads by its symbol. A foreign one reads by its ISO code (`USD 19` to a pt-BR reader),

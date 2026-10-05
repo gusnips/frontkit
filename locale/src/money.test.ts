@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   asCurrency,
   currencyForLocale,
+  currencyLabel,
   formatMoney,
   quoteCurrency,
   type Currency,
@@ -94,5 +95,18 @@ describe("formatMoney", () => {
   it("reads a foreign currency by its ISO code, never a symbol the reader could mistake", () => {
     expect(formatMoney(1_900, "usd", "pt-BR")).toBe(`USD${NBSP}19`);
     expect(formatMoney(9_700, "brl", "en")).toBe(`BRL${NBSP}97`);
+  });
+});
+
+describe("currencyLabel", () => {
+  it("leads with the code and follows with the symbol", () => {
+    expect(currencyLabel("brl", "pt-BR")).toBe("BRL (R$)");
+    expect(currencyLabel("usd", "en")).toBe("USD ($)");
+    expect(currencyLabel("eur", "es")).toBe("EUR (€)");
+  });
+
+  it("reads the same symbol whichever language the reader has", () => {
+    expect(currencyLabel("brl", "en")).toBe("BRL (R$)");
+    expect(currencyLabel("usd", "pt-BR")).toBe("USD ($)");
   });
 });
