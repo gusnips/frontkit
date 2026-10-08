@@ -350,6 +350,38 @@ It keeps the page and drops only a fragment carrying a credential, because the p
 worth returning to. `createRequireAuth` uses it; use it anywhere else you record where someone was:
 a dead-session redirect is the common one.
 
+## Keep the email between sign-in screens
+
+```tsx
+import { recallAuthEmail, rememberAuthEmail } from "@gusnips/react";
+
+<input
+  name="email"
+  type="email"
+  defaultValue={recallAuthEmail()}
+  onChange={(event) => rememberAuthEmail(event.currentTarget.value)}
+/>;
+```
+
+Sign in, "use a code instead", forgot password and create account are separate screens, and each
+one used to open with an empty email field. Put those two props on every one of them and the
+address follows the person. Call `forgetAuthEmail()` where your app learns a session exists, so the
+next person at this browser starts empty.
+
+It is kept in `localStorage` for 30 minutes after the last keystroke, and never in a URL, where it
+would reach `Referer`, access logs, history and analytics. It is `localStorage` and not
+`sessionStorage` because an emailed link opens in a new tab, and a new tab does not inherit
+`sessionStorage`. That tab is where a person lands on sign-in after confirming an account. Where
+the browser blocks site data, or on React Native, the address lasts in memory until the page or the
+app is left.
+
+- Read it once, when the screen opens. It is not a store: nothing re-renders when it changes. On a
+  prerendered page, read it after hydration, never while rendering.
+- Leave the field uncontrolled. A `defaultValue` and a change handler are enough. Also call
+  `rememberAuthEmail(value)` where you read the field at submit, because some password managers fill
+  a form without firing events.
+- Never put a password, a code or a token here.
+
 ## Never dead-end anyone
 
 ```ts
