@@ -529,6 +529,110 @@ toast needs no `catch`. Outside a component, `copyText(text)` does the write on 
 The words are yours, and so is the live region: a label that changes needs `aria-live` to be
 heard.
 
+## Slash commands in a text field
+
+A slash command is text like `/help` that picks an action instead of sending a message.
+
+```ts
+import { parseCommand } from "@gusnips/react/commands";
+
+parseCommand("/help");
+// { name: "help" }
+```
+
+Names have no leading slash. Give each command other names (`aliases`) and search words (`tags`):
+
+```ts
+const commands = [
+  {
+    name: "help",
+    description: "See commands",
+    aliases: ["commands", "shortcuts"],
+    tags: ["keyboard", "guide"],
+  },
+];
+```
+
+`/commands` runs `/help`. Searching for `keyboard` finds its menu row, but `/keyboard` is not an
+executable name. `matchCommands(commands, query)` searches names, aliases, tags and descriptions,
+ignoring case and accents. Exact names rank first, then aliases, name prefixes, alias prefixes,
+tags and descriptions. Equal ranks keep registry order; each name gets one row.
+
+`resolveCommand(commands, name)` answers `matched`, `unknown` or `ambiguous`. An exact name wins
+over an alias. Two commands sharing an alias are ambiguous, not a reason to run the first one.
+
+For a controlled text field, use the hook:
+
+```tsx
+import { useSlashCommands } from "@gusnips/react/commands";
+
+const slash = useSlashCommands({
+  text,
+  commands,
+  onChange: setText,
+  onExecute: runCommand,
+  onError: showCommandError,
+});
+
+function submit() {
+  if (slash.submit()) return;
+  sendMessage(text);
+}
+```
+
+The functions in that example belong to your app. `runCommand(command, arg, altKey)` gets the
+original command object, the argument and whether Alt was held. It owns permissions and action
+errors. Supply only commands allowed in this field, with descriptions and tags in the current
+language. Changing those commands or the language refreshes the menu even if `text` stays the same.
+
+Call `slash.handleKeyDown(event)` first in the field's key handler. If it returns `true`, stop
+your own handler. Arrows move the selection; Enter picks it. Tab completes the name without
+running it. Escape hides the menu until the query changes. Shift+Enter stays yours. During IME
+composition (when a keyboard combines keystrokes into a character), the hook lets the browser
+finish that character without running or sending anything.
+
+Render the rows in your own menu. Keep focus in the field with the browser's `preventDefault`
+on mouse down; use click for the action so keyboard and screen-reader clicks work too:
+
+```tsx
+return slash.open ? (
+  <div id={slash.listId} role="listbox" aria-label="Commands">
+    {slash.items.map((command, index) => (
+      <button
+        key={command.name}
+        id={slash.itemId(command)}
+        type="button"
+        role="option"
+        tabIndex={-1}
+        aria-selected={slash.index === index}
+        onMouseEnter={() => slash.highlight(index)}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => slash.pick(command, event.altKey)}
+      >
+        /{command.name}: {command.description}
+      </button>
+    ))}
+  </div>
+) : null;
+```
+
+Give the field `role="combobox"`, `aria-autocomplete="list"`, `aria-expanded={slash.open}`,
+`aria-controls={slash.open ? slash.listId : undefined}` and `aria-activedescendant={slash.activeId}`.
+Translate the menu label too. If there are no rows, explain how to find commands and offer a
+"See commands" button that calls `slash.showAll()`. It opens the full list, even after Escape.
+`onError` is required: show what was not recognized, or which names share an alias, with the
+same way back to the list.
+
+Set `takesArg: true` when a command accepts an argument. Selecting it, or submitting its bare
+alias, completes `/name ` without running it. Completion keeps arguments already typed.
+`parseCommand` leaves multiline text as a normal message.
+
+Call `submit()` before every normal send, queue or quota check, including button and imperative
+paths. It returns `true` for commands it ran, completed or rejected, so unknown commands never
+silently become model messages. It returns `false` for ordinary text. The hook never sends a
+message, clears a draft or changes attached files; those stay with the app. It also has no timer
+or scheduler: offer a repeat command only when your app has real scheduling behind it.
+
 ## Also here
 
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
@@ -609,6 +713,7 @@ lives behind a subpath, so you install a dependency only if you import the thing
 | `@gusnips/react/ui`       | the seven wrappers                       | @base-ui/react        |
 | `@gusnips/react/contract` | two prerender names                      | nothing               |
 | `@gusnips/react/theme`    | `createTheme`, `startTheme`              | react                 |
+| `@gusnips/react/commands` | slash matching and `useSlashCommands`    | react                 |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
 point.** An optional peer the barrel imports anyway is not optional: it is a required one whose
