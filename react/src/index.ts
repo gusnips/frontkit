@@ -32,6 +32,8 @@
 
 export { cn } from "./cn.ts";
 export { copyText, useCopy, type CopyOptions, type CopyState } from "./copy.ts";
+export { BusyRing } from "./busy-ring.tsx";
+export { useHeldPending } from "./held-pending.ts";
 export { returnPathFromLocation, safeInternalPath, type PathParts } from "./internal-path.ts";
 
 export { forgetAuthEmail, recallAuthEmail, rememberAuthEmail } from "./auth-email.ts";

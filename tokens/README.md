@@ -92,4 +92,26 @@ comes back in High Contrast.
 Want them separately? `@gusnips/tokens/theme.css` is the names with no rules,
 `@gusnips/tokens/base.css` the rules with no names.
 
+## The busy ring, if you want it
+
+```css
+@import "@gusnips/tokens/busy-ring.css";
+```
+
+The ring that `<BusyRing />` from `@gusnips/react` draws round a button while it works. It is
+not in `index.css`, which leaves motion to your product, so you ask for it. It paints in
+`currentColor`, so it needs no colour of its own. Tune it after the import:
+
+```css
+:root {
+  --busy-ring-width: 3px; /* 2px */
+  --busy-ring-duration: 700ms; /* 900ms */
+  --busy-ring-duration-reduced: 2000ms; /* 2400ms */
+}
+```
+
+Under reduced motion it turns slower and keeps turning. The `0.01ms` clamp above would freeze
+it, so the ring says `!important` and beats the clamp by being more specific than `*`. A frozen
+ring reads as a hang, and the ring is the only sign that a press was heard.
+
 MIT · part of [frontkit](https://github.com/gusnips/frontkit)

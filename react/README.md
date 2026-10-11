@@ -529,6 +529,47 @@ toast needs no `catch`. Outside a component, `copyText(text)` does the write on 
 The words are yours, and so is the live region: a label that changes needs `aria-live` to be
 heard.
 
+## A busy button a person can see
+
+```tsx
+import { BusyRing, useHeldPending } from "@gusnips/react";
+
+function SaveButton({ saving, ...props }: { saving: boolean } & ButtonProps) {
+  const busy = useHeldPending(saving);
+  return (
+    <button {...props} disabled={busy} aria-busy={busy} className="relative rounded-md ...">
+      Save
+      {busy && <BusyRing />}
+    </button>
+  );
+}
+```
+
+```css
+@import "@gusnips/tokens/busy-ring.css";
+```
+
+A refresh that answers in 80 ms turns its pending flag on and off inside a frame. Nothing was
+painted, so the reader pressed "Reload", saw nothing change, and decided the press was ignored.
+A louder spinner cannot fix that, because the spinner never shows. `useHeldPending(pending)`
+keeps the flag on for at least 400 ms once it turns on. It is `true` on the very render
+`pending` turns true, so the busy look is there on the press and not a frame later, and a slow
+request is not made slower. Pass a second argument to change the 400.
+
+`<BusyRing />` is a ring that runs round the button's edge. It paints in `currentColor`, so it
+contrasts with every variant in both themes and adds nothing to your palette. The button needs
+`position: relative` and a disabled style that does not dim it (`disabled:opacity-100`), or the
+ring shows at half strength. It copies the button's `border-radius`.
+
+Tune it in your own CSS: `--busy-ring-width` (2px), `--busy-ring-duration` (900ms) and
+`--busy-ring-duration-reduced` (2400ms). Under reduced motion the ring turns slower and does not
+stop, because a frozen ring reads as a hang. The `@gusnips/tokens` base rules clamp every
+animation to one pass under reduced motion, and the ring wins that fight on purpose.
+
+There is no shared `Button`, so the two lines above live in your button once. That is also the
+place to change the look later: swap the ring for an icon or a label there, or edit the CSS for a
+different ring everywhere.
+
 ## Slash commands in a text field
 
 A slash command is text like `/help` that picks an action instead of sending a message.
@@ -636,7 +677,7 @@ or scheduler: offer a repeat command only when your app has real scheduling behi
 ## Also here
 
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
-`i18nInitOptions`, and `cn`.
+`i18nInitOptions`, `useHeldPending` and `BusyRing` (above), and `cn`.
 
 Pass `storageWriter: "app"` to `i18nInitOptions` when your own language control writes the stored
 locale. Leave it out and the detector writes it, which is right until you offer "follow the
