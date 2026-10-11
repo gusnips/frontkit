@@ -55,14 +55,15 @@
   animation: busy-ring var(--busy-ring-duration, 900ms) linear infinite;
 }
 
-/* `!important` because base.css clamps every element's animation to one 0.01 ms pass under
-   reduced motion, also with `!important`. Between two important declarations the more specific
-   selector wins, and `.busy-ring` is more specific than `*`, so this keeps the ring turning
-   for an app that imports index.css. Without it the ring freezes exactly where it is needed. */
-@media (prefers-reduced-motion: reduce) {
-  .busy-ring {
-    animation-duration: var(--busy-ring-duration-reduced, 2400ms) !important;
-    animation-iteration-count: infinite !important;
-    animation-delay: 0s !important;
+/* Important declarations inside a layer beat unlayered important declarations. Keep the
+   override in base, where products put their global reduced-motion clamp: .busy-ring then
+   beats * on specificity. It also beats an unlayered clamp, including base.css's. */
+@layer base {
+  @media (prefers-reduced-motion: reduce) {
+    .busy-ring {
+      animation-duration: var(--busy-ring-duration-reduced, 2400ms) !important;
+      animation-iteration-count: infinite !important;
+      animation-delay: 0s !important;
+    }
   }
 }

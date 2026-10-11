@@ -315,6 +315,12 @@ function main(): void {
     expect(css.includes(needle), `${label} is missing from the compiled output`);
   }
   expect(
+    /@layer base\s*\{\s*@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.busy-ring\s*\{/.test(
+      css,
+    ),
+    "the ring's reduced-motion override must be in the base layer; layered important clamps beat unlayered rules",
+  );
+  expect(
     ringReduced.includes(".busy-ring"),
     "the ring has no reduced-motion rule of its own; base.css's clamp would freeze it",
   );

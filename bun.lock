@@ -90,7 +90,7 @@
     },
     "tokens": {
       "name": "@gusnips/tokens",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "devDependencies": {
         "@tailwindcss/cli": "^4.3.3",
         "@types/node": "^24.12.0",
