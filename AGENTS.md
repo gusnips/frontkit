@@ -246,7 +246,9 @@ these was checked against the code, not assumed.
   sizes, a loading spinner) and 60 lines (4 variants, 3 sizes, no cva, and deliberately _no_
   `focus-visible:` styles because its one focus ring lives in the theme). They overlap on the
   idea and nothing else. A shared styled Button satisfying eight brands grows variant props
-  forever. Share behavior, skin per product.
+  forever. Share behavior, skin per product. What a busy button needs is shared in two small
+  pieces that carry no skin: `useHeldPending` and `BusyRing` in `@gusnips/react`, and the ring's
+  CSS in `@gusnips/tokens/busy-ring.css`. The Button that calls them stays in the product.
 - **`EmptyState` / `ErrorState` ship as a contract, not a component.** They share a prop shape
   and one class string; the visual is a tinted icon badge, a branded Scene, or a mascot board.
   What ships is `EmptyStateProps` / `ErrorStateProps` — the _type_ is what enforces "never dead

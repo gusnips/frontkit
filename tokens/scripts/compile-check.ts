@@ -156,9 +156,13 @@ function compile(): string {
   writeFileSync(join(workDir, "fixture.html"), `<div class="${classes}"></div>\n`);
   writeFileSync(
     join(workDir, "entry.css"),
-    ['@import "tailwindcss";', '@import "../src/index.css";', '@source "./fixture.html";', ""].join(
-      "\n",
-    ),
+    [
+      '@import "tailwindcss";',
+      '@import "../src/index.css";',
+      '@import "../src/busy-ring.css";',
+      '@source "./fixture.html";',
+      "",
+    ].join("\n"),
   );
 
   const out = join(workDir, "out.css");
@@ -293,6 +297,27 @@ function main(): void {
   for (const [label, needle] of baseRules) {
     expect(css.includes(needle), `${label} is missing from the compiled output`);
   }
+
+  // 9. The busy ring. It is opt-in, so index.css never carries it, but the one thing it must do
+  //    is keep turning under reduced motion, and base.css's clamp is `!important` on `*`.
+  //    A ring that freezes there is the one sign a press was heard, gone.
+  const ringReduced = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+  for (const [label, needle] of [
+    ["the ring rule", ".busy-ring {"],
+    ["the ring keyframes", "@keyframes busy-ring"],
+    ["the animatable angle", "@property --busy-ring-angle"],
+    [
+      "the ring's slower reduced-motion lap",
+      "var(--busy-ring-duration-reduced, 2400ms) !important",
+    ],
+    ["the ring's looping under reduced motion", "animation-iteration-count: infinite !important"],
+  ] as const) {
+    expect(css.includes(needle), `${label} is missing from the compiled output`);
+  }
+  expect(
+    ringReduced.includes(".busy-ring"),
+    "the ring has no reduced-motion rule of its own; base.css's clamp would freeze it",
+  );
 
   if (failures.length > 0) {
     console.error("✗ tokens: the compiled CSS does not match the contract.\n");

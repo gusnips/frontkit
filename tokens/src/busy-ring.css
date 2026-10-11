@@ -1,0 +1,68 @@
+/*
+ * The ring that runs round a busy control's edge, for `<BusyRing />` from `@gusnips/react`.
+ *
+ * Opt in with `@import "@gusnips/tokens/busy-ring.css";`. It is not part of index.css: that file
+ * leaves motion and keyframes to the product, and this is both. It is a separate file so the
+ * product that wants one ring, and the product that wants its own, can each say so.
+ *
+ * It paints in `currentColor`, the text colour of the control it sits in, so one ring contrasts
+ * with every variant and both themes and adds no colour to the palette. The arc is a conic
+ * gradient whose start angle is animated (`@property` is what makes an angle animatable), cut
+ * to a ring by masking out the content box.
+ *
+ * Reduced motion turns it slower and does not stop it. A frozen ring reads as a hang, and the
+ * ring is the only sign that the press was heard.
+ *
+ * Tune it in your own CSS, not here:
+ *
+ *   :root {
+ *     --busy-ring-width: 3px;
+ *     --busy-ring-duration: 700ms;
+ *   }
+ */
+
+@property --busy-ring-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes busy-ring {
+  to {
+    --busy-ring-angle: 360deg;
+  }
+}
+
+.busy-ring {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  padding: var(--busy-ring-width, 2px);
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--busy-ring-angle),
+    transparent 0turn,
+    transparent 0.45turn,
+    currentColor 1turn
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: busy-ring var(--busy-ring-duration, 900ms) linear infinite;
+}
+
+/* `!important` because base.css clamps every element's animation to one 0.01 ms pass under
+   reduced motion, also with `!important`. Between two important declarations the more specific
+   selector wins, and `.busy-ring` is more specific than `*`, so this keeps the ring turning
+   for an app that imports index.css. Without it the ring freezes exactly where it is needed. */
+@media (prefers-reduced-motion: reduce) {
+  .busy-ring {
+    animation-duration: var(--busy-ring-duration-reduced, 2400ms) !important;
+    animation-iteration-count: infinite !important;
+    animation-delay: 0s !important;
+  }
+}
