@@ -156,10 +156,16 @@ function localStorageOrMemory(): SupportedStorage {
  *   it touches storage. This happens at every version, and it is the common case: a laptop that
  *   wakes up offline with a tab still open.
  * - Before 2.110.2, the token is still good but `/logout` gets no answer. `signOut()` returns
- *   before it removes anything. `scope: "local"` does not help, because it calls `/logout` too.
+ *   before it removes anything.
  *
  * Either way a reload reads the session and signs the person back in. On a shared computer, that
  * person is whoever sits down next. A screen that says "signed out" at that point is wrong.
+ *
+ * It ends this device's session and no other: `signOut({ scope: "local" })`, which fails in both
+ * cases above too, because it calls `/logout` as well. auth-js's default is `"global"`, which ends
+ * every session the person has. Signing out of a laptop then signed them out of their phone, and a
+ * tab left open anywhere failed its next refresh with "Invalid Refresh Token: Refresh Token Not
+ * Found". To end the other sessions on purpose, use {@link signOutOtherDevices}.
  *
  * Removing the key yourself is not enough on its own: nothing tells your `onAuthStateChange`
  * listeners or your other tabs, and auth-js's PKCE verifiers stay behind. So after removing it,
@@ -173,7 +179,7 @@ function localStorageOrMemory(): SupportedStorage {
  *
  * It resolves once the stored session is gone. `error` is `null` when auth ended the session on the
  * server too. Otherwise it is the reason auth did not: its error, a thrown value or the deadline.
- * The session may still be live on the server and on other devices. `SIGNED_OUT` arrives once
+ * The session may still be live on the server. `SIGNED_OUT` arrives once
  * auth-js has finished with the first call: about 100 ms later from 2.108.2 on, and up to 22 s
  * later at 2.106.2. If your screen does not reload, clear your own store when this resolves instead
  * of waiting for the event.
@@ -181,6 +187,40 @@ function localStorageOrMemory(): SupportedStorage {
 export async function signOutEvenOffline(
   auth: Pick<SupabaseSessionAuth, "signOut">,
   { storage, storageKey }: SupabaseSessionStorage,
+): Promise<{ error: unknown }> {
+  const { error } = await withinSignOutDeadline(auth.signOut({ scope: "local" }));
+  if (error == null) return { error: null };
+  // From 2.110.2 on, auth-js has already removed the session when only `/logout` failed, and has
+  // already sent SIGNED_OUT. Going on would send it a second time.
+  if ((await storage.getItem(storageKey)) === null) return { error };
+  await storage.removeItem(storageKey);
+  // Not awaited: inside auth-js it can wait behind the first call, which may still be in its
+  // refresh backoff. The session is already out of storage, and storage is what a reload reads.
+  void auth.signOut({ scope: "local" }).catch(() => {});
+  return { error };
+}
+
+/**
+ * Ends the person's sessions on every other device and keeps this one signed in. For a "sign out
+ * of other devices" button in account settings: a phone that was lost, a computer left signed in.
+ *
+ * It resolves `{ error: null }` once auth has ended the other sessions. Otherwise `error` says why
+ * it did not: auth's error, a thrown value, or the deadline. This device is untouched either way,
+ * so the person is still signed in and can press the button again.
+ *
+ * Like {@link signOutEvenOffline}, it waits on auth for {@link SIGN_OUT_TIMEOUT_MS} at most, because
+ * offline with an expired token auth-js first sits in its refresh backoff. A deadline does not
+ * prove the other sessions are still live: auth may end them after this gave up.
+ */
+export function signOutOtherDevices(
+  auth: Pick<SupabaseSessionAuth, "signOut">,
+): Promise<{ error: unknown }> {
+  return withinSignOutDeadline(auth.signOut({ scope: "others" }));
+}
+
+/** `call`'s result, or the deadline as its error once {@link SIGN_OUT_TIMEOUT_MS} has passed. */
+async function withinSignOutDeadline(
+  call: Promise<{ error: unknown }>,
 ): Promise<{ error: unknown }> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<{ error: unknown }>((resolve) => {
@@ -192,20 +232,12 @@ export async function signOutEvenOffline(
       SIGN_OUT_TIMEOUT_MS,
     );
   });
-  const { error } = await Promise.race([
-    auth.signOut().catch((thrown: unknown) => ({ error: thrown })),
+  const result = await Promise.race([
+    call.catch((thrown: unknown) => ({ error: thrown })),
     deadline,
   ]);
   clearTimeout(timer);
-  if (error == null) return { error: null };
-  // From 2.110.2 on, auth-js has already removed the session when only `/logout` failed, and has
-  // already sent SIGNED_OUT. Going on would send it a second time.
-  if ((await storage.getItem(storageKey)) === null) return { error };
-  await storage.removeItem(storageKey);
-  // Not awaited: inside auth-js it can wait behind the first call, which may still be in its
-  // refresh backoff. The session is already out of storage, and storage is what a reload reads.
-  void auth.signOut({ scope: "local" }).catch(() => {});
-  return { error };
+  return result;
 }
 
 /**
@@ -220,7 +252,8 @@ export async function signOutEvenOffline(
  * rejection means. It still rejects when auth did not end the session, but by then the session
  * has already left this device. And a sign-out auth has not answered within
  * {@link SIGN_OUT_TIMEOUT_MS} now rejects instead of hanging. Without `stored`, it is
- * `auth.signOut()` and rejects on that call's error, as before.
+ * `auth.signOut({ scope: "local" })` and rejects on that call's error. Either way it ends this
+ * device's session only: a token one device's API refused says nothing about the others.
  *
  * `stored` is optional here but not at a sign-out button. The API client signs out only after
  * auth has answered: a refresh auth refused, or a new token the API refused. So the network was up
@@ -247,7 +280,9 @@ export function createSupabaseSessionAdapter(
       }
     },
     signOut: async () => {
-      const { error } = stored ? await signOutEvenOffline(auth, stored) : await auth.signOut();
+      const { error } = stored
+        ? await signOutEvenOffline(auth, stored)
+        : await auth.signOut({ scope: "local" });
       if (error) throw error;
     },
   };

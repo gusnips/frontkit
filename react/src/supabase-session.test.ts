@@ -12,6 +12,7 @@ import {
   isAuthOutage,
   parseAuthCallback,
   signOutEvenOffline,
+  signOutOtherDevices,
   supabaseAuthStorage,
   supabaseStorageKey,
   type SupabaseSessionAuth,
@@ -75,10 +76,11 @@ const unreachable: typeof fetch = async () => {
   throw new TypeError("fetch failed");
 };
 
+/** `paths` collects each request's path and query, so a test can read the scope `/logout` got. */
 function reachable(paths: string[] = []): typeof fetch {
   return async (input) => {
-    const { pathname } = new URL(input instanceof Request ? input.url : input);
-    paths.push(pathname);
+    const { pathname, search } = new URL(input instanceof Request ? input.url : input);
+    paths.push(pathname + search);
     if (pathname.endsWith("/token")) return Response.json(storedSession(now() + 3600));
     if (pathname.endsWith("/logout")) return new Response(null, { status: 204 });
     return Response.json({ msg: "not part of this test" }, { status: 404 });
@@ -204,7 +206,8 @@ describe("createSupabaseSessionAdapter", () => {
     const adapter = createSupabaseSessionAdapter(auth({ signOut }));
 
     await expect(adapter.signOut()).rejects.toBe(refusal);
-    expect(signOut).toHaveBeenCalledOnce();
+    // This device only: a token one device's API refused says nothing about the others.
+    expect(signOut).toHaveBeenCalledExactlyOnceWith({ scope: "local" });
   });
 
   it("with `stored`, rejects when auth never heard it, but the session has left", async () => {
@@ -273,16 +276,54 @@ describe("signOutEvenOffline", () => {
     expect(await sessionAfterReload(stored)).toBeNull();
   });
 
-  it("ends the session on the server too when auth answers", async () => {
+  it("ends this device's session on the server too when auth answers, and no other", async () => {
     const paths: string[] = [];
     const { stored, auth, signedOut } = await signedIn(now() + 3600, reachable(paths));
 
     const { error } = await signOutEvenOffline(auth, stored);
 
     expect(error).toBeNull();
-    expect(paths).toContain("/auth/v1/logout");
+    // auth-js's default, scope=global, would end the person's sessions on every device.
+    expect(paths).toContain("/auth/v1/logout?scope=local");
     expect(signedOut()).toBe(1);
     expect(await sessionAfterReload(stored)).toBeNull();
+  });
+});
+
+describe("signOutOtherDevices", () => {
+  it("ends the other sessions and keeps this one", async () => {
+    const paths: string[] = [];
+    const { stored, auth, signedOut } = await signedIn(now() + 3600, reachable(paths));
+
+    const { error } = await signOutOtherDevices(auth);
+
+    expect(error).toBeNull();
+    expect(paths).toContain("/auth/v1/logout?scope=others");
+    expect(signedOut()).toBe(0);
+    expect(await sessionAfterReload(stored)).not.toBeNull();
+  });
+
+  it("keeps this device signed in and says why when auth cannot be reached", async () => {
+    const { stored, auth, signedOut } = await signedIn(now() + 3600);
+
+    const { error } = await signOutOtherDevices(auth);
+
+    expect(error).toBeInstanceOf(AuthRetryableFetchError);
+    expect(signedOut()).toBe(0);
+    expect(await sessionAfterReload(stored)).not.toBeNull();
+  });
+
+  it("gives up at the deadline instead of waiting out the refresh backoff", async () => {
+    vi.useFakeTimers();
+    const { stored, auth } = await signedIn(now() - 60);
+
+    const signingOut = signOutOtherDevices(auth);
+    await vi.advanceTimersByTimeAsync(SIGN_OUT_TIMEOUT_MS);
+    const { error } = await signingOut;
+
+    expect(error).toMatchObject({ message: expect.stringContaining(`${SIGN_OUT_TIMEOUT_MS} ms`) });
+    expect(await stored.storage.getItem(stored.storageKey)).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(60_000);
   });
 });
 

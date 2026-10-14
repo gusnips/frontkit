@@ -108,7 +108,22 @@ Two rules come with it:
   has finished the first call: a moment later, or up to 22 seconds on auth-js 2.106.
 
 `error` is `null` when auth ended the session on the server too. Otherwise the person is signed
-out on this device and may still be signed in on others.
+out on this device, and that session may still be live on the server.
+
+It signs out this device only. auth-js's own default ends every session the person has, so signing
+out of a laptop also signed them out of their phone, and a tab left open there failed its next
+refresh with "Invalid Refresh Token". To end the others on purpose, give account settings a button
+that calls `signOutOtherDevices`. It keeps this device signed in, so it can be pressed again when
+it fails:
+
+```ts
+import { signOutOtherDevices } from "@gusnips/react/supabase";
+
+const { error } = await signOutOtherDevices(supabase.auth);
+```
+
+`error` is `null` once auth has ended the other sessions. Like the sign-out, it waits on auth for
+3 seconds at most.
 
 Pass the same object to `createSupabaseSessionAdapter(supabase.auth, authStorage)` and the API
 client's sign-out goes through the helper too.
