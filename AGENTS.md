@@ -331,6 +331,14 @@ pin them; if one fails, a lesson is being un-learned.
    within the API client's 3 s sign-out deadline, then lets auth-js's own local sign-out send
    `SIGNED_OUT`.
 
+   **And a sign-out ends this device's session, never every one.** auth-js's `signOut()` defaults to
+   `scope: "global"`, which revokes every refresh token the person has. Through react 0.9.27 both
+   the helper and the session adapter called it bare, so signing out anywhere signed the person
+   out everywhere, and every tab left open on another device failed its next refresh with
+   "Invalid Refresh Token: Refresh Token Not Found". Every sign-out here passes
+   `scope: "local"`. Ending the other sessions is its own action, `signOutOtherDevices`
+   (`scope: "others"`), which leaves this device signed in so a failure can be retried.
+
    **A 5xx is auth failing, not auth answering, and the vendor's own predicate must not be
    trusted to say so.** `isAuthRetryableFetchError` reads a list its library owns and has already
    changed — 502, 503 and 504 at auth-js 2.91; those plus the 52x family and still **no 500** at
