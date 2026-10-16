@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CepLookupError, lookupCep } from "./lookup.ts";
 
 const VIACEP = "https://viacep.com.br/ws/01001000/json/";
@@ -193,5 +193,82 @@ describe("lookupCep", () => {
     await expect(lookupCep("01001000", { fetch })).rejects.toMatchObject({
       message: "No CEP provider answered. ViaCEP: HTTP 500. BrasilAPI: the body is not an address",
     });
+  });
+});
+
+// Safari before 16 has neither, Safari before 17.4 has no `any`, and React Native has neither.
+describe("lookupCep without AbortSignal.any and AbortSignal.timeout", () => {
+  const { any, timeout } = AbortSignal;
+  beforeEach(() => {
+    Object.assign(AbortSignal, { any: undefined, timeout: undefined });
+  });
+  afterEach(() => {
+    Object.assign(AbortSignal, { any, timeout });
+    vi.useRealTimers();
+  });
+
+  it("asks BrasilAPI when ViaCEP times out", async () => {
+    const fetch = providers(hang, reply(brasilApiBody));
+    await expect(lookupCep("01001000", { fetch, timeoutMs: 20 })).resolves.toEqual({
+      ...address,
+      ibge: null,
+    });
+    expect(urls(fetch)).toEqual([VIACEP, BRASILAPI]);
+  });
+
+  it("names the timeout when both providers are too slow", async () => {
+    const fetch = providers(hang, hang);
+    await expect(lookupCep("01001000", { fetch, timeoutMs: 20 })).rejects.toMatchObject({
+      message:
+        "No CEP provider answered. ViaCEP: no answer in 20 ms. BrasilAPI: no answer in 20 ms",
+    });
+  });
+
+  it("rejects with the caller's reason at once, and does not ask BrasilAPI", async () => {
+    const fetch = providers(hang, reply(brasilApiBody));
+    const controller = new AbortController();
+    const reason = new Error("left the page");
+    const result = lookupCep("01001000", { fetch, signal: controller.signal });
+    controller.abort(reason);
+    await expect(result).rejects.toBe(reason);
+    expect(urls(fetch)).toEqual([VIACEP]);
+  });
+
+  it("rejects at once with a signal that is already aborted", async () => {
+    const fetch = providers(hang, reply(brasilApiBody));
+    const controller = new AbortController();
+    controller.abort();
+    await expect(lookupCep("01001000", { fetch, signal: controller.signal })).rejects.toMatchObject(
+      {
+        name: "AbortError",
+      },
+    );
+    expect(urls(fetch)).toEqual([VIACEP]);
+  });
+
+  it("rejects with the fetch's error where a signal has no reason", async () => {
+    const fetch = providers(hang, reply(brasilApiBody));
+    const controller = new AbortController();
+    // As before Safari 15.4.
+    Object.defineProperty(controller.signal, "reason", { get: () => undefined });
+    const result = lookupCep("01001000", { fetch, signal: controller.signal });
+    controller.abort();
+    await expect(result).rejects.toMatchObject({ name: "AbortError" });
+    expect(urls(fetch)).toEqual([VIACEP]);
+  });
+
+  it("leaves no timer and no listener behind", async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const add = vi.spyOn(controller.signal, "addEventListener");
+    const remove = vi.spyOn(controller.signal, "removeEventListener");
+    const fetch = providers(reply({ erro: true }), reply(brasilApiBody));
+    await expect(lookupCep("01001000", { fetch, signal: controller.signal })).resolves.toEqual({
+      ...address,
+      ibge: null,
+    });
+    expect(vi.getTimerCount()).toBe(0);
+    expect(add).toHaveBeenCalledTimes(2);
+    expect(remove.mock.calls).toEqual(add.mock.calls);
   });
 });

@@ -119,8 +119,8 @@ try {
 
 Each provider gets 5 seconds before the next one is asked. Change that with `timeoutMs`. Pass
 `signal` to cancel: the call rejects at once and asks no other provider. Pass `fetch` to use your
-own, in tests for example. It needs a global `fetch` and `AbortSignal.any` (Node 22, browsers since
-2024).
+own, in tests for example. Any browser or runtime with `fetch` and `AbortController` can run it,
+React Native included.
 
 `street` and `neighborhood` can be empty. A whole small town can share one CEP, so a CEP with no
 street is still a real CEP. `ibge` is the city's IBGE code, or `null` when the provider didn't send
