@@ -71,10 +71,29 @@ describe("lookupCep", () => {
     expect(urls(fetch)).toEqual([VIACEP]);
   });
 
-  it.each([true, "true"])("returns null for erro: %j and does not ask BrasilAPI", async (erro) => {
-    const fetch = providers(reply({ erro }));
+  it.each([true, "true"])(
+    "asks BrasilAPI when ViaCEP answers erro: %j, and returns its address",
+    async (erro) => {
+      const fetch = providers(reply({ erro }), reply(brasilApiBody));
+      await expect(lookupCep("01001000", { fetch })).resolves.toEqual({ ...address, ibge: null });
+      expect(urls(fetch)).toEqual([VIACEP, BRASILAPI]);
+    },
+  );
+
+  it("returns null when ViaCEP answers erro and BrasilAPI answers 404", async () => {
+    const fetch = providers(reply({ erro: true }), reply({ name: "CepPromiseError" }, 404));
     await expect(lookupCep("01001000", { fetch })).resolves.toBe(null);
-    expect(urls(fetch)).toEqual([VIACEP]);
+    expect(urls(fetch)).toEqual([VIACEP, BRASILAPI]);
+  });
+
+  it.each([
+    ["a network error", fail(new TypeError("fetch failed"))],
+    ["a timeout", hang],
+    ["HTTP 503", reply("", 503)],
+  ])("keeps ViaCEP's not found when BrasilAPI fails with %s", async (_, brasilApi) => {
+    const fetch = providers(reply({ erro: true }), brasilApi);
+    await expect(lookupCep("01001000", { fetch, timeoutMs: 20 })).resolves.toBe(null);
+    expect(urls(fetch)).toEqual([VIACEP, BRASILAPI]);
   });
 
   it.each([500, 503, 429])("asks BrasilAPI when ViaCEP answers HTTP %i", async (status) => {
@@ -124,6 +143,20 @@ describe("lookupCep", () => {
     controller.abort();
     await expect(result).rejects.toMatchObject({ name: "AbortError" });
     expect(urls(fetch)).toEqual([VIACEP]);
+  });
+
+  it("rejects when the caller aborts BrasilAPI after ViaCEP's not found", async () => {
+    const controller = new AbortController();
+    const fetch = providers(reply({ erro: true }), (init) => {
+      controller.abort();
+      return hang(init);
+    });
+    await expect(lookupCep("01001000", { fetch, signal: controller.signal })).rejects.toMatchObject(
+      {
+        name: "AbortError",
+      },
+    );
+    expect(urls(fetch)).toEqual([VIACEP, BRASILAPI]);
   });
 
   it("keeps an empty street and neighborhood", async () => {

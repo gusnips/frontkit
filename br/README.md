@@ -98,12 +98,14 @@ await lookupCep("01001-000");
 // { cep: "01001000", street: "Praça da Sé", neighborhood: "Sé", city: "São Paulo", state: "SP", ibge: "3550308" }
 ```
 
-`null` means the CEP does not exist. Input that isn't eight digits is `null` too, and makes no
+It asks ViaCEP first, and BrasilAPI when ViaCEP fails or doesn't know the CEP.
+
+`null` means the CEP was not found. Input that isn't eight digits is `null` too, and makes no
 request.
 
-A thrown `CepLookupError` means nobody could answer: ViaCEP failed, and so did BrasilAPI, the backup
-it tries next. The error's `cause` lists both failures. A failure never comes back as `null`, so a
-dropped connection doesn't tell the reader their CEP is wrong.
+A thrown `CepLookupError` means neither provider could answer. The error's `cause` lists both
+failures. A failure never comes back as `null`, so a dropped connection doesn't tell the reader
+their CEP is wrong.
 
 ```ts
 try {
