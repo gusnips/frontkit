@@ -1,10 +1,15 @@
 // @vitest-environment happy-dom
 import { createClient } from "@supabase/supabase-js";
-import { afterEach, describe, expect, it } from "vitest";
+import { Window } from "happy-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { supabaseAuthStorage } from "./supabase-session.ts";
 
 // A real browser `localStorage` and a real auth-js, so what is measured is the choice supabase-js
 // makes for itself, not this file's idea of it. The Node tests beside this one can only stub it.
+// Node 26 has a `localStorage` of its own, `undefined` without `--localstorage-file`, and vitest
+// leaves it in front of happy-dom's (`window` is the global, so it reads Node's too). A browser
+// has one, so take a happy-dom window's and put it where a browser keeps it.
+vi.stubGlobal("localStorage", new Window().localStorage);
 const PROJECT_URL = "https://abcdefghijklmnop.supabase.co";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
