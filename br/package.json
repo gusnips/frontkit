@@ -1,7 +1,7 @@
 {
   "name": "@gusnips/br",
-  "version": "0.2.0",
-  "description": "Brazilian documents and phone numbers: CPF and CNPJ (the alphanumeric CNPJ too), phones, CEP. Check digits, display, input masks. Zero dependencies, no framework.",
+  "version": "0.3.0",
+  "description": "Brazilian documents and phone numbers: CPF and CNPJ (the alphanumeric CNPJ too), phones, CEP. Check digits, display, input masks, CEP address lookup. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",
   "author": "Gustavo Salomé",
@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./lookup": {
+      "types": "./dist/lookup.d.ts",
+      "default": "./dist/lookup.js"
     }
   },
   "types": "./dist/index.d.ts",

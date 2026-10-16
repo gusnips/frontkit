@@ -1,7 +1,8 @@
 # @gusnips/br
 
-Checks and formats Brazilian documents and phone numbers: CPF, CNPJ, phones and CEP. The same
-code runs on a server, in a browser and in React Native. No dependencies.
+Checks and formats Brazilian documents and phone numbers: CPF, CNPJ, phones and CEP. It also finds
+the address for a CEP. The same code runs on a server, in a browser and in React Native. No
+dependencies.
 
 ```ts
 import { isValidCnpj } from "@gusnips/br";
@@ -91,19 +92,50 @@ that bare digits are Brazilian is how a foreign number gets matched to somebody 
 ## CEP
 
 ```ts
+import { lookupCep } from "@gusnips/br/lookup";
+
+await lookupCep("01001-000");
+// { cep: "01001000", street: "Praça da Sé", neighborhood: "Sé", city: "São Paulo", state: "SP", ibge: "3550308" }
+```
+
+`null` means the CEP does not exist. Input that isn't eight digits is `null` too, and makes no
+request.
+
+A thrown `CepLookupError` means nobody could answer: ViaCEP failed, and so did BrasilAPI, the backup
+it tries next. The error's `cause` lists both failures. A failure never comes back as `null`, so a
+dropped connection doesn't tell the reader their CEP is wrong.
+
+```ts
+try {
+  const address = await lookupCep(cep);
+  if (address === null) return t("errors.cepNotFound");
+  fill(address);
+} catch {
+  return t("errors.cepLookupFailed"); // let them type the address by hand
+}
+```
+
+Each provider gets 5 seconds before the next one is asked. Change that with `timeoutMs`. Pass
+`signal` to cancel: the call rejects at once and asks no other provider. Pass `fetch` to use your
+own, in tests for example. It needs a global `fetch` and `AbortSignal.any` (Node 22, browsers since
+2024).
+
+`street` and `neighborhood` can be empty. A whole small town can share one CEP, so a CEP with no
+street is still a real CEP. `ibge` is the city's IBGE code, or `null` when the provider didn't send
+one (BrasilAPI never does).
+
+Formatting needs no request, and comes from the main entry:
+
+```ts
 import { formatCep, normalizeCep } from "@gusnips/br";
 
 formatCep("01310100"); // "01310-100"
 normalizeCep("01310-100"); // "01310100", or null when it isn't eight digits
 ```
 
-Looking a CEP up is a network call to a provider you choose, so it isn't here. A real CEP can also
-cover a whole small town with no street name, so a lookup that finds no street doesn't mean the CEP
-is wrong.
-
 ## Not here
 
-- **Error messages.** Every function returns a boolean, a string or `null`. The sentence the reader
-  sees belongs in your own translations:
+- **Error messages.** The checks return a boolean, a string or `null`, and `lookupCep` returns
+  `null` or throws. The sentence the reader sees belongs in your own translations:
   `isValidCpf(value) ? undefined : t("errors.cpfInvalid")`.
 - **zod.** Wrapping a check is one line, `z.string().refine(isValidCpf)`, and the message is yours.

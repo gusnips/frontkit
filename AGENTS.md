@@ -107,7 +107,8 @@ consumer can afford to install:
   profile of `http/` and `locale/`: no framework, no platform, no dependency. It is its own package
   rather than a part of either because a country's documents are neither the envelope nor a
   language — an English UI in Brazil still validates a CNPJ. Six adopters had written it, in three
-  independent lineages, and none accepted the alphanumeric CNPJ.
+  independent lineages, and none accepted the alphanumeric CNPJ. The CEP lookup is its one network
+  call, so it is a subpath (`@gusnips/br/lookup`) and the main entry never touches `fetch`.
 - `react/` runs in a browser AND inside a prerender, so it cannot contain `node:*`.
 - `vite/` needs `node:fs`. Having somewhere for that to live is what lets the other three be
   strict.

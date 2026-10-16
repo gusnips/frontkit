@@ -1,10 +1,11 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    // No DOM, no @types/node. An API validates a CNPJ, a form masks it as it is typed, and a React
-    // Native screen does both; the narrowest lib is what proves one build of this file serves all
-    // three.
-    "lib": ["ES2022"],
+    // No @types/node. An API validates a CNPJ, a form masks it as it is typed, and a React Native
+    // screen does both. DOM is here only for the types of `fetch` and `AbortSignal`, which the CEP
+    // lookup uses and every one of those runtimes has. The purity check still rejects browser-only
+    // globals and Node imports, the same arrangement as `locale/`.
+    "lib": ["ES2022", "DOM"],
     "types": [],
     "rootDir": "./src",
     "outDir": "./dist"
