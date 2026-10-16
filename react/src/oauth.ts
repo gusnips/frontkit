@@ -128,7 +128,11 @@ export type DeviceState =
   /** Unknown, expired or already decided: ask them to start again from the app. */
   | { status: "refused"; refusal: OAuthRefusal }
   | { status: "failed"; error: unknown; retry: () => void }
-  /** Ask whether `view.userCode` matches the one on their screen, then approve or deny. */
+  /**
+   * Show `view.userCode` and say: go on only if you started this sign-in yourself, just now, and
+   * this is the code on your screen. Somebody can run the real script and send a stranger the
+   * link, and that sentence is the only guard against it (RFC 8628 §5.4).
+   */
   | { status: "ready"; view: DeviceView }
   /** Done. Tell them to go back to the app, which carries on by itself. */
   | { status: "approved" }

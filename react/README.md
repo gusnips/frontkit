@@ -737,10 +737,11 @@ The link the script prints carries `?code=`, so the field usually starts full. T
 what was typed as `WDJB-MJHT`, however it was typed. `invalidLetter` turns on as soon as a letter
 no code uses (a vowel) is typed, so you can say so before all eight are in. `state.status` adds
 three to the consent page's four: `typing` until the code is complete, then `approved` or
-`denied`. When it is `ready`, show `view.userCode` and ask whether it matches the code on their
-screen. That question is what stops a link somebody else started. Once decided, the page stays
-decided: it never asks the server again, because the server no longer knows the code, and asking
-on the next focus would tell someone who just said yes that their code is wrong.
+`denied`. When it is `ready`, show `view.userCode` and say: go on only if you started this
+sign-in yourself, just now, and this is the code on your screen. Somebody can run the real script
+and send a stranger the link, and that sentence is the only guard against it. Once decided, the
+page stays decided: it never asks the server again, because the server no longer knows the code,
+and asking on the next focus would tell someone who just said yes that their code is wrong.
 
 ## Also here
 
