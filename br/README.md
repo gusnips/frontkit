@@ -24,22 +24,40 @@ digits. The last two, the check digits, are still numbers. `isValidCnpj`, `forma
 `maskCnpj` accept both kinds. A checker that strips letters before it checks turns these CNPJs down,
 so a company registered this year can't sign up.
 
-Three kinds of function, and they do different jobs:
+```ts
+import { normalizeDocument } from "@gusnips/br";
+
+normalizeDocument("12.abc.345/01de-35"); // "12ABC34501DE35"
+```
+
+`normalizeDocument` removes only dots, slashes, hyphens and whitespace. It uppercases ASCII a-z
+and keeps every other character, including `*`, `!` and Unicode. It never pads, truncates or
+checks a value. Use it before sending or storing a document, then validate when you need to reject
+bad input.
+
+Each function has its own job:
 
 - `formatCpf` and `formatCnpj` display a **complete** value. They add back the leading zeros a
   number column drops (`1144477735` becomes `011.444.777-35`), and anything that isn't a document
   comes back unchanged.
 - `maskCpf`, `maskCnpj` and `maskDocument` format **partial** input as it is typed, and never pad.
-  `maskDocument` switches from CPF to CNPJ after 11 digits, or at the first letter.
-- `isValidCpf` and `isValidCnpj` check the check digits. A value made of one repeated digit is always
-  refused, because the arithmetic alone would accept it.
+  `maskDocument` switches from CPF to CNPJ after 11 digits, or at the first letter. Masks drop
+  unsupported characters and extra input. Never use one to prepare a value for an API or storage:
+  `maskCnpj("12ABC34501DE35A")` hides the extra `A` and looks valid.
+- `isValidCpf` and `isValidCnpj` check the whole value and its check digits. Formatting and lowercase
+  ASCII letters are accepted. Extra characters, Unicode letters or digits, masked values and letters
+  in the last two positions are refused. A value made of one repeated digit is also refused,
+  because the arithmetic alone would accept it.
 
 `classifyDocument` answers "is this a CPF or a CNPJ?" by shape alone, without checking the digits.
-Government datasets contain test CPFs whose check digits fail, and those are still people.
+It accepts only 11 digits for a CPF, or 12 ASCII letters or digits followed by two digits for a CNPJ,
+with the same normalization as the validators. Government datasets contain test CPFs whose check
+digits fail, and those are still people.
 
-`cpfCheckDigits` and `cnpjCheckDigits` compute the last two digits from the rest. Use them to build a
-valid document in a test, or to complete a head office's CNPJ from its 8-character root:
-`root + "0001"` plus the two digits.
+`cpfCheckDigits` and `cnpjCheckDigits` compute the last two digits from the rest. They accept formatted
+bases and lowercase ASCII letters, but throw `RangeError` unless the whole base is nine digits for
+a CPF or twelve ASCII letters or digits for a CNPJ. Use them to build a valid document in a test,
+or to complete a head office's CNPJ from its 8-character root: `root + "0001"` plus the two digits.
 
 ## Phones
 
