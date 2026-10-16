@@ -9,6 +9,7 @@ export {
   maskCnpj,
   maskCpf,
   maskDocument,
+  normalizeDocument,
   redactCpf,
 } from "./document.ts";
 export type { DocumentKind } from "./document.ts";

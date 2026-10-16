@@ -1,9 +1,9 @@
 /**
  * CPF and CNPJ: check digits, display, input masks.
  *
- * Three concerns sit side by side here, and the adopters that merged them kept them apart for a
- * reason: a DISPLAY formatter works on a complete value and zero-pads it, a MASK formats partial
- * input as somebody types and never pads, and a VALIDATOR says whether the check digits hold.
+ * Normalization removes formatting but keeps unsupported characters for validation to refuse.
+ * A DISPLAY formatter works on a complete value and zero-pads it, a MASK formats partial input
+ * as somebody types and never pads, and a VALIDATOR says whether the check digits hold.
  *
  * The CNPJ is alphanumeric from July 2026 (Receita Federal, IN RFB 2.229/2024): the first twelve
  * characters may be A-Z as well as digits, and the two check digits stay numeric. Every copy this
@@ -15,12 +15,17 @@
 
 export type DocumentKind = "cpf" | "cnpj";
 
-/** Digits only. A CPF is numeric and stays numeric, so a pasted label or letter is noise. */
+/** Removes document formatting and uppercases ASCII letters. Keeps every other character. */
+export function normalizeDocument(value: string): string {
+  return value.replace(/[./\s-]/g, "").replace(/[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+/** Digits only, for permissive display formatting and input masks. */
 function cpfCharacters(value: string): string {
   return value.replace(/\D/g, "");
 }
 
-/** Digits and A-Z, uppercased — the characters a CNPJ can hold. */
+/** Digits and A-Z, for permissive display formatting and input masks. */
 function cnpjCharacters(value: string): string {
   return value.toUpperCase().replace(/[^0-9A-Z]/g, "");
 }
@@ -33,14 +38,15 @@ function cnpjCharacters(value: string): string {
  * Keep "what is it" and "does it check" as two questions.
  */
 export function classifyDocument(value: string): DocumentKind | null {
-  if (cpfCharacters(value).length === 11 && !/[A-Za-z]/.test(value)) return "cpf";
-  return /^[0-9A-Z]{12}\d{2}$/.test(cnpjCharacters(value)) ? "cnpj" : null;
+  const chars = normalizeDocument(value);
+  if (/^\d{11}$/.test(chars)) return "cpf";
+  return /^[0-9A-Z]{12}\d{2}$/.test(chars) ? "cnpj" : null;
 }
 
 /** The two check digits for the first nine digits of a CPF. */
 export function cpfCheckDigits(base9: string): string {
-  const digits = cpfCharacters(base9);
-  if (digits.length !== 9) throw new RangeError("A CPF base is 9 digits.");
+  const digits = normalizeDocument(base9);
+  if (!/^\d{9}$/.test(digits)) throw new RangeError("A CPF base is 9 digits.");
   const next = (source: string): number => {
     let sum = 0;
     for (let i = 0; i < source.length; i++) sum += Number(source[i]) * (source.length + 1 - i);
@@ -53,7 +59,7 @@ export function cpfCheckDigits(base9: string): string {
 
 /** The two check digits for the first twelve characters of a CNPJ, numeric or alphanumeric. */
 export function cnpjCheckDigits(base12: string): string {
-  const chars = cnpjCharacters(base12);
+  const chars = normalizeDocument(base12);
   if (!/^[0-9A-Z]{12}$/.test(chars)) throw new RangeError("A CNPJ base is 12 characters.");
   const next = (source: string): number => {
     let sum = 0;
@@ -71,15 +77,15 @@ export function cnpjCheckDigits(base12: string): string {
 
 /** Whether a CPF's check digits hold. Formatted or bare. Eleven repeated digits never pass. */
 export function isValidCpf(value: string): boolean {
-  const digits = cpfCharacters(value);
-  if (digits.length !== 11 || /[A-Za-z]/.test(value)) return false;
+  const digits = normalizeDocument(value);
+  if (!/^\d{11}$/.test(digits)) return false;
   if (/^(\d)\1{10}$/.test(digits)) return false;
   return cpfCheckDigits(digits.slice(0, 9)) === digits.slice(9);
 }
 
 /** Whether a numeric or alphanumeric CNPJ's check digits hold, formatted or bare. */
 export function isValidCnpj(value: string): boolean {
-  const chars = cnpjCharacters(value);
+  const chars = normalizeDocument(value);
   if (!/^[0-9A-Z]{12}\d{2}$/.test(chars)) return false;
   if (/^(.)\1{13}$/.test(chars)) return false;
   return cnpjCheckDigits(chars.slice(0, 12)) === chars.slice(12);
