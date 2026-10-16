@@ -89,23 +89,51 @@ export async function lookupCep(
   let notFound = false;
 
   for (const provider of PROVIDERS) {
-    const timeout = AbortSignal.timeout(timeoutMs);
+    const attempt = providerSignal(timeoutMs, signal);
     try {
-      const response = await request(provider.url(digits), {
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      });
+      const response = await request(provider.url(digits), { signal: attempt.signal });
       const address = await readAnswer(provider, response, digits);
       if (address !== null) return address;
       notFound = true;
     } catch (error) {
-      signal?.throwIfAborted();
-      failures.push(new Error(`${provider.name}: ${messageOf(error)}`, { cause: error }));
+      // `reason` is missing before Safari 15.4. The aborted fetch's own error says the same thing.
+      if (signal?.aborted) throw signal.reason ?? error;
+      // Only the timer and the caller abort `attempt`, and the caller has not.
+      const why = attempt.signal.aborted ? `no answer in ${timeoutMs} ms` : messageOf(error);
+      failures.push(new Error(`${provider.name}: ${why}`, { cause: error }));
+    } finally {
+      attempt.release();
     }
   }
 
   if (notFound) return null;
   const summary = failures.map((failure) => failure.message).join(". ");
   throw new CepLookupError(`No CEP provider answered. ${summary}`, { cause: failures });
+}
+
+/**
+ * A signal that aborts after `timeoutMs` or as soon as the caller's `signal` does, and `release`,
+ * which clears the timer and the listener so nothing outlives the request.
+ *
+ * Built by hand because `AbortSignal.timeout` needs Safari 16 and `AbortSignal.any` Safari 17.4, and
+ * React Native has neither. On a phone without them every lookup would throw.
+ */
+function providerSignal(
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): { signal: AbortSignal; release(): void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const forwardAbort = (): void => controller.abort(signal?.reason);
+  if (signal?.aborted) forwardAbort();
+  else signal?.addEventListener("abort", forwardAbort);
+  return {
+    signal: controller.signal,
+    release() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", forwardAbort);
+    },
+  };
 }
 
 /** The address, `null` when the provider says the CEP does not exist, or a throw. */

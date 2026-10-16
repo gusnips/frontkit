@@ -16,7 +16,7 @@
     },
     "br": {
       "name": "@gusnips/br",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "devDependencies": {
         "typescript": "^5.9.3",
         "vitest": "^4.1.2",
