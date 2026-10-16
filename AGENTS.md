@@ -57,8 +57,8 @@ frontkit/               ← repo root (this folder), git root
 already require lives behind one, so an adopter installs a dependency only by importing the thing
 that uses it — `@gusnips/react/ui` (`@base-ui/react`), `/store` (`zustand`), `/guards`
 (`react-router-dom`), `/hydrate` (`react-dom`), `/contract` (nothing), `/theme` (React only, so
-the Vite plugin that serializes it loads nothing else), `@gusnips/vite/preset`, `/render` and
-`/theme` (React). See invariant 15; `bun run exports` is what holds the line.
+the Vite plugin that serializes it loads nothing else), `/oauth` (`@tanstack/react-query`, the
+first subpath to import it at runtime), `@gusnips/vite/preset`, `/render` and `/theme` (React). See invariant 15; `bun run exports` is what holds the line.
 
 `@gusnips/locale/time` is a subpath no peer forced. What day it is in a zone has the same
 profile as the rest of that package — servers, browsers and Workers, `Intl` only — and `formatDayKey`

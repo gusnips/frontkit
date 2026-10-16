@@ -15,6 +15,7 @@
 //   @gusnips/react/supabase  the session adapter    → @supabase/supabase-js
 //   @gusnips/react/theme     the theme controller   → react only, but `@gusnips/vite/theme`
 //                                                    serializes it and must not load the rest
+//   @gusnips/react/oauth     the sign-in pages' logic → @tanstack/react-query, at runtime
 //
 // `react-dom` is the one the second migration added, and it is the sharpest case yet: that
 // adopter ships a REACT NATIVE app beside its two web apps, and React Native has no react-dom to

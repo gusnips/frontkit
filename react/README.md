@@ -689,6 +689,60 @@ silently become model messages. It returns `false` for ordinary text. The hook n
 message, clears a draft or changes attached files; those stay with the app. It also has no timer
 or scheduler: offer a repeat command only when your app has real scheduling behind it.
 
+## Signing an agent in
+
+When Claude or ChatGPT connects to your API, it sends the person to your consent page. When one of
+your scripts signs in on a machine with no browser, it prints a short code, and the person types
+it on your device page. `@gusnips/server/oauth` is the server half. These two hooks are the
+logic for the two pages. The pages themselves are yours.
+
+```tsx
+import { useConsentRequest } from "@gusnips/react/oauth";
+
+const consent = useConsentRequest(api.oauth, useLocation().search);
+
+if (consent.state.status === "ready")
+  return (
+    <Button onClick={() => consent.approve(workspaceId)} loading={consent.leaving}>
+      Allow {consent.state.view.clientName}
+    </Button>
+  );
+```
+
+`api.oauth` is two calls to your own API: `describe(query)` and `approve(query, choice)`. They
+reach the server's `describe` and `approve` through routes behind your sign-in. `state.status` is
+`loading`, `refused`, `failed` or `ready`:
+
+- **`refused`** means the request is not one to answer: an unknown app, or a return address it
+  never registered. Show `refusal.message` (or your own words for `refusal.reason`) and a link
+  home. Never a link back to the app, because sending the browser anywhere on a bad request is
+  how an open redirect is built.
+- **`failed`** means the request didn't arrive or answer. Show what failed and `state.retry`.
+- **`ready`** has the app's name and `redirectHost`, where the browser goes after the yes. Show
+  both: anyone can register any name, and the host is the part a stranger can't pick.
+
+`leaving` stays `true` from the press until the browser has left, so the button never comes back
+for a second press. Approve sends the browser on with `window.location.assign`, which also opens
+an app's own scheme such as `cursor://`.
+
+```tsx
+import { useDeviceApproval } from "@gusnips/react/oauth";
+
+const device = useDeviceApproval(api.device, useLocation().search);
+
+<input value={device.code} onChange={(event) => device.setCode(event.target.value)} />;
+```
+
+The link the script prints carries `?code=`, so the field usually starts full. The field shows
+what was typed as `WDJB-MJHT`, however it was typed. `invalidLetter` turns on as soon as a letter
+no code uses (a vowel) is typed, so you can say so before all eight are in. `state.status` adds
+three to the consent page's four: `typing` until the code is complete, then `approved` or
+`denied`. When it is `ready`, show `view.userCode` and say: go on only if you started this
+sign-in yourself, just now, and this is the code on your screen. Somebody can run the real script
+and send a stranger the link, and that sentence is the only guard against it. Once decided, the
+page stays decided: it never asks the server again, because the server no longer knows the code,
+and asking on the next focus would tell someone who just said yes that their code is wrong.
+
 ## Also here
 
 `ErrorBoundary`, an SSE reader split into a platform-free parser and a stream wrapper,
@@ -770,6 +824,7 @@ lives behind a subpath, so you install a dependency only if you import the thing
 | `@gusnips/react/contract` | two prerender names                      | nothing               |
 | `@gusnips/react/theme`    | `createTheme`, `startTheme`              | react                 |
 | `@gusnips/react/commands` | slash matching and `useSlashCommands`    | react                 |
+| `@gusnips/react/oauth`    | `useConsentRequest`, `useDeviceApproval` | @tanstack/react-query |
 
 The rule behind that table: **a peer marked optional must not be reachable from the main entry
 point.** An optional peer the barrel imports anyway is not optional: it is a required one whose
