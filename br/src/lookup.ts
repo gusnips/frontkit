@@ -1,10 +1,11 @@
 /**
- * Looks a CEP up: ViaCEP first, BrasilAPI when ViaCEP cannot answer.
+ * Looks a CEP up: ViaCEP first, BrasilAPI when ViaCEP fails or does not know the CEP. BrasilAPI
+ * also asks the Correios, so it finds new CEPs that ViaCEP has not loaded yet.
  *
  * The only file in this package that makes a request, so it is its own entry point,
  * `@gusnips/br/lookup`. The main entry never touches `fetch`.
  *
- * Two outcomes must never be confused. `null` is an answer: the CEP does not exist. A thrown
+ * Two outcomes must never be confused. `null` is an answer: the CEP was not found. A thrown
  * `CepLookupError` is no answer: neither provider answered. A form that shows "CEP not found"
  * for a dropped connection sends the reader to retype a CEP that was right.
  */
@@ -66,8 +67,9 @@ const PROVIDERS: Provider[] = [
 ];
 
 /**
- * The address for a CEP, or `null` when the CEP does not exist. Anything that is not eight digits
- * is `null` too, and makes no request.
+ * The first address a provider finds, or `null` when one said the CEP does not exist and none found
+ * it. When ViaCEP says "not found" and BrasilAPI then fails, ViaCEP's answer stands. Anything that is
+ * not eight digits is `null` too, and makes no request.
  *
  * Throws `CepLookupError` when neither provider answered, never `null`. Each provider gets
  * `timeoutMs` (5 s) before the next one is asked. Aborting `signal` rejects with its reason at
@@ -84,6 +86,7 @@ export async function lookupCep(
   // Called bare, not as `options.fetch()`: browser fetch throws when `this` is not the window.
   const request = options.fetch ?? globalThis.fetch;
   const failures: Error[] = [];
+  let notFound = false;
 
   for (const provider of PROVIDERS) {
     const timeout = AbortSignal.timeout(timeoutMs);
@@ -91,13 +94,16 @@ export async function lookupCep(
       const response = await request(provider.url(digits), {
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       });
-      return await readAnswer(provider, response, digits);
+      const address = await readAnswer(provider, response, digits);
+      if (address !== null) return address;
+      notFound = true;
     } catch (error) {
       signal?.throwIfAborted();
       failures.push(new Error(`${provider.name}: ${messageOf(error)}`, { cause: error }));
     }
   }
 
+  if (notFound) return null;
   const summary = failures.map((failure) => failure.message).join(". ");
   throw new CepLookupError(`No CEP provider answered. ${summary}`, { cause: failures });
 }
