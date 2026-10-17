@@ -1,19 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
+import brasilApiBancoDoBrasil from "../fixtures/brasil-api-banco-do-brasil.json";
 import brasilApiPetrobras from "../fixtures/brasil-api-petrobras.json";
 import brasilApiUnknown from "../fixtures/brasil-api-unknown.json";
+import cnpjWsBancoDoBrasil from "../fixtures/cnpj-ws-banco-do-brasil.json";
 import cnpjWsPetrobras from "../fixtures/cnpj-ws-petrobras.json";
 import cnpjWsUnknown from "../fixtures/cnpj-ws-unknown.json";
+import minhaReceitaBancoDoBrasil from "../fixtures/minha-receita-banco-do-brasil.json";
 import minhaReceitaPetrobras from "../fixtures/minha-receita-petrobras.json";
 import minhaReceitaUnknown from "../fixtures/minha-receita-unknown.json";
+import receitaWsBancoDoBrasil from "../fixtures/receita-ws-banco-do-brasil.json";
 import receitaWsPetrobras from "../fixtures/receita-ws-petrobras.json";
 import receitaWsUnknown from "../fixtures/receita-ws-unknown.json";
 import { brasilApi, cnpjWs, minhaReceita, receitaWs, registry } from "./providers.ts";
 import type { CnpjPartner, CnpjProvider, CnpjRecord } from "./types.ts";
 
-// Each fixture is one provider's real answer, recorded on 2026-10-16 with a plain GET to the `url`
-// it holds: Petrobras, and a CNPJ whose check digits hold and that no provider has.
+// Each fixture is one provider's real answer, recorded with a plain GET to the `url` it holds:
+// Petrobras, a CNPJ whose check digits hold and that no provider has (both on 2026-10-16), and a
+// Banco do Brasil branch opened on 2026-07-31 with a CNPJ that has letters (on 2026-10-17).
 const PETROBRAS = "33000167000101";
 const UNKNOWN = "99999998000147";
+const LETTERED = "00000000E08G12";
 
 interface Recording {
   url: string;
@@ -103,7 +109,57 @@ describe.each([
   });
 });
 
+/** What every provider says about the branch with letters in its CNPJ. */
+const LETTERED_EVERYWHERE = {
+  cnpj: LETTERED,
+  razao_social: "BANCO DO BRASIL SA",
+  nome_fantasia: null,
+  matriz_filial: "FILIAL",
+  situacao_cadastral: "ATIVA",
+  data_situacao_cadastral: "2026-07-31",
+  data_inicio_atividade: "2026-07-31",
+  natureza_juridica: { codigo: "2038", descricao: "Sociedade de Economia Mista" },
+  cnae_principal: { codigo: "6422100", descricao: "Bancos múltiplos, com carteira comercial" },
+  // cnpj.ws pads this with Receita's fixed-width spaces, which the mapper folds to one.
+  endereco: {
+    numero: "S/N",
+    complemento: "SETOR SHCN CL BLOCO D LOJA 80",
+    bairro: "ASA NORTE",
+    cep: "70832540",
+    uf: "DF",
+  },
+  telefones: ["556134939525"],
+  // Opted in and was excluded on the same day: still `optante: false`.
+  simples_nacional: { optante: false, data_opcao: "2007-07-01", data_exclusao: "2007-07-01" },
+  mei: { optante: false, data_opcao: "2009-07-01", data_exclusao: "2009-07-01" },
+};
+
+describe.each([
+  ["Minha Receita", minhaReceita(), minhaReceitaBancoDoBrasil],
+  ["BrasilAPI", brasilApi(), brasilApiBancoDoBrasil],
+  ["cnpj.ws", cnpjWs(), cnpjWsBancoDoBrasil],
+  // ReceitaWS answers with the CNPJ formatted, `00.000.000/E08G-12`.
+  ["ReceitaWS", receitaWs(), receitaWsBancoDoBrasil],
+])("%s, a CNPJ with letters", (_name, provider, recording) => {
+  it("asks for it with its letters and maps it to the same record as every other provider", async () => {
+    const fetch = recorded(recording);
+    const record = await ask(provider, LETTERED, fetch);
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([recording.url]);
+    expect(recording.url.endsWith(`/${LETTERED}`)).toBe(true);
+    expect(record).toMatchObject(LETTERED_EVERYWHERE);
+  });
+});
+
 describe("what only some providers publish", () => {
+  it("a branch: the company's partners everywhere except ReceitaWS, which lists none", async () => {
+    const partners = async (provider: CnpjProvider, recording: Recording) =>
+      ((await ask(provider, LETTERED, recorded(recording)))?.socios ?? []).sort(byName);
+    const fromMinhaReceita = await partners(minhaReceita(), minhaReceitaBancoDoBrasil);
+    expect(fromMinhaReceita).toHaveLength(41);
+    expect(await partners(cnpjWs(), cnpjWsBancoDoBrasil)).toEqual(fromMinhaReceita);
+    expect(await partners(receitaWs(), receitaWsBancoDoBrasil)).toEqual([]);
+  });
+
   it("Minha Receita: both city codes and the partners' documents, but no e-mail", async () => {
     const record = await petrobrasFrom(minhaReceita(), minhaReceitaPetrobras);
     expect(record.endereco).toEqual({

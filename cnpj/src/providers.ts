@@ -245,8 +245,7 @@ function fromCnpjWs(d: Json): CnpjRecord {
         faixa_etaria: text(s.faixa_etaria),
       };
     }),
-    // From cnpj.ws's documented schema, not a recording: Petrobras has no Simples row there.
-    // `simples` and `mei` are text, read as yes when they start with S (`Sim`).
+    // `simples` and `mei` are text (`Não`, `Sim`), read as yes when they start with S.
     simples_nacional: option(
       simples.simples,
       simples.data_opcao_simples,
@@ -322,10 +321,18 @@ function list(value: unknown): Json[] {
   return Array.isArray(value) ? value.filter(isJson) : [];
 }
 
-/** Trimmed text, `null` when empty. A number counts, because some providers send codes as numbers. */
+/**
+ * Trimmed text, `null` when empty. A number counts, because some providers send codes as numbers.
+ * Runs of whitespace become one space: cnpj.ws keeps the padding of Receita's fixed-width files
+ * (`SETOR SHCN CL             BLOCO D`), where the others send one space.
+ */
 function text(value: unknown): string | null {
   const s =
-    typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
+    typeof value === "string"
+      ? value.replace(/\s+/g, " ").trim()
+      : typeof value === "number"
+        ? String(value)
+        : "";
   return s === "" ? null : s;
 }
 
