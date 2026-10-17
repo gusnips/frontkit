@@ -42,13 +42,14 @@ into the history once, and the only fix was rewriting all of it before the first
 
 ```
 frontkit/               ← repo root (this folder), git root
-├── tokens/             ← @gusnips/tokens — one Tailwind 4 @theme file. Zero deps.
-├── http/               ← @gusnips/http   — the envelope; /retry, when to try again. Zero deps, no framework.
-├── locale/             ← @gusnips/locale — where a language lives in a URL; /time, what day it is; /money, what a language pays in. A leaf.
-├── br/                 ← @gusnips/br     — CPF, CNPJ, Brazilian phones, CEP. Zero deps, a leaf.
-├── react/              ← @gusnips/react  — the headless runtime. One required peer: react.
+├── tokens/             ← @gusnips/tokens: one Tailwind 4 @theme file. Zero deps.
+├── http/               ← @gusnips/http: the envelope; /retry, when to try again. Zero deps, no framework.
+├── locale/             ← @gusnips/locale: where a language lives in a URL; /time, what day it is; /money, what a language pays in. A leaf.
+├── br/                 ← @gusnips/br: CPF, CNPJ, Brazilian phones, CEP. Zero deps.
+├── cnpj/               ← @gusnips/cnpj: a company by its CNPJ, from a registry or four public APIs. Needs br.
+├── react/              ← @gusnips/react: the headless runtime. One required peer: react.
 │   └── src/ui/         ← the seven Base UI wrappers, behind a subpath (see below)
-├── vite/               ← @gusnips/vite   — the build rig. The ONLY package allowed node:fs.
+├── vite/               ← @gusnips/vite: the build rig. The ONLY package allowed node:fs.
 ├── scripts/            ← check-purity.ts, check-exports.ts and check-release.ts, the guards
 └── AGENTS.md           ← this file
 ```
@@ -91,7 +92,7 @@ select of its own. So the rule is shared (`currencyLabel`) and the control stays
 than incidental: it is what makes the package importable from **React Native**, which has no
 react-dom to give. See migration 2.
 
-**Six packages, split by dependency profile.** That split is not taste; it is what each
+**Seven packages, split by dependency profile.** That split is not taste; it is what each
 consumer can afford to install:
 
 - `tokens/` is imported by the Astro marketing sites too, so it cannot contain JavaScript.
@@ -109,19 +110,30 @@ consumer can afford to install:
   language — an English UI in Brazil still validates a CNPJ. Six adopters had written it, in three
   independent lineages, and none accepted the alphanumeric CNPJ. The CEP lookup is its one network
   call, so it is a subpath (`@gusnips/br/lookup`) and the main entry never touches `fetch`.
+- `cnpj/` asks the network for a company, so it has `br/`'s profile plus `fetch`. It is a package
+  and not a second `br/` subpath because its mappings follow four public services outside our
+  control: one of them changing a field is a release, and that release should not move the version
+  every server imports for `isValidCnpj`.
 - `react/` runs in a browser AND inside a prerender, so it cannot contain `node:*`.
 - `vite/` needs `node:fs`. Having somewhere for that to live is what lets the other three be
   strict.
 
-Dependency edges run one way: `vite/ → react/ → http/`. Never the reverse. In particular
-`PRERENDERED_ROUTE_ATTR` lives in `react/`, not `vite/`, because a **browser entry** reads it —
-putting it in the build-time package would drag `node:` into the client bundle.
+Dependency edges run one way: `vite/ → react/ → http/`, and `cnpj/ → br/`. Never the reverse. In
+particular `PRERENDERED_ROUTE_ATTR` lives in `react/`, not `vite/`, because a **browser entry** reads
+it, and putting it in the build-time package would drag `node:` into the client bundle.
 
-`locale/` and `br/` are **leaves**: nothing in frontkit imports them, deliberately. A package that depends on
+`locale/` is a **leaf**: nothing in frontkit imports it, deliberately. A package that depends on
 it would pin it at an exact version at pack time, which is the hazard the `vite → react` pin
 already costs us a paired bump for; a leaf has no version anyone else can get wrong. That is also
 why `i18nInitOptions` does not read `LOCALE_QUERY_PARAM` itself — the adopter passes it, one line,
 and the writer and the reader of the language still cannot drift.
+
+`br/` was a leaf too, until `cnpj/`. cnpj asks for it as `workspace:^`, which packs as a caret on
+br's current version rather than an exact pin, so an adopter on a newer br in the same minor still
+gets one copy. Two copies are possible across a minor, because a caret on a 0.x does not cross one,
+and they cost bytes and nothing else: br is pure functions with no module state, and cnpj
+re-exports none of its classes, so no `instanceof` can see two of them. Release cnpj after a br
+minor anyway, to keep it at one.
 
 Folder names state their ROLE, not an npm scope — the same rule as providerkit's `core/`.
 
@@ -169,7 +181,7 @@ Per package: `cd react && bun run test`, etc.
 - **`bun run release:check` packs each package and reads the manifest that comes out.** It is the
   only thing here that looks at what the registry will actually receive, and the only reason the
   bug above is a caught error rather than a broken tarball.
-- **Publish in dependency order** — `tokens`, `http`, `locale`, `br`, `react`, `vite` — and bump `vite` whenever
+- **Publish in dependency order** (`tokens`, `http`, `locale`, `br`, `cnpj`, `react`, `vite`), and bump `vite` whenever
   `react` ships, because the pin inside it changed even when none of its own code did.
 - **And the adopter's half of that pin: the two carets move together, or the install grows a second
   copy of `react`.** That exact pin inside `vite` is reachable through the ADOPTER's `vite` caret,

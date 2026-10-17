@@ -1,0 +1,8 @@
+{
+  // The tests, which the build excludes, under the same narrow lib as the source. They read the
+  // recorded answers in fixtures/, which sit outside src/ so the tarball does not carry them.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true, "rootDir": ".", "resolveJsonModule": true },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

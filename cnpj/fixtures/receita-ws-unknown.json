@@ -1,0 +1,15 @@
+{
+  "recorded": "2026-10-16",
+  "url": "https://receitaws.com.br/v1/cnpj/99999998000147",
+  "status": 200,
+  "body": {
+    "cnpj": "99.999.998/0001-47",
+    "ultima_atualizacao": "2026-09-24T16:14:05.276Z",
+    "status": "ERROR",
+    "message": "CNPJ rejeitado pela Receita Federal",
+    "billing": {
+      "free": true,
+      "database": true
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "recorded": "2026-10-16",
+  "url": "https://brasilapi.com.br/api/cnpj/v1/99999998000147",
+  "status": 404,
+  "body": {
+    "message": "CNPJ 99.999.998/0001-47 não encontrado.",
+    "type": "not_found",
+    "name": "NotFoundError"
+  }
+}
