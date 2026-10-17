@@ -21,20 +21,30 @@ maskDocument("1114447"); // "111.444.7", for a field as somebody types
 ```
 
 **Since July 2026 a new CNPJ can have letters.** The first twelve characters can be A-Z as well as
-digits. The last two, the check digits, are still numbers. `isValidCnpj`, `formatCnpj` and
-`maskCnpj` accept both kinds. A checker that strips letters before it checks turns these CNPJs down,
-so a company registered this year can't sign up.
+digits. The last two, the check digits, are still numbers. `normalizeCnpj`, `isValidCnpj`,
+`formatCnpj` and `maskCnpj` accept both kinds. A checker that strips letters before it checks turns
+these CNPJs down, so a company registered this year can't sign up.
 
 ```ts
-import { normalizeDocument } from "@gusnips/br";
+import { normalizeCnpj } from "@gusnips/br";
 
-normalizeDocument("12.abc.345/01de-35"); // "12ABC34501DE35"
+normalizeCnpj("12.abc.345/01de-35"); // "12ABC34501DE35"
 ```
 
-`normalizeDocument` removes only dots, slashes, hyphens and whitespace. It uppercases ASCII a-z
-and keeps every other character, including `*`, `!` and Unicode. It never pads, truncates or
-checks a value. Use it before sending or storing a document, then validate when you need to reject
-bad input.
+`normalizeCnpj` gives you the 14 characters to store, compare or send. It removes dots, slashes,
+hyphens and whitespace, and uppercases the letters. Anything else left over makes it return `null`,
+and so does a value with 13 characters or a letter in the last two places. It never drops or pads a
+character, because that can turn a typo into another company's CNPJ. It checks the shape only, so
+call `isValidCnpj` too when the check digits must hold.
+
+```ts
+normalizeCnpj("11.222.333/0001-81"); // "11222333000181"
+normalizeCnpj("CNPJ 11.222.333/0001-81"); // null
+```
+
+`normalizeDocument` does the same cleanup for a field that takes a CPF or a CNPJ, but it never
+returns `null`. It keeps every other character, including `*`, `!` and Unicode, and never pads,
+truncates or checks a value. Validate after it when you need to reject bad input.
 
 Each function has its own job:
 

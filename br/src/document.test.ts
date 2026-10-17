@@ -10,6 +10,7 @@ import {
   maskCnpj,
   maskCpf,
   maskDocument,
+  normalizeCnpj,
   normalizeDocument,
   redactCpf,
 } from "./document.ts";
@@ -31,6 +32,43 @@ describe("normalizeDocument", () => {
   ])("normalizes %j without losing unsupported characters", (value, normalized) => {
     expect(normalizeDocument(value)).toBe(normalized);
     expect(normalizeDocument(normalized)).toBe(normalized);
+  });
+});
+
+describe("normalizeCnpj", () => {
+  it.each([
+    ["11.222.333/0001-81", "11222333000181"],
+    ["11222333000181", "11222333000181"],
+    [" 11 222 333 0001 81\n", "11222333000181"],
+    [ALPHANUMERIC, "12ABC34501DE35"],
+    ["12ABC34501DE35", "12ABC34501DE35"],
+    ["12.abc.345/01de-35", "12ABC34501DE35"],
+    ["12abc34501de35", "12ABC34501DE35"],
+    ["\t12 abc 345 01de 35 ", "12ABC34501DE35"],
+  ])("normalizes %j to %j", (value, normalized) => {
+    expect(normalizeCnpj(value)).toBe(normalized);
+    expect(normalizeCnpj(normalized)).toBe(normalized);
+  });
+
+  it.each([
+    "CNPJ 11.222.333/0001-81",
+    "11.222.333/0001-81!",
+    "11_222_333_0001_81",
+    "11.222.333/0001–81",
+    "12.ABC.345/01DE-3A",
+    "12.ÁBC.345/01DE-35",
+    "11２22333000181",
+    "1222333000181",
+    "112223330001810",
+    "111.444.777-35",
+    "",
+  ])("refuses %j instead of dropping or padding a character", (value) => {
+    expect(normalizeCnpj(value)).toBe(null);
+  });
+
+  it("checks the shape, not the check digits", () => {
+    expect(normalizeCnpj("11.222.333/0001-82")).toBe("11222333000182");
+    expect(isValidCnpj("11.222.333/0001-82")).toBe(false);
   });
 });
 

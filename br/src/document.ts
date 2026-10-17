@@ -1,7 +1,8 @@
 /**
  * CPF and CNPJ: check digits, display, input masks.
  *
- * Normalization removes formatting but keeps unsupported characters for validation to refuse.
+ * Normalization removes formatting and never drops any other character: `normalizeDocument` keeps
+ * it for validation to refuse, and `normalizeCnpj` answers `null`.
  * A DISPLAY formatter works on a complete value and zero-pads it, a MASK formats partial input
  * as somebody types and never pads, and a VALIDATOR says whether the check digits hold.
  *
@@ -18,6 +19,19 @@ export type DocumentKind = "cpf" | "cnpj";
 /** Removes document formatting and uppercases ASCII letters. Keeps every other character. */
 export function normalizeDocument(value: string): string {
   return value.replace(/[./\s-]/g, "").replace(/[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+/**
+ * A CNPJ as the 14 characters to store, compare and send, letters uppercased: `12ABC34501DE35`.
+ * `null` when what is left after {@link normalizeDocument} is not shaped like a CNPJ.
+ *
+ * Any other character makes it `null` instead of being dropped, and a short value is never padded,
+ * because either one can turn a malformed value into another company's CNPJ. Shape only, like
+ * {@link classifyDocument}: {@link isValidCnpj} says whether the check digits hold.
+ */
+export function normalizeCnpj(value: string): string | null {
+  const chars = normalizeDocument(value);
+  return /^[0-9A-Z]{12}\d{2}$/.test(chars) ? chars : null;
 }
 
 /** Digits only, for permissive display formatting and input masks. */
@@ -40,7 +54,7 @@ function cnpjCharacters(value: string): string {
 export function classifyDocument(value: string): DocumentKind | null {
   const chars = normalizeDocument(value);
   if (/^\d{11}$/.test(chars)) return "cpf";
-  return /^[0-9A-Z]{12}\d{2}$/.test(chars) ? "cnpj" : null;
+  return normalizeCnpj(chars) === null ? null : "cnpj";
 }
 
 /** The two check digits for the first nine digits of a CPF. */
@@ -85,9 +99,8 @@ export function isValidCpf(value: string): boolean {
 
 /** Whether a numeric or alphanumeric CNPJ's check digits hold, formatted or bare. */
 export function isValidCnpj(value: string): boolean {
-  const chars = normalizeDocument(value);
-  if (!/^[0-9A-Z]{12}\d{2}$/.test(chars)) return false;
-  if (/^(.)\1{13}$/.test(chars)) return false;
+  const chars = normalizeCnpj(value);
+  if (chars === null || /^(.)\1{13}$/.test(chars)) return false;
   return cnpjCheckDigits(chars.slice(0, 12)) === chars.slice(12);
 }
 
