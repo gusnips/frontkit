@@ -1,6 +1,6 @@
 {
   "name": "@gusnips/br",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Brazilian documents and phone numbers: CPF and CNPJ (the alphanumeric CNPJ too), phones, CEP. Check digits, display, input masks, CEP address lookup. Zero dependencies, no framework.",
   "type": "module",
   "license": "MIT",

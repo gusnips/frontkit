@@ -164,6 +164,8 @@ How to write each value:
   masked the way Receita publishes it.
 - `motivo_situacao_cadastral` is `null` when Receita gives no reason ("SEM MOTIVO").
 - `simples_nacional` and `mei` are `{ "optante": false, ... }` for a company that never opted in.
+- `total_filiais` counts the company's branches other than this establishment and its head office:
+  a head office with 3 branches has 3, and each of those branches has 2.
 - A value you don't have is `null`, and a list you don't have is `[]`.
 
 Your answer is read with the same rules as the public ones, so a CNAE written `06.00-0-01` or a

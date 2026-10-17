@@ -77,7 +77,15 @@ const PROVIDERS: Provider[] = [
  */
 export async function lookupCep(
   cep: string,
-  options: { signal?: AbortSignal; timeoutMs?: number; fetch?: typeof fetch } = {},
+  options: {
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    /**
+     * Called with a URL string and `{ signal }`. `typeof fetch` would ask a Bun-typed caller for
+     * `fetch.preconnect` too.
+     */
+    fetch?: (input: string, init?: RequestInit) => Promise<Response>;
+  } = {},
 ): Promise<CepAddress | null> {
   const digits = normalizeCep(cep);
   if (digits === null) return null;

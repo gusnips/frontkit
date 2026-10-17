@@ -159,6 +159,18 @@ describe("lookupCep", () => {
     expect(urls(fetch)).toEqual([VIACEP, BRASILAPI]);
   });
 
+  // A wrapper that takes only a URL string must typecheck: `typeof fetch` refused it, and under Bun's
+  // types it also asked for `fetch.preconnect`.
+  it("takes any function that fetches a URL string", async () => {
+    const urls: string[] = [];
+    const fetch = async (url: string, init?: RequestInit): Promise<Response> => {
+      urls.push(url);
+      return reply(viaCepBody)(init);
+    };
+    await expect(lookupCep("01001-000", { fetch })).resolves.toEqual(address);
+    expect(urls).toEqual([VIACEP]);
+  });
+
   it("keeps an empty street and neighborhood", async () => {
     const town = { ...viaCepBody, logradouro: "", bairro: "" };
     await expect(lookupCep("01001000", { fetch: providers(reply(town)) })).resolves.toEqual({

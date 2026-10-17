@@ -36,7 +36,10 @@ export interface CnpjRecord {
   /** A company missing from Receita's Simples file never opted in, so it reads `optante: false`. */
   simples_nacional: CnpjOption;
   mei: CnpjOption;
-  /** How many establishments share the first 8 characters. `null` from the public providers. */
+  /**
+   * How many branches the company has besides this establishment and its head office: a head office
+   * with 3 branches has 3, and each of those branches has 2. `null` from the public providers.
+   */
   total_filiais: number | null;
 }
 
@@ -97,6 +100,9 @@ export interface CnpjProvider {
   name: string;
   lookup(
     cnpj: string,
-    request: { signal: AbortSignal; fetch: typeof fetch },
+    request: {
+      signal: AbortSignal;
+      fetch: (input: string, init?: RequestInit) => Promise<Response>;
+    },
   ): Promise<CnpjRecord | null>;
 }

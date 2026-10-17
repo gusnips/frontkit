@@ -34,7 +34,11 @@ export interface LookupCnpjOptions {
   timeoutMs?: number;
   /** Aborting it rejects with its reason at once and asks no other provider. */
   signal?: AbortSignal;
-  fetch?: typeof fetch;
+  /**
+   * Called with a URL string and `{ signal, headers }`, so a wrapper needs no more than this.
+   * `typeof fetch` would ask a Bun-typed caller for `fetch.preconnect` too.
+   */
+  fetch?: (input: string, init?: RequestInit) => Promise<Response>;
 }
 
 const DEFAULT_TIMEOUT_MS = 8000;
