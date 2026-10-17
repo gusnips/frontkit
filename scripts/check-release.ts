@@ -28,7 +28,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
-const PACKAGES = ["tokens", "http", "locale", "br", "react", "vite"];
+const PACKAGES = ["tokens", "http", "locale", "br", "cnpj", "react", "vite"];
 
 interface Manifest {
   name: string;
@@ -114,8 +114,14 @@ try {
             `Release with \`bun publish\`, never \`npm publish\`.`,
         );
 
+      // `workspace:*` packs as the exact version and `workspace:^` as a caret on it. Either way the
+      // number has to be the sibling's current one.
       const sibling = current.get(dep);
-      if (sibling !== undefined && !range.startsWith("workspace:") && range !== sibling)
+      if (
+        sibling !== undefined &&
+        !range.startsWith("workspace:") &&
+        range.replace(/^\^/, "") !== sibling
+      )
         problems.push(
           `${packed.name} would pin "${dep}": "${range}", but ${dep} is at ${sibling}. ` +
             `The lockfile is stale — run \`bun install\` and pack again.`,

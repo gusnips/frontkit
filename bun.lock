@@ -22,6 +22,17 @@
         "vitest": "^4.1.2",
       },
     },
+    "cnpj": {
+      "name": "@gusnips/cnpj",
+      "version": "0.1.0",
+      "dependencies": {
+        "@gusnips/br": "workspace:^",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.2",
+      },
+    },
     "http": {
       "name": "@gusnips/http",
       "version": "0.2.0",
@@ -204,6 +215,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
     "@gusnips/br": ["@gusnips/br@workspace:br"],
+
+    "@gusnips/cnpj": ["@gusnips/cnpj@workspace:cnpj"],
 
     "@gusnips/http": ["@gusnips/http@workspace:http"],
 

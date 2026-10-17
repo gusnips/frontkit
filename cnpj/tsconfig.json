@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // No @types/node, the same arrangement as `br/`: the lookup runs on a server, in a browser, in
+    // React Native and in a Worker. DOM is here only for the types of `fetch`, `Response` and
+    // `AbortSignal`, which every one of those runtimes has. The purity check rejects browser-only
+    // globals and Node imports.
+    "lib": ["ES2022", "DOM"],
+    "types": [],
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+}
