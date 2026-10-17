@@ -4,6 +4,7 @@ import cnpjWsPetrobras from "../fixtures/cnpj-ws-petrobras.json";
 import cnpjWsUnknown from "../fixtures/cnpj-ws-unknown.json";
 import minhaReceitaPetrobras from "../fixtures/minha-receita-petrobras.json";
 import minhaReceitaUnknown from "../fixtures/minha-receita-unknown.json";
+import receitaWsBancoDoBrasil from "../fixtures/receita-ws-banco-do-brasil.json";
 import receitaWsUnknown from "../fixtures/receita-ws-unknown.json";
 import { CnpjNotFoundError, CnpjUnavailableError, lookupCnpj } from "./lookup.ts";
 import { minhaReceita, registry } from "./providers.ts";
@@ -112,6 +113,23 @@ describe("lookupCnpj", () => {
     );
     expect(error).toHaveProperty("cause", [
       new Error("ReceitaWS: HTTP 429", { cause: new Error("HTTP 429") }),
+    ]);
+  });
+
+  it("finds a CNPJ with letters typed in lowercase with its mask, at the last provider", async () => {
+    const fetch = providers({
+      minhaReceita: status(503),
+      brasilApi: status(503),
+      cnpjWs: status(429),
+      receitaWs: reply(receitaWsBancoDoBrasil),
+    });
+    const record = await lookupCnpj("00.000.000/e08g-12", { fetch });
+    expect(record).toMatchObject({ cnpj: "00000000E08G12", razao_social: "BANCO DO BRASIL SA" });
+    expect(fetch.mock.calls.map(([input]) => String(input))).toEqual([
+      "https://minhareceita.org/00000000E08G12",
+      "https://brasilapi.com.br/api/cnpj/v1/00000000E08G12",
+      "https://publica.cnpj.ws/cnpj/00000000E08G12",
+      "https://receitaws.com.br/v1/cnpj/00000000E08G12",
     ]);
   });
 

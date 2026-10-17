@@ -1,0 +1,62 @@
+{
+  "recorded": "2026-10-17",
+  "url": "https://receitaws.com.br/v1/cnpj/00000000E08G12",
+  "status": 200,
+  "body": {
+    "abertura": "31/07/2026",
+    "situacao": "ATIVA",
+    "tipo": "FILIAL",
+    "nome": "BANCO DO BRASIL SA",
+    "porte": "DEMAIS",
+    "natureza_juridica": "203-8 - Sociedade de Economia Mista",
+    "atividade_principal": [
+      {
+        "code": "64.22-1-00",
+        "text": "Bancos múltiplos, com carteira comercial"
+      }
+    ],
+    "atividades_secundarias": [
+      {
+        "code": "64.99-9-99",
+        "text": "Outras atividades de serviços financeiros não especificadas anteriormente"
+      }
+    ],
+    "logradouro": "Q 201",
+    "numero": "S/N",
+    "complemento": "SETOR SHCN CL BLOCO D LOJA 80",
+    "municipio": "BRASILIA",
+    "bairro": "ASA NORTE",
+    "uf": "DF",
+    "cep": "70.832-540",
+    "email": "age1606@bb.com.br",
+    "telefone": "(61) 3493-9525",
+    "data_situacao": "31/07/2026",
+    "cnpj": "00.000.000/E08G-12",
+    "ultima_atualizacao": "2026-10-14T13:41:41.744Z",
+    "status": "OK",
+    "fantasia": "",
+    "efr": "",
+    "motivo_situacao": "",
+    "situacao_especial": "",
+    "data_situacao_especial": "",
+    "capital_social": "120000000000.00",
+    "qsa": [],
+    "simples": {
+      "optante": false,
+      "data_opcao": "01/07/2007",
+      "data_exclusao": "01/07/2007",
+      "ultima_atualizacao": "2026-10-13T23:59:59.000Z"
+    },
+    "simei": {
+      "optante": false,
+      "data_opcao": "01/07/2009",
+      "data_exclusao": "01/07/2009",
+      "ultima_atualizacao": "2026-10-13T23:59:59.000Z"
+    },
+    "extra": {},
+    "billing": {
+      "free": true,
+      "database": true
+    }
+  }
+}

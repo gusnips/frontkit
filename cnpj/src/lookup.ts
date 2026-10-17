@@ -6,7 +6,7 @@
  * the company may well exist. A form that says "no such company" over a dropped connection or a
  * rate limit sends the reader to retype a CNPJ that was right.
  */
-import { isValidCnpj, normalizeDocument } from "@gusnips/br";
+import { isValidCnpj, normalizeCnpj } from "@gusnips/br";
 import { brasilApi, cnpjWs, minhaReceita, receitaWs } from "./providers.ts";
 import type { CnpjProvider, CnpjRecord } from "./types.ts";
 
@@ -47,10 +47,15 @@ const DEFAULT_TIMEOUT_MS = 8000;
  * every provider said it does not have it, and `CnpjUnavailableError` otherwise. Letters are kept:
  * `12.abc.345/01de-35` is asked for as `12ABC34501DE35`.
  */
-export async function lookupCnpj(cnpj: string, options: LookupCnpjOptions = {}): Promise<CnpjRecord> {
-  if (!isValidCnpj(cnpj)) throw new RangeError(`Not a valid CNPJ: ${JSON.stringify(cnpj)}`);
-  // A valid CNPJ is 14 characters once formatting is gone, so this is the key every provider gets.
-  const key = normalizeDocument(cnpj);
+export async function lookupCnpj(
+  cnpj: string,
+  options: LookupCnpjOptions = {},
+): Promise<CnpjRecord> {
+  // The 14 characters every provider is asked for, once the shape and the check digits hold.
+  const key = normalizeCnpj(cnpj);
+  if (key === null || !isValidCnpj(key)) {
+    throw new RangeError(`Not a valid CNPJ: ${JSON.stringify(cnpj)}`);
+  }
   const {
     providers = [minhaReceita(), brasilApi(), cnpjWs(), receitaWs()],
     timeoutMs = DEFAULT_TIMEOUT_MS,

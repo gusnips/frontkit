@@ -54,11 +54,11 @@ With no `providers`, it asks these four, in this order. The two with a limit of 
 
 All four publish Receita Federal's open data, each in its own format. What they leave out:
 
-- ReceitaWS sends no city codes and no partner CPF or CNPJ, so those are `null`. Its free API only
-  answers CNPJs it already has stored. Any other error from it counts as a failure, not as not
-  found.
-- For the company in this package's tests, the e-mail was `null` on Minha Receita and BrasilAPI, and
-  present on cnpj.ws and ReceitaWS.
+- ReceitaWS sends no city codes and no partner CPF or CNPJ, so those are `null`. For a branch it
+  sent no partners at all, where the others sent the company's. Its free API only answers CNPJs it
+  already has stored, and a CNPJ it hasn't stored counts as a failure, not as not found.
+- For both companies in this package's tests, the e-mail was `null` on Minha Receita and BrasilAPI,
+  and present on cnpj.ws and ReceitaWS.
 - None of them says how many branches a company has, so `total_filiais` is `null`.
 
 Pass your own list to change the order or drop one:
