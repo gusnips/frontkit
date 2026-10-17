@@ -133,6 +133,18 @@ describe("lookupCnpj", () => {
     ]);
   });
 
+  // A wrapper that takes only a URL string must typecheck: `typeof fetch` refused it, and under Bun's
+  // types it also asked for `fetch.preconnect`.
+  it("takes any function that fetches a URL string", async () => {
+    const urls: string[] = [];
+    const fetch = async (url: string, init?: RequestInit): Promise<Response> => {
+      urls.push(url);
+      return reply(minhaReceitaPetrobras)(init);
+    };
+    await expect(lookupCnpj(PETROBRAS, { fetch })).resolves.toMatchObject({ cnpj: PETROBRAS });
+    expect(urls).toEqual([`https://minhareceita.org/${PETROBRAS}`]);
+  });
+
   it("asks in the order given, a registry first", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async (input) =>
       String(input).startsWith("https://registry.example/")
